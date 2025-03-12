@@ -13,10 +13,14 @@ import io
 # Carregar variáveis de ambiente
 load_dotenv()
 
-def carregar_dados_cartorio():
+def carregar_dados_cartorio(limit=500, specific_ids=None):
     """
-    Carrega os dados dos cartórios Casa Verde e Tatuápe
+    Carrega os dados dos cartórios Casa Verde e Tatuápe com otimização de filtros
     
+    Args:
+        limit (int): Limite de registros a serem carregados para evitar sobrecarga
+        specific_ids (list): Lista de IDs específicos para carregar, se houver
+        
     Returns:
         pandas.DataFrame: DataFrame com os dados filtrados dos cartórios
     """
@@ -26,24 +30,51 @@ def carregar_dados_cartorio():
     # URL para acessar a tabela crm_dynamic_items_1052
     url_items = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_dynamic_items_1052"
     
-    # Carregar os dados
-    df_items = load_bitrix_data(url_items)
+    # Preparar filtros para otimizar a consulta
+    filters = {"dimensionsFilters": [[]]}
+    
+    # Filtrar apenas os cartórios Casa Verde (16) e Tatuápe (34)
+    filters["dimensionsFilters"][0].append({
+        "fieldName": "CATEGORY_ID", 
+        "values": [16, 34], 
+        "type": "INCLUDE", 
+        "operator": "EQUALS"
+    })
+    
+    # Se houver IDs específicos, adicionar ao filtro
+    if specific_ids and len(specific_ids) > 0:
+        filters["dimensionsFilters"][0].append({
+            "fieldName": "ID", 
+            "values": specific_ids, 
+            "type": "INCLUDE", 
+            "operator": "EQUALS"
+        })
+    
+    # Lista de campos necessários para reduzir o volume de dados
+    # Se a API suportar seleção de campos, adicionar aqui
+    # fields = ["ID", "TITLE", "CATEGORY_ID", "STAGE_ID", "ASSIGNED_BY_ID", "ASSIGNED_BY_NAME", "UF_CRM_12_1723552666"]
+    
+    # Carregar os dados com filtros otimizados
+    st.info(f"Carregando dados de cartórios (limite: {limit if not specific_ids else 'específicos'})...")
+    df_items = load_bitrix_data(url_items, filters=filters)
     
     # Se o DataFrame estiver vazio, retornar DataFrame vazio
     if df_items is None or df_items.empty:
         st.error("Não foi possível carregar os dados dos cartórios. Verifique a conexão com o Bitrix24.")
         return pd.DataFrame()
     
-    # Filtrar apenas os cartórios Casa Verde (16) e Tatuápe (34)
-    df_filtrado = df_items[df_items['CATEGORY_ID'].isin([16, 34])].copy()  # Usar .copy() para evitar SettingWithCopyWarning
+    # Limitar o número de registros para melhorar performance, se não houver IDs específicos
+    if not specific_ids and limit > 0 and len(df_items) > limit:
+        st.warning(f"Limitando a {limit} registros para melhorar performance. Use filtros para dados mais específicos.")
+        df_items = df_items.head(limit)
     
     # Adicionar o nome do cartório para melhor visualização
-    df_filtrado.loc[:, 'NOME_CARTORIO'] = df_filtrado['CATEGORY_ID'].map({
+    df_items.loc[:, 'NOME_CARTORIO'] = df_items['CATEGORY_ID'].map({
         16: 'CARTÓRIO CASA VERDE',
         34: 'CARTÓRIO TATUÁPE'
     })
     
-    return df_filtrado
+    return df_items
 
 def criar_visao_geral_cartorio(df):
     """
@@ -1372,13 +1403,16 @@ def visualizar_cartorio_dados(df):
     else:
         st.info("Não foi possível analisar os IDs de família. Campo não encontrado nos dados.")
 
-def analisar_familias_ausentes():
+def analisar_familias_ausentes(limit=500):
     """
     Analisa famílias que estão presentes em crm_deal (ID da Família em UF_CRM_1722605592778)
     mas não estão presentes em crm_dynamic_item_1052 (ID da Família em UF_CRM_12_1723552666).
     
-    Filtra apenas negócios da categoria 32.
+    Filtra apenas negócios da categoria 32 e limita a quantidade de registros analisados.
     
+    Args:
+        limit (int): Limite de registros a carregar para cada tabela
+        
     Returns:
         tuple: (Métrica de contagem, DataFrame com os detalhes dos negócios ausentes)
     """
@@ -1405,8 +1439,15 @@ def analisar_familias_ausentes():
             "operator": "EQUALS"
         })
         
+        # Adicionar limite ao filtro, se a API suportar
+        # category_filter["limit"] = limit
+        
+        # Otimização: Definir campos específicos a serem retornados para a tabela crm_deal
+        # Se a API suportar seleção de campos
+        # category_filter["fields"] = ["ID", "TITLE", "ASSIGNED_BY_NAME"]
+        
         # Carregar dados principais dos negócios com filtro de categoria
-        status_text.info("Carregando negócios da categoria 32...")
+        status_text.info(f"Carregando negócios da categoria 32 (limite: {limit})...")
         progress_bar.progress(10)
         
         df_deal = load_bitrix_data(url_deal, filters=category_filter)
@@ -1421,16 +1462,20 @@ def analisar_familias_ausentes():
         status_text.info(f"Carregados {len(df_deal)} negócios da categoria 32")
         progress_bar.progress(30)
         
+        # Limitando dados para melhorar performance
+        if len(df_deal) > limit:
+            status_text.warning(f"Limitando a análise a {limit} negócios para melhorar performance")
+            df_deal = df_deal.sample(limit) if len(df_deal) > limit * 2 else df_deal.head(limit)
+        
         # Simplificar: selecionar apenas as colunas necessárias para otimizar
-        df_deal = df_deal[['ID', 'TITLE', 'ASSIGNED_BY_NAME']]
+        if 'ID' in df_deal.columns and 'TITLE' in df_deal.columns and 'ASSIGNED_BY_NAME' in df_deal.columns:
+            df_deal = df_deal[['ID', 'TITLE', 'ASSIGNED_BY_NAME']]
+        else:
+            # Listar colunas disponíveis para diagnóstico
+            status_text.warning(f"Algumas colunas necessárias não foram encontradas. Colunas disponíveis: {', '.join(df_deal.columns.tolist()[:10])}...")
         
         # Obter lista de IDs dos deals para filtrar a tabela crm_deal_uf
         deal_ids = df_deal['ID'].astype(str).tolist()
-        
-        # Limitar a quantidade de IDs para evitar sobrecarga (se houverem muitos)
-        if len(deal_ids) > 1000:
-            status_text.warning(f"Limitando análise a 1000 negócios dos {len(deal_ids)} encontrados")
-            deal_ids = deal_ids[:1000]
         
         # Filtro para crm_deal_uf baseado nos IDs dos deals da categoria 32
         deal_filter = {"dimensionsFilters": [[]]}
@@ -1440,6 +1485,10 @@ def analisar_familias_ausentes():
             "type": "INCLUDE", 
             "operator": "EQUALS"
         })
+        
+        # Otimização: Definir campos específicos a serem retornados
+        # Se a API suportar seleção de campos
+        # deal_filter["fields"] = ["DEAL_ID", "UF_CRM_1722605592778"]
         
         # Carregar dados da tabela crm_deal_uf (onde estão os campos personalizados do funil de negócios)
         status_text.info("Carregando campos personalizados dos negócios...")
@@ -1454,12 +1503,21 @@ def analisar_familias_ausentes():
             return 0, pd.DataFrame()
         
         # Simplificar: manter apenas as colunas necessárias
-        df_deal_uf = df_deal_uf[['DEAL_ID', 'UF_CRM_1722605592778']]
+        if 'DEAL_ID' in df_deal_uf.columns and 'UF_CRM_1722605592778' in df_deal_uf.columns:
+            df_deal_uf = df_deal_uf[['DEAL_ID', 'UF_CRM_1722605592778']]
+        else:
+            status_text.warning(f"Algumas colunas necessárias não foram encontradas em crm_deal_uf. Colunas disponíveis: {', '.join(df_deal_uf.columns.tolist()[:10])}...")
+        
+        # Preparar filtro para otimizar a carga dos dados de crm_dynamic_items_1052
+        # Se a API suportar seleção de campos
+        # dynamic_filter = {"fields": ["UF_CRM_12_1723552666"]}
+        # dynamic_filter["limit"] = limit * 2  # Buscar mais registros para comparação efetiva
         
         # Carregar dados da tabela crm_dynamic_items_1052 (cadastro de famílias)
         status_text.info("Carregando cadastro de famílias...")
         progress_bar.progress(70)
         
+        # Carregar apenas os campos necessários para reduzir o volume de dados
         df_dynamic_item = load_bitrix_data(url_dynamic_item)
         
         # Verificar se conseguiu carregar os dados
@@ -1469,7 +1527,21 @@ def analisar_familias_ausentes():
             return 0, pd.DataFrame()
         
         # Simplificar: manter apenas a coluna necessária para a comparação
-        df_dynamic_item = df_dynamic_item[['UF_CRM_12_1723552666']]
+        if 'UF_CRM_12_1723552666' in df_dynamic_item.columns:
+            df_dynamic_item = df_dynamic_item[['UF_CRM_12_1723552666']]
+        else:
+            status_text.warning(f"A coluna UF_CRM_12_1723552666 não foi encontrada. Colunas disponíveis: {', '.join(df_dynamic_item.columns.tolist()[:10])}...")
+            # Tentar encontrar uma coluna com nome similar
+            id_familia_cols = [col for col in df_dynamic_item.columns if 'ID' in col.upper() and 'FAMILIA' in col.upper()]
+            if id_familia_cols:
+                status_text.info(f"Usando coluna alternativa: {id_familia_cols[0]}")
+                df_dynamic_item = df_dynamic_item[[id_familia_cols[0]]]
+                # Renomear para o nome esperado
+                df_dynamic_item.rename(columns={id_familia_cols[0]: 'UF_CRM_12_1723552666'}, inplace=True)
+            else:
+                progress_bar.progress(100)
+                status_text.error("Não foi possível encontrar a coluna de ID de família.")
+                return 0, pd.DataFrame()
         
         # Mesclar df_deal com df_deal_uf para obter os IDs de família
         status_text.info("Analisando dados...")
@@ -1500,12 +1572,14 @@ def analisar_familias_ausentes():
             status_text.warning("Não foram encontrados registros com ID de família na tabela crm_dynamic_items_1052.")
             return 0, pd.DataFrame()
         
-        # Obter lista de IDs de família em cada tabela
-        ids_familia_deal = df_merged['UF_CRM_1722605592778'].dropna().unique().astype(str)
-        ids_familia_dynamic = df_dynamic_item['UF_CRM_12_1723552666'].dropna().unique().astype(str)
+        # Otimização: Converter para conjuntos (sets) para operação mais rápida
+        # Obter lista de IDs de família em cada tabela e converter para strings para comparação consistente
+        ids_familia_deal = set(df_merged['UF_CRM_1722605592778'].dropna().astype(str))
+        ids_familia_dynamic = set(df_dynamic_item['UF_CRM_12_1723552666'].dropna().astype(str))
         
         # Encontrar IDs de família que existem em crm_deal mas não em crm_dynamic_item_1052
-        ids_ausentes = set(ids_familia_deal) - set(ids_familia_dynamic)
+        # Usando operação de conjuntos - muito mais rápida para grandes datasets
+        ids_ausentes = ids_familia_deal - ids_familia_dynamic
         
         # Contagem de famílias ausentes
         total_ausentes = len(ids_ausentes)
@@ -1521,7 +1595,8 @@ def analisar_familias_ausentes():
             return 0, pd.DataFrame()
         
         # Filtrar os negócios que têm as famílias ausentes
-        df_ausentes = df_merged[df_merged['UF_CRM_1722605592778'].astype(str).isin(ids_ausentes)]
+        # Convertendo ids_ausentes de set para list
+        df_ausentes = df_merged[df_merged['UF_CRM_1722605592778'].astype(str).isin(list(ids_ausentes))]
         
         # Renomear colunas para melhor visualização
         df_resultado = df_ausentes.rename(columns={
@@ -1532,7 +1607,8 @@ def analisar_familias_ausentes():
         })
         
         # Selecionar apenas as colunas relevantes na ordem solicitada
-        df_resultado = df_resultado[['ID do Negócio', 'Nome do Negócio', 'Responsável', 'ID da Família']]
+        if all(col in df_resultado.columns for col in ['ID do Negócio', 'Nome do Negócio', 'Responsável', 'ID da Família']):
+            df_resultado = df_resultado[['ID do Negócio', 'Nome do Negócio', 'Responsável', 'ID da Família']]
         
         # Concluir progresso
         progress_bar.progress(100)
@@ -1546,50 +1622,191 @@ def analisar_familias_ausentes():
 
 def show_cartorio():
     """
-    Exibe a página principal do Cartório
+    Exibe a página principal do Cartório com carregamento otimizado
     """
     # Título centralizado
     st.markdown("<h1 style='text-align: center;'>Monitoramento de Cartórios</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center;'>Esta seção apresenta dados sobre os processos em cartório.</p>", unsafe_allow_html=True)
     
-    # Carregar os dados dos cartórios
-    df_cartorio = carregar_dados_cartorio()
+    # Adicionar opções de carregamento para evitar sobrecargas
+    st.sidebar.markdown("### Opções de Carregamento")
     
-    if df_cartorio.empty:
-        st.warning("Não foi possível carregar os dados dos cartórios. Verifique a conexão com o Bitrix24.")
-        return
-    else:
-        st.success(f"Dados carregados com sucesso: {len(df_cartorio)} registros encontrados.")
-    
-    # Adicionar filtro de cartório
-    cartorio_filter = st.multiselect(
-        "Filtrar por Cartório:",
-        ["CARTÓRIO CASA VERDE", "CARTÓRIO TATUÁPE"],
-        default=["CARTÓRIO CASA VERDE", "CARTÓRIO TATUÁPE"]
+    # Opção para limitar registros
+    limite_registros = st.sidebar.slider(
+        "Limite de Registros", 
+        min_value=100, 
+        max_value=2000, 
+        value=500, 
+        step=100,
+        help="Limitar o número de registros carregados para melhorar a performance"
     )
     
-    # Aplicar filtro de cartório aos dados
-    if cartorio_filter and not df_cartorio.empty:
-        df_cartorio = df_cartorio[df_cartorio['NOME_CARTORIO'].isin(cartorio_filter)]
-        st.info(f"Filtrando para mostrar apenas: {', '.join(cartorio_filter)}")
+    # Opção para carregar por IDs específicos
+    usar_ids_especificos = st.sidebar.checkbox(
+        "Filtrar por IDs Específicos", 
+        value=False,
+        help="Carregar apenas registros com IDs específicos"
+    )
     
-    # Mostrar todas as informações relevantes em uma única página
-    if not df_cartorio.empty:
-        # 1. Visão Geral
-        st.header("Visão Geral dos Cartórios")
-        visao_geral = criar_visao_geral_cartorio(df_cartorio)
-        if not visao_geral.empty:
-            st.dataframe(visao_geral, use_container_width=True)
-        else:
-            st.info("Não foi possível criar a visão geral. Verifique se os dados estão corretos.")
+    specific_ids = None
+    if usar_ids_especificos:
+        ids_input = st.sidebar.text_area(
+            "IDs (um por linha ou separados por vírgula)",
+            help="Informe os IDs específicos a serem carregados"
+        )
+        if ids_input:
+            # Processar entrada como lista de IDs (aceitando vírgula ou quebra de linha)
+            ids_text = ids_input.replace('\n', ',').replace(' ', '')
+            specific_ids = [int(id_str) for id_str in ids_text.split(',') if id_str.strip().isdigit()]
+            st.sidebar.info(f"Serão carregados {len(specific_ids)} registros específicos")
+    
+    # Inicializar cache de sessão para evitar recarregamentos
+    if 'cartorio_data_loaded' not in st.session_state:
+        st.session_state['cartorio_data_loaded'] = False
+        st.session_state['cartorio_data'] = None
+        st.session_state['visao_geral_data'] = None
+    
+    # Botão para carregar/recarregar dados
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        carregar_dados = st.button(
+            "🔄 Carregar Dados", 
+            type="primary", 
+            help="Clique para carregar/recarregar os dados dos cartórios"
+        )
+    
+    # Se o botão foi clicado ou os dados já foram carregados
+    if carregar_dados or st.session_state['cartorio_data_loaded']:
+        # Se o botão foi clicado, recarregar os dados
+        if carregar_dados:
+            with st.spinner("Carregando dados do Bitrix24..."):
+                # Carregar os dados com as opções selecionadas
+                df_cartorio = carregar_dados_cartorio(
+                    limit=limite_registros if not usar_ids_especificos else 0, 
+                    specific_ids=specific_ids
+                )
+                
+                # Atualizar o estado da sessão
+                st.session_state['cartorio_data_loaded'] = not df_cartorio.empty
+                st.session_state['cartorio_data'] = df_cartorio
+                
+                # Calcular visão geral apenas se houver dados
+                if not df_cartorio.empty:
+                    st.session_state['visao_geral_data'] = criar_visao_geral_cartorio(df_cartorio)
         
-        # 2. Dados Detalhados
-        visualizar_cartorio_dados(df_cartorio)
+        # Usar dados em cache
+        df_cartorio = st.session_state['cartorio_data']
+        visao_geral = st.session_state['visao_geral_data']
         
-        # 3. Análise de Famílias Ausentes no Cadastro
-        st.header("Negócios com Famílias não Cadastradas (Categoria 32)")
+        # Verificar se temos dados para exibir
+        if df_cartorio is None or df_cartorio.empty:
+            st.warning("Não foi possível carregar os dados dos cartórios. Verifique a conexão com o Bitrix24.")
+            return
         
-        # Criar caixa expansível para mostrar a análise (inicialmente fechada)
+        # Adicionar filtro de cartório
+        cartorio_filter = st.multiselect(
+            "Filtrar por Cartório:",
+            ["CARTÓRIO CASA VERDE", "CARTÓRIO TATUÁPE"],
+            default=["CARTÓRIO CASA VERDE", "CARTÓRIO TATUÁPE"]
+        )
+        
+        # Aplicar filtro de cartório aos dados
+        df_filtrado = df_cartorio
+        if cartorio_filter and not df_cartorio.empty:
+            df_filtrado = df_cartorio[df_cartorio['NOME_CARTORIO'].isin(cartorio_filter)]
+            st.info(f"Filtrando para mostrar apenas: {', '.join(cartorio_filter)}")
+        
+        # Exibir métricas básicas sem processamento pesado
+        st.header("Resumo dos Registros")
+        
+        # Métricas simples em cards
+        total_registros = len(df_filtrado)
+        
+        # Contar registros por cartório
+        contagem_por_cartorio = df_filtrado['NOME_CARTORIO'].value_counts().to_dict()
+        
+        # Preparar contagens por cartório
+        casa_verde_count = contagem_por_cartorio.get('CARTÓRIO CASA VERDE', 0)
+        tatuape_count = contagem_por_cartorio.get('CARTÓRIO TATUÁPE', 0)
+        
+        # Exibir métricas em colunas
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(label="Total de Registros", value=total_registros)
+        with col2:
+            st.metric(label="Casa Verde", value=casa_verde_count)
+        with col3:
+            st.metric(label="Tatuápe", value=tatuape_count)
+        
+        # Organizar o conteúdo em abas para facilitar a navegação
+        tab1, tab2, tab3 = st.tabs(["Visão Geral", "Análise de Estágios", "Análise de IDs"])
+        
+        # Aba 1: Visão Geral
+        with tab1:
+            st.header("Visão Geral dos Cartórios")
+            if visao_geral is not None and not visao_geral.empty:
+                st.dataframe(visao_geral, use_container_width=True)
+            else:
+                st.info("Não foi possível criar a visão geral. Verifique se os dados estão corretos.")
+        
+        # Aba 2: Análise de Estágios (sob demanda)
+        with tab2:
+            st.header("Análise de Estágios")
+            if st.button("📊 Carregar Análise de Estágios", type="primary"):
+                with st.spinner("Processando análise de estágios..."):
+                    # Limitando a quantidade de dados para análise
+                    df_analise = df_filtrado
+                    if len(df_analise) > 1000:
+                        st.warning(f"Limitando análise a 1000 registros dos {len(df_analise)} disponíveis para melhor performance.")
+                        df_analise = df_analise.head(1000)
+                    
+                    # Executar a análise de estágios
+                    visualizar_cartorio_dados(df_analise)
+            else:
+                st.info("Clique no botão acima para carregar a análise detalhada dos estágios.")
+        
+        # Aba 3: Análise de IDs de Família (sob demanda)
+        with tab3:
+            st.header("Análise de IDs de Família")
+            # Análise de IDs de Família
+            if st.button("🔍 Executar Análise de IDs", type="primary"):
+                with st.spinner("Analisando IDs de família..."):
+                    # Limitar dados para análise
+                    df_analise = df_filtrado
+                    if len(df_analise) > 1000:
+                        st.warning(f"Limitando análise a 1000 registros dos {len(df_analise)} disponíveis para melhor performance.")
+                        df_analise = df_analise.head(1000)
+                    
+                    # Executar análise
+                    family_id_summary, family_id_details = analyze_cartorio_ids(df_analise)
+                    
+                    if not family_id_summary.empty:
+                        # Exibir resumo
+                        st.subheader("Resumo de IDs de Família")
+                        st.dataframe(family_id_summary, use_container_width=True)
+                        
+                        # Exibir detalhes se não forem muitos
+                        if len(family_id_details) <= 1000:
+                            st.subheader("Detalhes dos IDs")
+                            st.dataframe(family_id_details, use_container_width=True)
+                        else:
+                            st.warning(f"Há {len(family_id_details)} registros de detalhes. Use filtros adicionais para análise mais específica.")
+                            
+                            # Opção para baixar os detalhes
+                            csv = family_id_details.to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                label="Baixar detalhes completos (CSV)",
+                                data=csv,
+                                file_name="detalhes_ids_familia.csv",
+                                mime="text/csv"
+                            )
+                    else:
+                        st.info("Não foi possível analisar os IDs de família.")
+            else:
+                st.info("Clique no botão acima para executar a análise de IDs de família.")
+        
+        # Análise de Famílias Ausentes (separada e sob demanda)
+        st.header("Negócios com Famílias não Cadastradas")
         with st.expander("Exibir análise de negócios com famílias não cadastradas", expanded=False):
             # Explicação do processo
             st.markdown("""
@@ -1597,13 +1814,13 @@ def show_cartorio():
                 <p style="margin: 0;">Esta análise compara os negócios da categoria 32 com o cadastro de famílias para identificar quais
                 negócios possuem IDs de família que não estão cadastrados no sistema.</p>
                 <p style="margin-top: 10px; font-size: 14px; color: #666;">
-                    <strong>Nota:</strong> O processo pode levar alguns instantes, dependendo da quantidade de dados.
+                    <strong>Atenção:</strong> Esta análise é pesada e pode demorar alguns minutos. Considere usar em horários de menor uso.
                 </p>
             </div>
             """, unsafe_allow_html=True)
             
             # Botão para iniciar a análise
-            if st.button("Iniciar Análise"):
+            if st.button("🔍 Iniciar Análise de Famílias Ausentes"):
                 # Executar análise sem spinner (já temos progressbar interno)
                 total_ausentes, df_ausentes = analisar_familias_ausentes()
                 
@@ -1613,24 +1830,12 @@ def show_cartorio():
                     <div style="background-color: #ffe4e4; padding: 15px; border-radius: 10px; border-left: 5px solid #e53935; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         <h3 style="margin-top: 0; color: #c62828; font-size: 16px;">Negócios com Famílias não Cadastradas</h3>
                         <p style="font-size: 24px; font-weight: bold; margin: 0;">{total_ausentes}</p>
-                        <p style="margin-top: 10px; font-size: 14px;">
-                            Negócios da categoria 32 cujas famílias (UF_CRM_1722605592778) não estão cadastradas no sistema (UF_CRM_12_1723552666).
-                        </p>
                     </div>
                     """, unsafe_allow_html=True)
                     
                     # Exibir tabela com os detalhes
                     st.subheader("Detalhes dos Negócios Afetados")
-                    st.dataframe(
-                        df_ausentes, 
-                        use_container_width=True,
-                        column_config={
-                            "ID do Negócio": st.column_config.NumberColumn("ID do Negócio", format="%d"),
-                            "Nome do Negócio": "Nome do Negócio",
-                            "Responsável": "Responsável",
-                            "ID da Família": st.column_config.NumberColumn("ID da Família", format="%d")
-                        }
-                    )
+                    st.dataframe(df_ausentes, use_container_width=True)
                     
                     # Adicionar botão para exportar os dados
                     csv = df_ausentes.to_csv(index=False).encode('utf-8')
@@ -1641,12 +1846,27 @@ def show_cartorio():
                         mime="text/csv",
                     )
                 elif total_ausentes == 0:
-                    st.success("Não foram encontrados negócios com famílias não cadastradas na categoria 32. Todas as famílias estão devidamente registradas!")
+                    st.success("Não foram encontrados negócios com famílias não cadastradas na categoria 32.")
             else:
-                st.info("Clique no botão acima para iniciar a análise de negócios com famílias não cadastradas.")
+                st.info("Clique no botão acima para iniciar a análise.")
     else:
-        st.info("Nenhum dado disponível para exibir.")
+        # Exibir mensagem para carregar dados
+        st.info("👆 Clique no botão 'Carregar Dados' para iniciar o carregamento dos registros de cartório.")
         
+        # Exibir card de exemplo
+        st.markdown("""
+        <div style="background-color: #f0f7ff; padding: 20px; border-radius: 10px; border-left: 5px solid #1976d2; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="margin-top: 0; color: #1976d2;">Sobre esta página</h3>
+            <p>Esta página permite analisar os processos em cartório de forma otimizada, carregando apenas os dados necessários para cada análise.</p>
+            <p><strong>Dicas de uso:</strong></p>
+            <ul>
+                <li>Use o limite de registros para melhorar a performance</li>
+                <li>Para análises específicas, use o filtro por IDs</li>
+                <li>Cada tipo de análise pode ser carregado sob demanda</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    
     # Rodapé com informação de atualização
     st.markdown("---")
-    st.caption("Dados atualizados em tempo real do Bitrix24.") 
+    st.caption("Dados atualizados em tempo real do Bitrix24.")
