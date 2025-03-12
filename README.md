@@ -1,154 +1,146 @@
-# Dashboard de Análise de Negociações do Bitrix24
+# Dashboard Analítico - CRM Bitrix24
 
-Um dashboard interativo para análise de negociações do Bitrix24, desenvolvido com Streamlit. Este projeto permite visualizar e analisar dados de negócios, responsáveis e funil de vendas.
+## Sobre o Projeto
 
-## Funcionalidades
+Dashboard desenvolvido em Streamlit para análise de dados do CRM Bitrix24, com foco na visualização e análise do status de higienização de processos.
 
-- **Análise do Funil**: Visualização do funil de negociações por fase e responsável
-- **Análise de Duplicados**: Identificação de links duplicados para evitar duplicação de esforços
-- **Cards sem Modificação**: Monitoramento de negócios que não são atualizados há muito tempo
-- **Múltiplas Fontes de Dados**: Suporte para extração de dados diretamente da API do Bitrix24 ou via arquivo CSV
-
-## Nova Arquitetura
-
-O projeto foi reestruturado para suportar a extração de dados diretamente da API do Bitrix24, oferecendo mais flexibilidade e dados em tempo real:
+## Estrutura do Projeto
 
 ```
-projeto/
-├── src/
-│   ├── config/               # Configurações da aplicação
-│   │   ├── __init__.py
-│   │   └── bitrix_config.py  # Configurações do Bitrix24
-│   ├── data/                 # Camada de dados
-│   │   ├── __init__.py
-│   │   ├── bitrix_connector.py    # Conexão com a API do Bitrix24
-│   │   ├── data_processor.py      # Processamento de dados
-│   │   ├── data_repository.py     # Cache e persistência
-│   │   └── bitrix_integration.py  # Integração unificada
-│   └── ui/
-│       └── streamlit/        # Interface do usuário
-│           └── responsavel_dashboard.py # Dashboard principal
-├── cache/                    # Cache de dados
-├── outputs/                  # Saídas geradas (CSV, Excel, etc.)
-├── backups/                  # Backups de dados
-└── .env                      # Variáveis de ambiente (não versionado)
+dash_higilizacao/
+├── main.py                    # Arquivo principal da aplicação
+├── install_lottie.py          # Utilitário para instalar biblioteca de animações
+├── .streamlit/                # Configurações do Streamlit
+│   └── config.toml            # Arquivo de configuração do tema
+├── assets/                    # Recursos estáticos (CSS, imagens)
+│   └── styles.css             # Estilos CSS centralizados
+├── api/                       # Módulos de conexão com APIs
+│   └── bitrix_connector.py    # Conector para a API do Bitrix24
+├── components/                # Componentes reutilizáveis
+│   ├── filters.py             # Componentes de filtros
+│   ├── metrics.py             # Componentes de métricas
+│   └── tables.py              # Componentes de tabelas
+├── views/                     # Visualizações da aplicação
+│   ├── inicio.py              # Página inicial
+│   ├── producao.py            # Página de produção
+│   ├── conclusoes.py          # Página de conclusões
+│   ├── cartorio/              # Seção de cartório
+│   │   └── cartorio_main.py   # Página principal de cartório
+│   └── extracoes/             # Seção de extrações
+│       └── extracoes_main.py  # Página principal de extrações
+└── utils/                     # Funções utilitárias
+    ├── data_processor.py      # Processador de dados
+    └── animation_utils.py     # Utilitários para animações
 ```
 
-## Requisitos
+## Funcionalidades Implementadas
 
-- Python 3.8 ou superior
-- Pacotes Python listados em `requirements.txt`
-- Acesso à API do Bitrix24 (token de acesso)
+### Página de Produção
+- Métricas macro com contagens por status de higienização
+- Tabela de status por responsável
+- Tabela de pendências detalhada
+- Tabela de produção geral
+- Filtros por data, responsável e status
+- Animações de carregamento e barras de progresso
+- Filtro por IDs específicos para consultas otimizadas
 
-## Instalação
+## Campos Analisados
 
-1. Clone o repositório:
-   ```bash
-   git clone https://github.com/seu-usuario/bitrix-dashboard.git
-   cd bitrix-dashboard
+Os principais campos utilizados para análise de higienização:
+
+- `UF_CRM_HIGILIZACAO_STATUS`: Status geral de higienização (PENDENCIA, INCOMPLETO, COMPLETO)
+- `UF_CRM_1741183785848`: Documentação Pend/Infos (sim/não)
+- `UF_CRM_1741183721969`: Cadastro na Árvore Higielizado (sim/não)
+- `UF_CRM_1741183685327`: Estrutura Árvore Higieniza (sim/não)
+- `UF_CRM_1741183828129`: Requerimento (sim/não)
+- `UF_CRM_1741198696`: Emissões Brasileiras Bitrix24 (sim/não)
+
+## Como Executar
+
+1. Instale as dependências necessárias:
+```
+pip install -r requirements.txt
+```
+
+2. Configure as variáveis de ambiente:
+   - Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
    ```
-
-2. Instale as dependências:
-   ```bash
-   pip install -r requirements.txt
+   BITRIX_TOKEN=seu_token_aqui
+   BITRIX_URL=sua_url_aqui
+   BITRIX_REST_TOKEN=seu_token_rest_aqui
+   BITRIX_REST_URL=sua_url_rest_aqui
    ```
-
-3. Configure as variáveis de ambiente:
-   - Copie o arquivo `.env.example` para `.env`
-   - Preencha as configurações do Bitrix24 no arquivo `.env`
-
-## Executando o Dashboard
-
-```bash
-streamlit run src/ui/streamlit/responsavel_dashboard.py
-```
-
-## Configuração das Fontes de Dados
-
-### Opção 1: API do Bitrix24 (Recomendado)
-
-Para usar a API do Bitrix24, você precisa:
-1. Ter um token de acesso válido (`BITRIX_TOKEN`)
-2. Configurar a URL base da API (`BITRIX_BASE_URL`)
-3. Opcional: Configurar o ID da categoria (`BITRIX_CATEGORY_ID`, default: 34)
-
-Essas configurações podem ser definidas no arquivo `.env`:
-
-```
-BITRIX_BASE_URL=https://seudominio.bitrix24.com.br/bitrix/tools/biconnector/pbi.php
-BITRIX_TOKEN=seu_token_aqui
-BITRIX_CATEGORY_ID=34
-```
-
-### Opção 2: Arquivo CSV Local
-
-Você também pode usar um arquivo CSV local com os dados exportados do Bitrix24:
-
-1. Prepare um arquivo CSV com o formato exigido (veja a aba "Upload de Arquivo" no dashboard)
-2. Coloque o arquivo como `extratacao_bitrix24.csv` na raiz do projeto ou na pasta `data/`
-3. Configure a variável de ambiente `USE_BITRIX_CSV=True` ou selecione "Arquivo CSV local" na interface
-
-## Campos Personalizados
-
-O dashboard está configurado para trabalhar com os seguintes campos personalizados do Bitrix24:
-
-- `UF_CRM_1722605592778`: Link da Árvore da Família
-- `UF_CRM_1737689240946`: Campos Reunião
-- `UF_CRM_1740458137391`: Data de Fechamento
-
-Você pode personalizar esses campos editando o arquivo `src/config/bitrix_config.py`.
-
-## Cache e Desempenho
-
-Por padrão, os dados extraídos da API são armazenados em cache por 12 horas para melhorar o desempenho. Você pode:
-
-- Alterar a duração do cache através da variável `CACHE_DURATION_HOURS`
-- Forçar a atualização dos dados clicando no botão "Atualizar dados do Bitrix24"
-- Limpar manualmente o cache excluindo os arquivos na pasta `cache/`
-
-## Contribuições
-
-Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou pull requests.
-
-## Licença
-
-Este projeto está licenciado sob a licença MIT.
-
-## Configuração do Ambiente
-
-Para configurar corretamente o ambiente e garantir o funcionamento do dashboard, siga estas etapas:
-
-1. **Instale as dependências**:
-   ```
-   pip install -r requirements.txt
-   ```
-
-2. **Configure as variáveis de ambiente**:
-   - Crie um arquivo `.env` na raiz do projeto baseado no arquivo `.env.example`
-   - Preencha as seguintes variáveis obrigatórias:
-     ```
-     BITRIX_BASE_URL="https://seudominio.bitrix24.com.br/bitrix/tools/biconnector/pbi.php"
-     BITRIX_TOKEN="seu_token_do_bitrix24"
-     BITRIX_CATEGORY_ID=34
+   - Ou configure as mesmas variáveis nos Secrets do Streamlit Cloud:
+     1. Acesse o dashboard do Streamlit Cloud
+     2. Selecione seu aplicativo
+     3. Vá em Settings > Secrets
+     4. Adicione as mesmas variáveis no formato TOML:
+     ```toml
+     BITRIX_TOKEN = "seu_token_aqui"
+     BITRIX_URL = "sua_url_aqui"
+     BITRIX_REST_TOKEN = "seu_token_rest_aqui"
+     BITRIX_REST_URL = "sua_url_rest_aqui"
      ```
 
-3. **Obtenha um token do Bitrix24**:
-   - Acesse o painel de administração do Bitrix24
-   - Vá para Aplicativos > Outros > Webhooks/REST API
-   - Crie um novo webhook com as permissões necessárias (crm.deal.list, etc.)
-   - Copie o token gerado e adicione ao seu arquivo `.env`
+3. (Opcional) Instale a biblioteca para animações de carregamento:
+```
+python install_lottie.py
+```
+Ou manualmente:
+```
+pip install streamlit-lottie==0.0.5
+```
 
-4. **Execute a aplicação**:
-   ```
-   streamlit run app.py
-   ```
+4. Execute a aplicação:
+```
+streamlit run main.py
+```
 
-## Solução de Problemas
+## Otimização de Carregamento
 
-- **Erro: "Token do Bitrix24 não configurado"**
-  - Verifique se o arquivo `.env` existe na raiz do projeto
-  - Certifique-se de que a variável `BITRIX_TOKEN` está configurada corretamente
+O dashboard oferece várias formas de otimizar o carregamento de dados:
 
-- **Erro ao carregar dados**
-  - Verifique se o URL do Bitrix24 está correto
-  - Confirme se o token tem as permissões necessárias para acessar os dados do CRM
+1. **Filtro por IDs específicos**: 
+   - Nas "Opções Avançadas" da página de produção, ative "Filtrar por IDs específicos"
+   - Insira os IDs desejados separados por vírgula
+   - Isso reduz substancialmente o tempo de carregamento
+
+2. **Modo de Demonstração**: 
+   - Ative o "Modo de demonstração" para usar dados sintéticos 
+   - Útil para testes ou quando a API estiver indisponível
+
+3. **Cache de Sessão**:
+   - Os dados são armazenados em cache para navegação rápida entre páginas
+   - Use o botão "Atualizar Dados" para recarregar quando necessário
+
+## Animações de Carregamento
+
+O dashboard inclui animações profissionais durante o carregamento de dados:
+
+- Barra de progresso mostrando o andamento real do processamento
+- Animações Lottie para feedback visual (requer biblioteca adicional)
+- Mensagens de status atualizadas durante o processo
+
+Para habilitar as animações avançadas, execute `python install_lottie.py` ou instale manualmente a biblioteca streamlit-lottie.
+
+## Design
+
+O dashboard segue um design minimalista com esquema de cores em azul e branco, com:
+- Interface limpa e profissional
+- Estilo consistente em todos os componentes
+- Opção para tema escuro
+- Todo CSS centralizado para padronização
+
+## Próximas Etapas
+
+- Implementação das páginas de conclusões
+- Implementação das páginas de cartório
+- Implementação das páginas de extrações
+- Refinamento de layouts e visualizações
+- Adição de funcionalidades de exportação de dados
+
+## Notas de Desenvolvimento
+
+Última atualização: Agosto 2024
+
+**Observação sobre estrutura:** A pasta `views` foi adotada em vez de `pages` para evitar a criação automática de menu pelo Streamlit, que gera navegação duplicada. 
