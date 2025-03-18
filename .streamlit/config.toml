@@ -1,6 +1,17 @@
 [theme]
-primaryColor = "#1E88E5"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F5F5F5"
-textColor = "#212121"
-font = "sans serif" 
+primaryColor = "#007bff"
+backgroundColor = "#f5f7fa"
+secondaryBackgroundColor = "#e9ecef"
+textColor = "#212529"
+font = "sans-serif"
+
+[server]
+enableXsrfProtection = true
+enableCORS = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+showErrorDetails = true
+toolbarMode = "auto" 
