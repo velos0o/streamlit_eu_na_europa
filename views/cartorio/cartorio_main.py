@@ -22,6 +22,9 @@ def carregar_dados_cartorio():
     Returns:
         pandas.DataFrame: DataFrame com os dados filtrados dos cartórios
     """
+    # Garantir acesso ao módulo streamlit
+    import streamlit as st_module
+    
     try:
         # Logs detalhados
         debug_info = {}
@@ -32,16 +35,16 @@ def carregar_dados_cartorio():
             BITRIX_TOKEN, BITRIX_URL = get_credentials()
             debug_info["credentials"] = "obtidas"
         except Exception as cred_error:
-            if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-                st.error(f"❌ Erro ao obter credenciais: {str(cred_error)}")
-                st.code(traceback.format_exc())
+            if 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']:
+                st_module.error(f"❌ Erro ao obter credenciais: {str(cred_error)}")
+                st_module.code(traceback.format_exc())
             debug_info["credentials_error"] = str(cred_error)
             return pd.DataFrame()
         
         # Verificar se temos as credenciais necessárias
         if not BITRIX_TOKEN or not BITRIX_URL:
-            if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-                st.error("🔑 Credenciais do Bitrix24 não encontradas ou inválidas")
+            if 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']:
+                st_module.error("🔑 Credenciais do Bitrix24 não encontradas ou inválidas")
             debug_info["credentials_valid"] = False
             return pd.DataFrame()
         else:
@@ -55,15 +58,15 @@ def carregar_dados_cartorio():
         safe_url = url_items.replace(" ", "%20")
         
         # Adicionar log de depuração
-        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+        if 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']:
             token_masked = f"{BITRIX_TOKEN[:5]}...{BITRIX_TOKEN[-3:]}" if len(BITRIX_TOKEN) > 8 else "***"
-            st.info(f"🔗 Tentando acessar: {BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={token_masked}&table=crm_dynamic_items_1052")
+            st_module.info(f"🔗 Tentando acessar: {BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={token_masked}&table=crm_dynamic_items_1052")
         
         # Fazer requisição manual para diagnóstico detalhado
-        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+        if 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']:
             try:
                 # Tentar acessar a API diretamente para diagnóstico
-                st.info("Realizando requisição de diagnóstico...")
+                st_module.info("Realizando requisição de diagnóstico...")
                 
                 # Adicionar cabeçalhos completos
                 headers = {
@@ -74,64 +77,64 @@ def carregar_dados_cartorio():
                 }
                 
                 # Usar a biblioteca requests para diagnóstico
-                with st.spinner("Testando acesso à API..."):
+                with st_module.spinner("Testando acesso à API..."):
                     test_response = requests.get(safe_url, headers=headers, timeout=30)
-                    st.write(f"Status da resposta: {test_response.status_code}")
+                    st_module.write(f"Status da resposta: {test_response.status_code}")
                     
                     # Mostrar cabeçalhos da resposta
-                    st.write("Cabeçalhos da resposta:", dict(test_response.headers))
+                    st_module.write("Cabeçalhos da resposta:", dict(test_response.headers))
                     
                     # Verificar se o conteúdo pode ser interpretado como JSON
                     try:
                         json_data = test_response.json()
-                        st.success("✅ Resposta decodificada como JSON com sucesso")
+                        st_module.success("✅ Resposta decodificada como JSON com sucesso")
                         if isinstance(json_data, list):
-                            st.write(f"Número de itens na resposta: {len(json_data)}")
+                            st_module.write(f"Número de itens na resposta: {len(json_data)}")
                         debug_info["test_response_valid"] = True
                     except Exception as json_error:
-                        st.error(f"❌ Erro ao decodificar resposta como JSON: {str(json_error)}")
-                        st.code(test_response.text[:500] + "..." if len(test_response.text) > 500 else test_response.text)
+                        st_module.error(f"❌ Erro ao decodificar resposta como JSON: {str(json_error)}")
+                        st_module.code(test_response.text[:500] + "..." if len(test_response.text) > 500 else test_response.text)
                         debug_info["test_response_valid"] = False
                         debug_info["json_error"] = str(json_error)
                 
             except Exception as request_error:
-                st.error(f"❌ Erro na requisição de diagnóstico: {str(request_error)}")
-                st.code(traceback.format_exc())
+                st_module.error(f"❌ Erro na requisição de diagnóstico: {str(request_error)}")
+                st_module.code(traceback.format_exc())
                 debug_info["request_error"] = str(request_error)
         
         # Carregar os dados com ou sem exibição de logs conforme o modo de depuração
-        show_logs = 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']
+        show_logs = 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']
         try:
             from api.bitrix_connector import load_bitrix_data
             df_items = load_bitrix_data(safe_url, show_logs=show_logs)
             debug_info["load_data_called"] = True
         except Exception as load_error:
             if show_logs:
-                st.error(f"❌ Erro ao carregar dados com load_bitrix_data: {str(load_error)}")
-                st.code(traceback.format_exc())
+                st_module.error(f"❌ Erro ao carregar dados com load_bitrix_data: {str(load_error)}")
+                st_module.code(traceback.format_exc())
             debug_info["load_error"] = str(load_error)
             return pd.DataFrame()
         
         # Se o DataFrame estiver vazio, retornar DataFrame vazio
         if df_items is None or df_items.empty:
-            if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-                st.error("📊 Não foram encontrados dados na tabela crm_dynamic_items_1052")
+            if 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']:
+                st_module.error("📊 Não foram encontrados dados na tabela crm_dynamic_items_1052")
             debug_info["df_empty"] = True
             return pd.DataFrame()
         else:
             debug_info["df_empty"] = False
         
         # Adicionar log de depuração
-        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-            st.success(f"✅ Dados carregados com sucesso: {len(df_items)} registros")
-            st.write("Colunas disponíveis:", df_items.columns.tolist())
+        if 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']:
+            st_module.success(f"✅ Dados carregados com sucesso: {len(df_items)} registros")
+            st_module.write("Colunas disponíveis:", df_items.columns.tolist())
             debug_info["df_columns"] = df_items.columns.tolist()
         
         # Verificar se a coluna CATEGORY_ID existe
         if 'CATEGORY_ID' not in df_items.columns:
-            if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-                st.error("❌ Coluna CATEGORY_ID não encontrada nos dados recebidos")
-                st.write("Colunas disponíveis:", df_items.columns.tolist())
+            if 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']:
+                st_module.error("❌ Coluna CATEGORY_ID não encontrada nos dados recebidos")
+                st_module.write("Colunas disponíveis:", df_items.columns.tolist())
             debug_info["category_id_missing"] = True
             return pd.DataFrame()
         else:
@@ -141,8 +144,8 @@ def carregar_dados_cartorio():
         df_filtrado = df_items[df_items['CATEGORY_ID'].isin([16, 34])].copy()  # Usar .copy() para evitar SettingWithCopyWarning
         
         # Adicionar log de depuração
-        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-            st.success(f"✅ Dados filtrados: {len(df_filtrado)} registros após filtro de cartórios")
+        if 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']:
+            st_module.success(f"✅ Dados filtrados: {len(df_filtrado)} registros após filtro de cartórios")
             debug_info["filtered_records"] = len(df_filtrado)
         
         # Adicionar o nome do cartório para melhor visualização
@@ -152,19 +155,19 @@ def carregar_dados_cartorio():
         })
         
         # Armazenar informações de depuração na sessão
-        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-            st.session_state['DEBUG_INFO'] = debug_info
+        if 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']:
+            st_module.session_state['DEBUG_INFO'] = debug_info
             
         return df_filtrado
     
     except Exception as e:
         # Log de erro detalhado no modo de depuração
-        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-            st.error(f"❌ Erro geral ao carregar dados do cartório: {str(e)}")
-            st.code(traceback.format_exc())
+        if 'BITRIX_DEBUG' in st_module.session_state and st_module.session_state['BITRIX_DEBUG']:
+            st_module.error(f"❌ Erro geral ao carregar dados do cartório: {str(e)}")
+            st_module.code(traceback.format_exc())
             
             # Criar um relatório de diagnóstico completo
-            st.error("Relatório de Diagnóstico")
+            st_module.error("Relatório de Diagnóstico")
             
             # Versão do Python e bibliotecas
             import sys
@@ -183,12 +186,12 @@ def carregar_dados_cartorio():
             
             # Exibir relatório
             for key, value in diagnostic_report.items():
-                st.text(f"{key}: {value}")
+                st_module.text(f"{key}: {value}")
                 
             # Armazenar relatório na sessão
-            st.session_state['ERROR_DIAGNOSTIC'] = diagnostic_report
+            st_module.session_state['ERROR_DIAGNOSTIC'] = diagnostic_report
         else:
-            st.error("Não foi possível carregar os dados dos cartórios. Ative o modo de depuração para mais detalhes.")
+            st_module.error("Não foi possível carregar os dados dos cartórios. Ative o modo de depuração para mais detalhes.")
         
         return pd.DataFrame()
 
