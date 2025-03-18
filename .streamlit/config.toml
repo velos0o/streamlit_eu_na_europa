@@ -3,7 +3,7 @@ primaryColor = "#007bff"
 backgroundColor = "#f5f7fa"
 secondaryBackgroundColor = "#e9ecef"
 textColor = "#212529"
-font = "sans-serif"
+font = "sans serif"
 
 [server]
 enableXsrfProtection = true
