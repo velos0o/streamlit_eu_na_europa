@@ -3,7 +3,7 @@ import streamlit as st
 # Configuração geral da página
 st.set_page_config(
     page_title="Dashboard CRM Bitrix24",
-    page_icon="logo..svg",
+    page_icon="assets/logo.svg",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -72,7 +72,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Adicionar logo no sidebar centralizado
-st.sidebar.image("logo..svg", width=180)
+st.sidebar.image("assets/logo.svg", width=180)
 
 # Menu de navegação simplificado
 st.sidebar.title("Dashboard CRM Bitrix24")

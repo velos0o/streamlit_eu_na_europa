@@ -19,24 +19,53 @@ def get_credentials():
     2. Se não encontrar, tenta das variáveis de ambiente (.env)
     3. Se não encontrar, usa os valores padrão (que devem ser substituídos em produção)
     """
+    token = None
+    url = None
+    
+    # Log para depuração - será exibido somente no Streamlit Cloud
+    if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+        st.info("🔍 Iniciando processo de obtenção de credenciais")
+    
+    # Verificar se estamos em ambiente Streamlit Cloud
     try:
-        # Verificar se estamos em ambiente Streamlit Cloud
-        if hasattr(st, 'secrets') and 'BITRIX_TOKEN' in st.secrets:
-            token = st.secrets.BITRIX_TOKEN
-            url = st.secrets.BITRIX_URL
-        else:
-            # Usar variáveis de ambiente locais
+        if hasattr(st, 'secrets'):
+            try:
+                # Verificar se as chaves existem no secrets
+                if 'BITRIX_TOKEN' in st.secrets:
+                    token = st.secrets.BITRIX_TOKEN
+                    url = st.secrets.BITRIX_URL
+                    
+                    if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+                        st.success("✅ Credenciais obtidas do Streamlit Secrets")
+                else:
+                    if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+                        st.warning("⚠️ Chave 'BITRIX_TOKEN' não encontrada em Streamlit Secrets")
+            except Exception as secrets_error:
+                if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+                    st.error(f"❌ Erro ao acessar Streamlit Secrets: {str(secrets_error)}")
+    except Exception as attr_error:
+        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+            st.error(f"❌ Erro ao verificar atributo 'secrets': {str(attr_error)}")
+    
+    # Se não conseguiu do Streamlit Secrets, tentar variáveis de ambiente
+    if not token or not url:
+        try:
             token = os.getenv('BITRIX_TOKEN')
             url = os.getenv('BITRIX_URL')
-    except Exception as e:
-        # Se ocorrer qualquer erro ao tentar acessar secrets, usar variáveis de ambiente
-        token = os.getenv('BITRIX_TOKEN')
-        url = os.getenv('BITRIX_URL')
+            
+            if token and url and 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+                st.success("✅ Credenciais obtidas das variáveis de ambiente (.env)")
+        except Exception as env_error:
+            if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+                st.error(f"❌ Erro ao acessar variáveis de ambiente: {str(env_error)}")
     
-    # Retornar valores padrão se não encontrados
+    # Se ainda não encontrou, usar valores padrão
     if not token or not url:
-        token = "RuUSETRkbFD3whitfgMbioX8qjLgcdPubr"  # Token padrão - substitua em produção
-        url = "https://eunaeuropacidadania.bitrix24.com.br"  # URL padrão - substitua em produção
+        token = "RuUSETRkbFD3whitfgMbioX8qjLgcdPubr"  # Token padrão
+        url = "https://eunaeuropacidadania.bitrix24.com.br"  # URL padrão
+        
+        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+            st.warning("⚠️ Usando credenciais padrão (fallback)")
     
     return token, url
 

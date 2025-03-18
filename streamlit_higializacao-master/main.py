@@ -120,13 +120,13 @@ pagina = st.session_state['pagina_atual']
 try:
     if pagina == "Início":
         show_inicio()
-    elif pagina == "Produção":
+    elif pagina == "Produção Higienização":
         show_producao()
-    elif pagina == "Conclusões":
+    elif pagina == "Conclusões Higienização":
         show_conclusoes()
-    elif pagina == "Cartório":
+    elif pagina == "Emissões Brasileiras":
         show_cartorio()
-    elif pagina == "Extrações de Dados":
+    elif pagina == "Extrações de Dados Bitrix24":
         show_extracoes()
 except Exception as e:
     st.error(f"Erro ao carregar a página: {str(e)}")

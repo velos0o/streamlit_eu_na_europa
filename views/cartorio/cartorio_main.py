@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from api.bitrix_connector import load_bitrix_data, get_credentials
 import re
 import io
+import requests
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -20,30 +21,70 @@ def carregar_dados_cartorio():
     Returns:
         pandas.DataFrame: DataFrame com os dados filtrados dos cartórios
     """
-    # Obter token do Bitrix24
-    BITRIX_TOKEN, BITRIX_URL = get_credentials()
+    try:
+        # Obter token do Bitrix24
+        BITRIX_TOKEN, BITRIX_URL = get_credentials()
+        
+        # Verificar se temos as credenciais necessárias
+        if not BITRIX_TOKEN or not BITRIX_URL:
+            if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+                st.error("🔑 Credenciais do Bitrix24 não encontradas ou inválidas")
+            return pd.DataFrame()
+        
+        # URL para acessar a tabela crm_dynamic_items_1052
+        url_items = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_dynamic_items_1052"
+        
+        # Adicionar log de depuração
+        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+            st.info(f"🔗 Tentando acessar: {BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN[:5]}...{BITRIX_TOKEN[-5:]}&table=crm_dynamic_items_1052")
+        
+        # Carregar os dados com ou sem exibição de logs conforme o modo de depuração
+        show_logs = 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']
+        df_items = load_bitrix_data(url_items, show_logs=show_logs)
+        
+        # Se o DataFrame estiver vazio, retornar DataFrame vazio
+        if df_items is None or df_items.empty:
+            if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+                st.error("📊 Não foram encontrados dados na tabela crm_dynamic_items_1052")
+            return pd.DataFrame()
+        
+        # Adicionar log de depuração
+        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+            st.success(f"✅ Dados carregados com sucesso: {len(df_items)} registros")
+            st.write("Colunas disponíveis:", df_items.columns.tolist())
+        
+        # Verificar se a coluna CATEGORY_ID existe
+        if 'CATEGORY_ID' not in df_items.columns:
+            if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+                st.error("❌ Coluna CATEGORY_ID não encontrada nos dados recebidos")
+                st.write("Colunas disponíveis:", df_items.columns.tolist())
+            return pd.DataFrame()
+        
+        # Filtrar apenas os cartórios Casa Verde (16) e Tatuápe (34)
+        df_filtrado = df_items[df_items['CATEGORY_ID'].isin([16, 34])].copy()  # Usar .copy() para evitar SettingWithCopyWarning
+        
+        # Adicionar log de depuração
+        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+            st.success(f"✅ Dados filtrados: {len(df_filtrado)} registros após filtro de cartórios")
+        
+        # Adicionar o nome do cartório para melhor visualização
+        df_filtrado.loc[:, 'NOME_CARTORIO'] = df_filtrado['CATEGORY_ID'].map({
+            16: 'CARTÓRIO CASA VERDE',
+            34: 'CARTÓRIO TATUÁPE'
+        })
+        
+        return df_filtrado
     
-    # URL para acessar a tabela crm_dynamic_items_1052
-    url_items = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_dynamic_items_1052"
-    
-    # Carregar os dados
-    df_items = load_bitrix_data(url_items)
-    
-    # Se o DataFrame estiver vazio, retornar DataFrame vazio
-    if df_items is None or df_items.empty:
-        st.error("Não foi possível carregar os dados dos cartórios. Verifique a conexão com o Bitrix24.")
+    except Exception as e:
+        # Log de erro detalhado no modo de depuração
+        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+            st.error(f"❌ Erro ao carregar dados do cartório: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
+        else:
+            st.error("Não foi possível carregar os dados dos cartórios. Ative o modo de depuração para mais detalhes.")
+        
         return pd.DataFrame()
-    
-    # Filtrar apenas os cartórios Casa Verde (16) e Tatuápe (34)
-    df_filtrado = df_items[df_items['CATEGORY_ID'].isin([16, 34])].copy()  # Usar .copy() para evitar SettingWithCopyWarning
-    
-    # Adicionar o nome do cartório para melhor visualização
-    df_filtrado.loc[:, 'NOME_CARTORIO'] = df_filtrado['CATEGORY_ID'].map({
-        16: 'CARTÓRIO CASA VERDE',
-        34: 'CARTÓRIO TATUÁPE'
-    })
-    
-    return df_filtrado
 
 def criar_visao_geral_cartorio(df):
     """
@@ -1548,6 +1589,46 @@ def show_cartorio():
     """
     Exibe a página principal do Cartório
     """
+    # Ativar modo de depuração para diagnóstico de problemas no Streamlit Cloud
+    if 'BITRIX_DEBUG' not in st.session_state:
+        st.session_state['BITRIX_DEBUG'] = False
+    
+    # Adicionar opção de depuração na barra lateral
+    with st.sidebar:
+        st.session_state['BITRIX_DEBUG'] = st.checkbox("Modo de depuração", value=st.session_state['BITRIX_DEBUG'])
+    
+    # Se modo de depuração ativado, exibir informações sobre o ambiente
+    if st.session_state['BITRIX_DEBUG']:
+        with st.expander("Informações de Depuração", expanded=True):
+            st.markdown("### Diagnóstico do Ambiente")
+            
+            # Verificar se estamos em Streamlit Cloud ou local
+            try:
+                is_cloud = hasattr(st, 'secrets')
+                st.success(f"Ambiente: {'Streamlit Cloud' if is_cloud else 'Local'}")
+                
+                # Verificar secrets
+                if is_cloud:
+                    try:
+                        has_secrets = 'BITRIX_TOKEN' in st.secrets and 'BITRIX_URL' in st.secrets
+                        st.success(f"Secrets configurados: {'Sim' if has_secrets else 'Não'}")
+                        if not has_secrets:
+                            st.warning("⚠️ Secrets não encontrados. Verifique a configuração no dashboard do Streamlit.")
+                    except Exception as secret_error:
+                        st.error(f"Erro ao verificar secrets: {str(secret_error)}")
+            except Exception as env_error:
+                st.error(f"Erro ao verificar ambiente: {str(env_error)}")
+            
+            # Testar obtenção de credenciais
+            try:
+                from api.bitrix_connector import get_credentials
+                token, url = get_credentials()
+                st.success("Credenciais carregadas com sucesso")
+                # Mostrar versões parciais para verificação sem expor totalmente
+                st.code(f"Token: {token[:5]}...{token[-5:]}\nURL: {url}")
+            except Exception as cred_error:
+                st.error(f"Erro ao carregar credenciais: {str(cred_error)}")
+    
     # Título centralizado
     st.markdown("<h1 style='text-align: center;'>Monitoramento de Cartórios</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center;'>Esta seção apresenta dados sobre os processos em cartório.</p>", unsafe_allow_html=True)
@@ -1557,6 +1638,39 @@ def show_cartorio():
     
     if df_cartorio.empty:
         st.warning("Não foi possível carregar os dados dos cartórios. Verifique a conexão com o Bitrix24.")
+        
+        # Se modo de depuração ativado, mostrar informações adicionais
+        if st.session_state['BITRIX_DEBUG']:
+            st.error("Falha ao carregar dados dos cartórios - Verifique o seguinte:")
+            st.markdown("""
+            1. As credenciais do Bitrix24 estão configuradas corretamente?
+            2. A URL do Bitrix24 está acessível?
+            3. Os tokens estão válidos e não expiraram?
+            4. A tabela crm_dynamic_items_1052 existe e está acessível?
+            """)
+            
+            # Botão para testar conexão
+            if st.button("Testar Conexão com Bitrix24"):
+                try:
+                    import requests
+                    from api.bitrix_connector import get_credentials
+                    
+                    token, url = get_credentials()
+                    test_url = f"{url}/bitrix/tools/biconnector/pbi.php?token={token}&table=crm_dynamic_items_1052&limit=1"
+                    
+                    with st.spinner("Testando conexão..."):
+                        response = requests.get(test_url, timeout=10)
+                        
+                        if response.status_code == 200:
+                            st.success(f"Conexão bem-sucedida! Código: {response.status_code}")
+                            # Mostrar primeiros 200 caracteres da resposta
+                            st.code(response.text[:200] + "...")
+                        else:
+                            st.error(f"Falha na conexão. Código: {response.status_code}")
+                            st.code(response.text[:200] + "...")
+                except Exception as conn_error:
+                    st.error(f"Erro no teste de conexão: {str(conn_error)}")
+        
         return
     else:
         st.success(f"Dados carregados com sucesso: {len(df_cartorio)} registros encontrados.")
