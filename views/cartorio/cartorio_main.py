@@ -10,6 +10,7 @@ from api.bitrix_connector import load_bitrix_data, get_credentials
 import re
 import io
 import requests
+import traceback
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -22,43 +23,119 @@ def carregar_dados_cartorio():
         pandas.DataFrame: DataFrame com os dados filtrados dos cartórios
     """
     try:
+        # Logs detalhados
+        debug_info = {}
+        
         # Obter token do Bitrix24
-        BITRIX_TOKEN, BITRIX_URL = get_credentials()
+        try:
+            from api.bitrix_connector import get_credentials
+            BITRIX_TOKEN, BITRIX_URL = get_credentials()
+            debug_info["credentials"] = "obtidas"
+        except Exception as cred_error:
+            if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+                st.error(f"❌ Erro ao obter credenciais: {str(cred_error)}")
+                st.code(traceback.format_exc())
+            debug_info["credentials_error"] = str(cred_error)
+            return pd.DataFrame()
         
         # Verificar se temos as credenciais necessárias
         if not BITRIX_TOKEN or not BITRIX_URL:
             if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
                 st.error("🔑 Credenciais do Bitrix24 não encontradas ou inválidas")
+            debug_info["credentials_valid"] = False
             return pd.DataFrame()
+        else:
+            debug_info["credentials_valid"] = True
         
         # URL para acessar a tabela crm_dynamic_items_1052
         url_items = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_dynamic_items_1052"
+        debug_info["url_constructed"] = True
+        
+        # Contornar possíveis problemas de codificação URL
+        safe_url = url_items.replace(" ", "%20")
         
         # Adicionar log de depuração
         if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-            st.info(f"🔗 Tentando acessar: {BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN[:5]}...{BITRIX_TOKEN[-5:]}&table=crm_dynamic_items_1052")
+            token_masked = f"{BITRIX_TOKEN[:5]}...{BITRIX_TOKEN[-3:]}" if len(BITRIX_TOKEN) > 8 else "***"
+            st.info(f"🔗 Tentando acessar: {BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={token_masked}&table=crm_dynamic_items_1052")
+        
+        # Fazer requisição manual para diagnóstico detalhado
+        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+            try:
+                # Tentar acessar a API diretamente para diagnóstico
+                st.info("Realizando requisição de diagnóstico...")
+                
+                # Adicionar cabeçalhos completos
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Accept": "*/*",
+                    "Content-Type": "application/json",
+                    "Accept-Encoding": "gzip, deflate, br"
+                }
+                
+                # Usar a biblioteca requests para diagnóstico
+                with st.spinner("Testando acesso à API..."):
+                    test_response = requests.get(safe_url, headers=headers, timeout=30)
+                    st.write(f"Status da resposta: {test_response.status_code}")
+                    
+                    # Mostrar cabeçalhos da resposta
+                    st.write("Cabeçalhos da resposta:", dict(test_response.headers))
+                    
+                    # Verificar se o conteúdo pode ser interpretado como JSON
+                    try:
+                        json_data = test_response.json()
+                        st.success("✅ Resposta decodificada como JSON com sucesso")
+                        if isinstance(json_data, list):
+                            st.write(f"Número de itens na resposta: {len(json_data)}")
+                        debug_info["test_response_valid"] = True
+                    except Exception as json_error:
+                        st.error(f"❌ Erro ao decodificar resposta como JSON: {str(json_error)}")
+                        st.code(test_response.text[:500] + "..." if len(test_response.text) > 500 else test_response.text)
+                        debug_info["test_response_valid"] = False
+                        debug_info["json_error"] = str(json_error)
+                
+            except Exception as request_error:
+                st.error(f"❌ Erro na requisição de diagnóstico: {str(request_error)}")
+                st.code(traceback.format_exc())
+                debug_info["request_error"] = str(request_error)
         
         # Carregar os dados com ou sem exibição de logs conforme o modo de depuração
         show_logs = 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']
-        df_items = load_bitrix_data(url_items, show_logs=show_logs)
+        try:
+            from api.bitrix_connector import load_bitrix_data
+            df_items = load_bitrix_data(safe_url, show_logs=show_logs)
+            debug_info["load_data_called"] = True
+        except Exception as load_error:
+            if show_logs:
+                st.error(f"❌ Erro ao carregar dados com load_bitrix_data: {str(load_error)}")
+                st.code(traceback.format_exc())
+            debug_info["load_error"] = str(load_error)
+            return pd.DataFrame()
         
         # Se o DataFrame estiver vazio, retornar DataFrame vazio
         if df_items is None or df_items.empty:
             if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
                 st.error("📊 Não foram encontrados dados na tabela crm_dynamic_items_1052")
+            debug_info["df_empty"] = True
             return pd.DataFrame()
+        else:
+            debug_info["df_empty"] = False
         
         # Adicionar log de depuração
         if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
             st.success(f"✅ Dados carregados com sucesso: {len(df_items)} registros")
             st.write("Colunas disponíveis:", df_items.columns.tolist())
+            debug_info["df_columns"] = df_items.columns.tolist()
         
         # Verificar se a coluna CATEGORY_ID existe
         if 'CATEGORY_ID' not in df_items.columns:
             if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
                 st.error("❌ Coluna CATEGORY_ID não encontrada nos dados recebidos")
                 st.write("Colunas disponíveis:", df_items.columns.tolist())
+            debug_info["category_id_missing"] = True
             return pd.DataFrame()
+        else:
+            debug_info["category_id_missing"] = False
         
         # Filtrar apenas os cartórios Casa Verde (16) e Tatuápe (34)
         df_filtrado = df_items[df_items['CATEGORY_ID'].isin([16, 34])].copy()  # Usar .copy() para evitar SettingWithCopyWarning
@@ -66,6 +143,7 @@ def carregar_dados_cartorio():
         # Adicionar log de depuração
         if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
             st.success(f"✅ Dados filtrados: {len(df_filtrado)} registros após filtro de cartórios")
+            debug_info["filtered_records"] = len(df_filtrado)
         
         # Adicionar o nome do cartório para melhor visualização
         df_filtrado.loc[:, 'NOME_CARTORIO'] = df_filtrado['CATEGORY_ID'].map({
@@ -73,14 +151,42 @@ def carregar_dados_cartorio():
             34: 'CARTÓRIO TATUÁPE'
         })
         
+        # Armazenar informações de depuração na sessão
+        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
+            st.session_state['DEBUG_INFO'] = debug_info
+            
         return df_filtrado
     
     except Exception as e:
         # Log de erro detalhado no modo de depuração
         if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-            st.error(f"❌ Erro ao carregar dados do cartório: {str(e)}")
-            import traceback
+            st.error(f"❌ Erro geral ao carregar dados do cartório: {str(e)}")
             st.code(traceback.format_exc())
+            
+            # Criar um relatório de diagnóstico completo
+            st.error("Relatório de Diagnóstico")
+            
+            # Versão do Python e bibliotecas
+            import sys
+            import pandas as pd
+            import streamlit as st
+            import requests
+            
+            diagnostic_report = {
+                "python_version": sys.version,
+                "streamlit_version": st.__version__,
+                "pandas_version": pd.__version__,
+                "requests_version": requests.__version__,
+                "error": str(e),
+                "error_type": type(e).__name__
+            }
+            
+            # Exibir relatório
+            for key, value in diagnostic_report.items():
+                st.text(f"{key}: {value}")
+                
+            # Armazenar relatório na sessão
+            st.session_state['ERROR_DIAGNOSTIC'] = diagnostic_report
         else:
             st.error("Não foi possível carregar os dados dos cartórios. Ative o modo de depuração para mais detalhes.")
         
@@ -1591,7 +1697,7 @@ def show_cartorio():
     """
     # Ativar modo de depuração para diagnóstico de problemas no Streamlit Cloud
     if 'BITRIX_DEBUG' not in st.session_state:
-        st.session_state['BITRIX_DEBUG'] = False
+        st.session_state['BITRIX_DEBUG'] = True  # Ativar por padrão para capturar o erro
     
     # Adicionar opção de depuração na barra lateral
     with st.sidebar:
@@ -1602,6 +1708,9 @@ def show_cartorio():
         with st.expander("Informações de Depuração", expanded=True):
             st.markdown("### Diagnóstico do Ambiente")
             
+            # Log de informações básicas
+            st.info("Versão do Streamlit: " + st.__version__)
+            
             # Verificar se estamos em Streamlit Cloud ou local
             try:
                 is_cloud = hasattr(st, 'secrets')
@@ -1610,24 +1719,116 @@ def show_cartorio():
                 # Verificar secrets
                 if is_cloud:
                     try:
-                        has_secrets = 'BITRIX_TOKEN' in st.secrets and 'BITRIX_URL' in st.secrets
+                        # Verificar a existência e o formato dos secrets
+                        secrets_items = []
+                        if hasattr(st, 'secrets'):
+                            for key in dir(st.secrets):
+                                if not key.startswith('_') and not callable(getattr(st.secrets, key)):
+                                    if isinstance(getattr(st.secrets, key), dict):
+                                        secrets_items.append(f"{key}: <dict>")
+                                    else:
+                                        secrets_items.append(f"{key}: <valor definido>")
+                        
+                        has_secrets = len(secrets_items) > 0
                         st.success(f"Secrets configurados: {'Sim' if has_secrets else 'Não'}")
-                        if not has_secrets:
-                            st.warning("⚠️ Secrets não encontrados. Verifique a configuração no dashboard do Streamlit.")
+                        
+                        if has_secrets:
+                            st.write("Chaves disponíveis nos secrets:", ", ".join(secrets_items))
+                        else:
+                            st.warning("⚠️ Nenhum secret encontrado. Verifique a configuração no dashboard do Streamlit.")
                     except Exception as secret_error:
                         st.error(f"Erro ao verificar secrets: {str(secret_error)}")
+                        st.code(traceback.format_exc())
             except Exception as env_error:
                 st.error(f"Erro ao verificar ambiente: {str(env_error)}")
+                st.code(traceback.format_exc())
+            
+            # Verificação do sistema de arquivos
+            try:
+                import os
+                current_dir = os.getcwd()
+                st.success(f"Diretório de trabalho: {current_dir}")
+                
+                # Listar arquivos importantes
+                if os.path.exists('.streamlit'):
+                    has_secrets_file = os.path.exists('.streamlit/secrets.toml')
+                    st.success(f"Arquivo de secrets (.streamlit/secrets.toml): {'Presente' if has_secrets_file else 'Ausente'}")
+                else:
+                    st.warning("Diretório .streamlit não encontrado")
+            except Exception as fs_error:
+                st.error(f"Erro ao verificar sistema de arquivos: {str(fs_error)}")
+                st.code(traceback.format_exc())
             
             # Testar obtenção de credenciais
             try:
                 from api.bitrix_connector import get_credentials
                 token, url = get_credentials()
-                st.success("Credenciais carregadas com sucesso")
-                # Mostrar versões parciais para verificação sem expor totalmente
-                st.code(f"Token: {token[:5]}...{token[-5:]}\nURL: {url}")
+                if token and url:
+                    st.success("Credenciais carregadas com sucesso")
+                    # Mostrar versões parciais para verificação sem expor totalmente
+                    if token:
+                        token_masked = f"{token[:5]}...{token[-3:]}" if len(token) > 8 else "***"
+                    else:
+                        token_masked = "não definido"
+                    
+                    st.code(f"Token: {token_masked}\nURL: {url}")
+                else:
+                    st.error("Credenciais não obtidas corretamente")
             except Exception as cred_error:
                 st.error(f"Erro ao carregar credenciais: {str(cred_error)}")
+                st.code(traceback.format_exc())
+            
+            # Botão para testar a API diretamente
+            if st.button("Testar API do Bitrix24 (Diagnóstico)"):
+                try:
+                    import requests
+                    import json
+                    from api.bitrix_connector import get_credentials
+                    
+                    token, url = get_credentials()
+                    
+                    if not token or not url:
+                        st.error("Credenciais não disponíveis para teste de API")
+                    else:
+                        # Teste simples para verificar se podemos acessar a API
+                        test_url = f"{url}/bitrix/tools/biconnector/pbi.php?token={token}&table=crm_dynamic_items_1052&limit=1"
+                        
+                        with st.spinner("Testando API do Bitrix24..."):
+                            try:
+                                # Adicionar cabeçalhos completos
+                                headers = {
+                                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                                    "Accept": "*/*",
+                                    "Content-Type": "application/json",
+                                    "Accept-Encoding": "gzip, deflate, br"
+                                }
+                                
+                                # Fazer a requisição com timeout e headers
+                                response = requests.get(test_url, headers=headers, timeout=20)
+                                
+                                # Capturar informações da resposta
+                                st.write(f"Status Code: {response.status_code}")
+                                st.write(f"Cabeçalhos da resposta: {dict(response.headers)}")
+                                
+                                # Tentar decodificar como JSON
+                                try:
+                                    json_data = response.json()
+                                    st.success("Resposta decodificada como JSON com sucesso")
+                                    if isinstance(json_data, list) and len(json_data) > 0:
+                                        st.write(f"Número de itens na resposta: {len(json_data)}")
+                                        if len(json_data) > 1:
+                                            st.write("Estrutura da resposta:", json_data[0])
+                                    else:
+                                        st.write("Estrutura da resposta:", json_data)
+                                except json.JSONDecodeError:
+                                    st.error("Não foi possível decodificar a resposta como JSON")
+                                    st.code(response.text[:500] + "..." if len(response.text) > 500 else response.text)
+                            except Exception as req_error:
+                                st.error(f"Erro na requisição: {str(req_error)}")
+                                st.code(traceback.format_exc())
+                except Exception as api_error:
+                    st.error(f"Erro ao testar API: {str(api_error)}")
+                    st.code(traceback.format_exc())
     
     # Título centralizado
     st.markdown("<h1 style='text-align: center;'>Monitoramento de Cartórios</h1>", unsafe_allow_html=True)

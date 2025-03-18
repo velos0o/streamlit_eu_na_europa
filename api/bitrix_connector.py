@@ -95,8 +95,20 @@ def load_bitrix_data(url, filters=None, show_logs=False):
     """
     try:
         if show_logs:
-            st.info(f"Tentando acessar: {url}")
-        headers = {"Content-Type": "application/json"}
+            st.info(f"Tentando acessar: {url.split('token=')[0]}token=***&{url.split('&', 1)[1] if '&' in url else ''}")
+        
+        # Cabeçalhos HTTP completos para evitar problemas de segurança
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Cache-Control": "no-cache"
+        }
+        
+        # Contornar possíveis problemas de URL
+        safe_url = url.replace(" ", "%20")
         
         # Tentar até 3 vezes em caso de falha
         max_attempts = 3
@@ -105,14 +117,49 @@ def load_bitrix_data(url, filters=None, show_logs=False):
                 if filters:
                     if show_logs:
                         st.write(f"Enviando filtros: {json.dumps(filters)}")
-                    response = requests.post(url, data=json.dumps(filters), headers=headers, timeout=30)
+                    response = requests.post(safe_url, data=json.dumps(filters), headers=headers, timeout=60)
                 else:
-                    response = requests.get(url, timeout=30)
+                    response = requests.get(safe_url, headers=headers, timeout=60)
                 
                 if response.status_code == 200:
+                    # Registrar detalhes da resposta nos logs
+                    if show_logs:
+                        st.success(f"Resposta recebida com sucesso (Status: {response.status_code})")
+                        st.write(f"Tamanho da resposta: {len(response.content)} bytes")
+                        st.write(f"Tipo de conteúdo: {response.headers.get('Content-Type', 'Não especificado')}")
+                    
+                    # Verificar o tipo de conteúdo da resposta
+                    content_type = response.headers.get('Content-Type', '').lower()
+                    
                     # Tentar interpretar a resposta como JSON
                     try:
-                        data = response.json()
+                        # Se for JSON, processar normalmente
+                        if 'application/json' in content_type or response.text.strip().startswith(('[', '{')):
+                            data = response.json()
+                        # Se for CSV, HTML ou outro formato, tentar converter
+                        else:
+                            if show_logs:
+                                st.warning(f"Resposta não é JSON. Tipo: {content_type}")
+                                st.code(response.text[:500] + "..." if len(response.text) > 500 else response.text)
+                            
+                            # Tentar processar como CSV
+                            if 'text/csv' in content_type:
+                                import io
+                                return pd.read_csv(io.StringIO(response.text))
+                            
+                            # Tentar extrair tabelas de HTML
+                            elif 'text/html' in content_type:
+                                try:
+                                    dfs = pd.read_html(response.text)
+                                    if dfs and len(dfs) > 0:
+                                        return dfs[0]
+                                except:
+                                    pass
+                            
+                            # Se não conseguir interpretar, retornar DataFrame vazio
+                            if show_logs:
+                                st.error("Não foi possível interpretar a resposta como dados estruturados")
+                            return pd.DataFrame()
                         
                         # Verificar se obtivemos dados
                         if data:
@@ -155,9 +202,9 @@ def load_bitrix_data(url, filters=None, show_logs=False):
                                         df = pd.DataFrame(data)
                                     else:
                                         if show_logs:
-                                            st.write(f"Colunas disponíveis: ['Item não é um dicionário']")
-                                            st.write("Exemplo do primeiro registro:")
-                                            st.json(first_item)
+                                            st.write(f"Formato não reconhecido: {type(first_item)}")
+                                            st.write("Exemplo do primeiro item:")
+                                            st.write(str(first_item)[:500])
                                         # Tentar criar um DataFrame mesmo assim
                                         df = pd.DataFrame(data)
                             else:
@@ -183,7 +230,21 @@ def load_bitrix_data(url, filters=None, show_logs=False):
                         if show_logs:
                             st.error(f"Erro ao decodificar JSON: {str(je)}")
                             st.write(f"Resposta da API (primeiros 500 caracteres): {response.text[:500]}")
-                        return pd.DataFrame()
+                        if attempt < max_attempts - 1:
+                            time.sleep(2)  # Aguardar antes de tentar novamente
+                        else:
+                            # Tentar extrair informações de erro da resposta
+                            if "error" in response.text.lower() or "unauthorized" in response.text.lower():
+                                if show_logs:
+                                    st.error("Possível erro de autenticação detectado na resposta")
+                            return pd.DataFrame()
+                elif response.status_code == 401 or response.status_code == 403:
+                    # Erro de autenticação
+                    if show_logs:
+                        st.error(f"Erro de autenticação na API Bitrix24: Código {response.status_code}")
+                        st.write(f"Resposta da API: {response.text[:500]}")
+                    # Não tentar novamente em caso de erro de autenticação
+                    return pd.DataFrame()
                 else:
                     if show_logs:
                         st.error(f"Erro ao acessar a API Bitrix24 na tentativa {attempt + 1}: Código {response.status_code}")
@@ -205,6 +266,8 @@ def load_bitrix_data(url, filters=None, show_logs=False):
     except Exception as e:
         if show_logs:
             st.error(f"Erro ao carregar dados do Bitrix24: {str(e)}")
+            import traceback
+            st.code(traceback.format_exc())
         return pd.DataFrame()
 
 def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=None, debug=False, progress_bar=None, message_container=None):
