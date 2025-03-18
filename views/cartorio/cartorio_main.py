@@ -24,6 +24,9 @@ def carregar_dados_cartorio():
     """
     # Garantir acesso ao módulo streamlit
     import streamlit as st_module
+    # Garantir acesso ao módulo requests
+    import requests as requests_module
+    import traceback
     
     try:
         # Logs detalhados
@@ -78,7 +81,7 @@ def carregar_dados_cartorio():
                 
                 # Usar a biblioteca requests para diagnóstico
                 with st_module.spinner("Testando acesso à API..."):
-                    test_response = requests.get(safe_url, headers=headers, timeout=30)
+                    test_response = requests_module.get(safe_url, headers=headers, timeout=30)
                     st_module.write(f"Status da resposta: {test_response.status_code}")
                     
                     # Mostrar cabeçalhos da resposta
@@ -173,13 +176,13 @@ def carregar_dados_cartorio():
             import sys
             import pandas as pd
             import streamlit as st
-            import requests
+            import requests as requests_module
             
             diagnostic_report = {
                 "python_version": sys.version,
                 "streamlit_version": st.__version__,
                 "pandas_version": pd.__version__,
-                "requests_version": requests.__version__,
+                "requests_version": requests_module.__version__,
                 "error": str(e),
                 "error_type": type(e).__name__
             }
@@ -1784,7 +1787,7 @@ def show_cartorio():
             # Botão para testar a API diretamente
             if st.button("Testar API do Bitrix24 (Diagnóstico)"):
                 try:
-                    import requests
+                    import requests as requests_module
                     import json
                     from api.bitrix_connector import get_credentials
                     
@@ -1807,7 +1810,7 @@ def show_cartorio():
                                 }
                                 
                                 # Fazer a requisição com timeout e headers
-                                response = requests.get(test_url, headers=headers, timeout=20)
+                                response = requests_module.get(test_url, headers=headers, timeout=20)
                                 
                                 # Capturar informações da resposta
                                 st.write(f"Status Code: {response.status_code}")
@@ -1856,14 +1859,14 @@ def show_cartorio():
             # Botão para testar conexão
             if st.button("Testar Conexão com Bitrix24"):
                 try:
-                    import requests
+                    import requests as requests_module
                     from api.bitrix_connector import get_credentials
                     
                     token, url = get_credentials()
                     test_url = f"{url}/bitrix/tools/biconnector/pbi.php?token={token}&table=crm_dynamic_items_1052&limit=1"
                     
                     with st.spinner("Testando conexão..."):
-                        response = requests.get(test_url, timeout=10)
+                        response = requests_module.get(test_url, timeout=10)
                         
                         if response.status_code == 200:
                             st.success(f"Conexão bem-sucedida! Código: {response.status_code}")
