@@ -113,16 +113,42 @@ def get_random_animation():
     
     print("Tentando carregar uma animação aleatória...")
     
+    # Diagnóstico para depuração
+    print(f"Diretório atual: {os.getcwd()}")
+    print(f"Diretório do módulo: {os.path.dirname(__file__)}")
+    
+    # Verificar se as pastas de animação existem
+    animation_paths = [
+        "assets/animations",
+        os.path.join(os.getcwd(), "assets", "animations"),
+        os.path.join(os.path.dirname(__file__), "..", "assets", "animations")
+    ]
+    
+    for path in animation_paths:
+        if os.path.exists(path):
+            print(f"✓ Diretório encontrado: {path}")
+            # Listar arquivos neste diretório
+            try:
+                files = os.listdir(path)
+                print(f"  Arquivos em {path}: {files}")
+            except Exception as e:
+                print(f"  Erro ao listar arquivos em {path}: {str(e)}")
+        else:
+            print(f"✗ Diretório não encontrado: {path}")
+    
     # Primeiro, tente carregar de arquivos locais
     animation_file = random.choice(ANIMATION_FILES)
     
     # Tenta diferentes locais possíveis para o arquivo
     possible_paths = [
+        os.path.join("assets", "animations", animation_file),  # Novo local após reorganização
+        os.path.join(os.getcwd(), "assets", "animations", animation_file),  # Caminho absoluto para novo local
         animation_file,  # No diretório atual
         os.path.join(".", animation_file),  # Explicitamente no diretório atual
         os.path.join(os.getcwd(), animation_file),  # Caminho absoluto no diretório atual
         os.path.join(os.path.dirname(__file__), "..", animation_file),  # Um nível acima do utils
         os.path.join(os.path.dirname(__file__), "..", "assets", animation_file),  # Na pasta assets
+        os.path.join(os.path.dirname(__file__), "..", "assets", "animations", animation_file),  # Na pasta assets/animations
     ]
     
     # Tentar cada caminho
