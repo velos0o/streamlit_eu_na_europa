@@ -1,10 +1,19 @@
 import streamlit as st
 import pandas as pd
+import os
+import sys
+from pathlib import Path
 from api.bitrix_connector import load_merged_data
 from components.metrics import render_metrics_section, render_conclusion_item
 from components.tables import create_responsible_status_table, create_pendencias_table, create_production_table
-from utils.data_processor import calculate_status_counts
-from utils.animation_utils import display_loading_animation, clear_loading_animation
+
+# Obter o caminho absoluto para a pasta utils
+utils_path = os.path.join(Path(__file__).parents[1], 'utils')
+sys.path.insert(0, str(utils_path))
+
+# Agora importa diretamente dos arquivos na pasta utils
+from data_processor import calculate_status_counts
+from animation_utils import display_loading_animation, clear_loading_animation
 
 def format_date_br(date):
     """
@@ -23,6 +32,30 @@ def format_date_br(date):
     # Formatar no padrão brasileiro
     return date.strftime('%d/%m/%Y %H:%M')
 
+# Função para carregar dados - será chamada automaticamente
+def load_data():
+    if 'home_data' not in st.session_state or st.session_state.get('force_reload', False):
+        st.session_state['force_reload'] = False
+        
+        with st.spinner("Carregando dados..."):
+            try:
+                # Carregar dados sem filtro de data
+                df = load_merged_data(
+                    category_id=32,
+                    debug=False,
+                    progress_bar=None,
+                    message_container=None
+                )
+                
+                if not df.empty:
+                    st.session_state['home_data'] = df
+                else:
+                    st.session_state['home_data'] = pd.DataFrame()
+                    
+            except Exception as e:
+                st.error(f"Erro ao carregar dados: {str(e)}")
+                st.session_state['home_data'] = pd.DataFrame()
+
 def show_inicio():
     """
     Exibe a página inicial do dashboard
@@ -38,140 +71,22 @@ def show_inicio():
     com foco na visualização e análise do status de higienização de processos.
     """)
     
-    # Verificar se os dados já foram carregados anteriormente
-    if 'home_data_loaded' not in st.session_state:
-        with st.container():
-            progress_bar, animation_container, message_container = display_loading_animation(
-                "Carregando dados...",
-                min_display_time=3
-            )
-            
-            try:
-                # Carregar dados sem filtro de data
-                df = load_merged_data(
-                    category_id=32,
-                    debug=False,
-                    progress_bar=progress_bar,
-                    message_container=message_container
-                )
-                
-                clear_loading_animation(progress_bar, animation_container, message_container)
-                
-                if not df.empty:
-                    st.session_state['home_data_loaded'] = True
-                    st.session_state['home_data'] = df
-                    
-                    # Exibir métricas
-                    counts = calculate_status_counts(df)
-                    st.subheader("Resumo de Métricas")
-                    render_metrics_section(counts)
-                    
-                    # Criar tabs para as diferentes visualizações
-                    tab1, tab2, tab3 = st.tabs([
-                        "Status por Responsável",
-                        "Pendências por Responsável",
-                        "Produção Geral"
-                    ])
-                    
-                    # Tab de Status por Responsável
-                    with tab1:
-                        st.markdown("""
-                        <style>
-                        .dataframe {
-                            width: 100% !important;
-                            max-height: 600px !important;
-                            overflow: auto !important;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
-                        status_table = create_responsible_status_table(df)
-                        st.dataframe(
-                            status_table,
-                            use_container_width=True,
-                            height=500
-                        )
-                    
-                    # Tab de Pendências
-                    with tab2:
-                        pendencias_table = create_pendencias_table(df)
-                        st.dataframe(
-                            pendencias_table,
-                            use_container_width=True,
-                            height=500
-                        )
-                    
-                    # Tab de Produção Geral
-                    with tab3:
-                        production_table = create_production_table(df)
-                        st.dataframe(
-                            production_table,
-                            use_container_width=True,
-                            height=500
-                        )
-                    
-                    # Últimas conclusões
-                    st.markdown("### Últimas Conclusões")
-                    if 'DATE_MODIFY' in df.columns:
-                        completed_df = df[df['UF_CRM_HIGILIZACAO_STATUS'] == 'COMPLETO']
-                        if not completed_df.empty:
-                            recent_df = completed_df.sort_values('DATE_MODIFY', ascending=False).head(5)
-                            for _, row in recent_df.iterrows():
-                                render_conclusion_item(
-                                    id=row.get('ID', 'N/A'),
-                                    title=row.get('TITLE', 'N/A'),
-                                    responsible=row.get('ASSIGNED_BY_NAME', 'N/A'),
-                                    date=format_date_br(row.get('DATE_MODIFY'))
-                                )
-                        else:
-                            st.info("Nenhum processo concluído encontrado.")
-                else:
-                    st.info("Nenhum dado encontrado para o período selecionado.")
-                    
-            except Exception as e:
-                clear_loading_animation(progress_bar, animation_container, message_container)
-                st.error(f"Erro ao carregar dados: {str(e)}")
-    else:
-        # Usar dados em cache
+    # Carregar dados automaticamente na inicialização
+    load_data()
+    
+    # Botão para recarregar dados manualmente
+    if st.button("Atualizar Dados"):
+        st.session_state['force_reload'] = True
+        st.experimental_rerun()
+    
+    # Exibir as informações se houver dados
+    if 'home_data' in st.session_state and not st.session_state['home_data'].empty:
         df = st.session_state['home_data']
         
         # Exibir métricas
         counts = calculate_status_counts(df)
         st.subheader("Resumo de Métricas")
         render_metrics_section(counts)
-        
-        # Criar tabs
-        tab1, tab2, tab3 = st.tabs([
-            "Status por Responsável",
-            "Pendências por Responsável",
-            "Produção Geral"
-        ])
-        
-        # Tab de Status por Responsável
-        with tab1:
-            status_table = create_responsible_status_table(df)
-            st.dataframe(
-                status_table,
-                use_container_width=True,
-                height=500
-            )
-        
-        # Tab de Pendências
-        with tab2:
-            pendencias_table = create_pendencias_table(df)
-            st.dataframe(
-                pendencias_table,
-                use_container_width=True,
-                height=500
-            )
-        
-        # Tab de Produção Geral
-        with tab3:
-            production_table = create_production_table(df)
-            st.dataframe(
-                production_table,
-                use_container_width=True,
-                height=500
-            )
         
         # Últimas conclusões
         st.markdown("### Últimas Conclusões")
@@ -188,7 +103,13 @@ def show_inicio():
                     )
             else:
                 st.info("Nenhum processo concluído encontrado.")
+    else:
+        st.info("Nenhum dado encontrado para o período selecionado.")
     
     # Rodapé
     st.markdown("---")
-    st.markdown("*Dashboard em desenvolvimento. Última atualização: Agosto 2024*") 
+    st.markdown("*Dashboard em desenvolvimento. Última atualização: Agosto 2024*")
+
+# Adiciona código de inicialização para executar no início do script
+if __name__ == "__main__":
+    show_inicio() 

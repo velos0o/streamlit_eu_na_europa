@@ -1,8 +1,17 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import os
+import sys
+from pathlib import Path
 from api.bitrix_connector import get_higilizacao_fields, get_status_color
-from utils.data_processor import format_status_text
+
+# Obter o caminho absoluto para a pasta utils
+utils_path = os.path.join(Path(__file__).parents[1], 'utils')
+sys.path.insert(0, str(utils_path))
+
+# Agora importa diretamente do arquivo data_processor
+from data_processor import format_status_text
 
 def render_styled_table(df, height=None):
     """
@@ -44,12 +53,11 @@ def create_responsible_status_table(df):
     # Preencher valores nulos no status como PENDENCIA
     df['UF_CRM_HIGILIZACAO_STATUS'] = df['UF_CRM_HIGILIZACAO_STATUS'].fillna('PENDENCIA')
     
-    # Criar tabela cruzada
+    # Criar tabela cruzada sem margens (sem linha e coluna de total)
     cross_tab = pd.crosstab(
         index=df['ASSIGNED_BY_NAME'],
         columns=df['UF_CRM_HIGILIZACAO_STATUS'],
-        margins=True,
-        margins_name='Total'
+        margins=False
     )
     
     # Garantir que todas as colunas existem
@@ -58,7 +66,7 @@ def create_responsible_status_table(df):
             cross_tab[status] = 0
     
     # Reordenar as colunas
-    ordered_columns = ['PENDENCIA', 'INCOMPLETO', 'COMPLETO', 'Total']
+    ordered_columns = ['PENDENCIA', 'INCOMPLETO', 'COMPLETO']
     cross_tab = cross_tab[ordered_columns]
     
     return cross_tab

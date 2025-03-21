@@ -13,8 +13,16 @@ from PIL import Image
 from api.bitrix_connector import load_merged_data, get_higilizacao_fields, get_status_color
 import time
 import os
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
-from utils.animation_utils import update_progress
+
+# Obter o caminho absoluto para a pasta utils
+utils_path = os.path.join(Path(__file__).parents[1], 'utils')
+sys.path.insert(0, str(utils_path))
+
+# Agora importa diretamente do arquivo animation_utils
+from animation_utils import update_progress
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -49,13 +57,29 @@ def show_conclusoes():
     Exibe a página de conclusões com métricas de produtividade e análises
     relacionadas às conclusões de processos de higienização.
     """
-    st.title("Relatório de Conclusões")
+    # Título com destaque extra
+    st.markdown("""
+    <h1 style="font-size: 3.2rem; font-weight: 900; color: #1A237E; text-align: center; 
+    margin-bottom: 1.8rem; padding-bottom: 10px; border-bottom: 4px solid #1976D2;
+    font-family: Arial, Helvetica, sans-serif;">
+    RELATÓRIO DE CONCLUSÕES</h1>
+    """, unsafe_allow_html=True)
     
     # Aplicar estilos
     aplicar_estilos_conclusoes()
     
     # Container de filtros
     with st.expander("Filtros", expanded=True):
+        # Informações sobre o cálculo de médias
+        st.markdown("""
+        <div style="background-color: #e6f7ff; padding: 10px; border-radius: 5px; border-left: 5px solid #1976D2; margin-bottom: 15px; font-family: Arial, Helvetica, sans-serif;">
+            <strong>⚠️ IMPORTANTE:</strong> As médias são calculadas considerando apenas os dias em que houve trabalho:<br>
+            • Segunda a Sexta: considerados dias úteis<br>
+            • Sábado: considerado dia útil<br>
+            • Domingo: não contado nas médias
+        </div>
+        """, unsafe_allow_html=True)
+        
         # Primeira linha de filtros
         col1, col2 = st.columns(2)
         
@@ -155,16 +179,10 @@ def show_conclusoes():
     if df_filtrado.empty:
         st.warning("Nenhum dado encontrado após aplicação dos filtros.")
         return
-    
-    # Separador
-    st.markdown("---")
-    
+     
     # 1. Métricas de Destaque
     st.subheader("Métricas de Destaque")
     mostrar_metricas_destaque(df_filtrado, df_todos, date_from, date_to)
-    
-    # Separador
-    st.markdown("---")
     
     # 2. Ranking de Produtividade
     st.subheader("Ranking de Produtividade")
@@ -172,10 +190,10 @@ def show_conclusoes():
     
     # Separador
     st.markdown("---")
-    
+ 
     # 3. Análises Temporais
     st.subheader("Análises Temporais")
-    mostrar_analises_temporais(df_filtrado)
+    mostrar_analises_temporais(df_filtrado, date_from, date_to)
     
     # Rodapé discreto
     st.markdown("---")
@@ -187,101 +205,273 @@ def aplicar_estilos_conclusoes():
     """
     st.markdown("""
     <style>
+    /* Estilos globais de tipografia */
+    body, .stApp {
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-size: 18px;
+        color: #333333;
+    }
+    
+    /* Estilos para títulos */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-weight: 900 !important;
+        color: #1A237E !important;
+        letter-spacing: -0.5px;
+    }
+    
+    h1 {
+        font-size: 3rem !important;
+        margin-bottom: 1.5rem !important;
+        font-weight: 900 !important;
+    }
+    
+    h2, .stSubheader {
+        font-size: 2.3rem !important;
+        margin-top: 2rem !important;
+        margin-bottom: 1rem !important;
+        padding-bottom: 0.5rem;
+        border-bottom: 3px solid #E0E0E0;
+        font-weight: 800 !important;
+    }
+    
+    h3 {
+        font-size: 1.8rem !important;
+        margin-top: 1.5rem !important;
+        margin-bottom: 0.75rem !important;
+        font-weight: 700 !important;
+    }
+    
+    /* Estilos para informações e avisos */
+    .stInfo, .stWarning, .stSuccess, .stError {
+        font-size: 1.2rem !important;
+        font-weight: 600;
+        padding: 1rem !important;
+    }
+    
+    /* Estilos para legendas */
+    .stCaption {
+        font-size: 1rem !important;
+        opacity: 0.8;
+        font-style: italic;
+    }
+    
+    /* Estilos para cards de métricas */
     .metric-card {
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        padding: 28px;
+        box-shadow: 0 6px 12px rgba(0,0,0,0.1);
         text-align: center;
         background: white;
-        margin: 10px 0;
-        transition: transform 0.2s;
-        border: 2px solid;
+        margin: 15px 0;
+        transition: transform 0.3s, box-shadow 0.3s;
+        border: 3px solid;
     }
+    
     .metric-card:hover {
-        transform: translateY(-5px);
+        transform: translateY(-8px);
+        box-shadow: 0 12px 16px rgba(0,0,0,0.15);
     }
+    
     .metric-card.total {
         border-color: #2E7D32;
-        border-left: 5px solid #2E7D32;
+        border-left: 8px solid #2E7D32;
     }
+    
     .metric-card.media-diaria {
-        border-color: #388E3C;
-        border-left: 5px solid #388E3C;
+        border-color: #1565C0;
+        border-left: 8px solid #1565C0;
     }
+    
     .metric-card.media-hora {
-        border-color: #43A047;
-        border-left: 5px solid #43A047;
+        border-color: #6A1B9A;
+        border-left: 8px solid #6A1B9A;
     }
+    
     .metric-card.taxa {
-        border-color: #4CAF50;
-        border-left: 5px solid #4CAF50;
+        border-color: #E65100;
+        border-left: 8px solid #E65100;
     }
+    
     .metric-value {
-        font-size: 32px;
-        font-weight: bold;
-        color: #1B5E20;
-        margin-bottom: 5px;
+        font-size: 56px !important;
+        font-weight: 900 !important;
+        line-height: 1.2;
+        margin-bottom: 10px;
     }
-    .metric-title {
-        font-size: 16px;
+    
+    .metric-card.total .metric-value {
         color: #2E7D32;
-        font-weight: 500;
     }
+    
+    .metric-card.media-diaria .metric-value {
+        color: #1565C0;
+    }
+    
+    .metric-card.media-hora .metric-value {
+        color: #6A1B9A;
+    }
+    
+    .metric-card.taxa .metric-value {
+        color: #E65100;
+    }
+    
+    .metric-title {
+        font-size: 20px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .metric-card.total .metric-title {
+        color: #2E7D32;
+    }
+    
+    .metric-card.media-diaria .metric-title {
+        color: #1565C0;
+    }
+    
+    .metric-card.media-hora .metric-title {
+        color: #6A1B9A;
+    }
+    
+    .metric-card.taxa .metric-title {
+        color: #E65100;
+    }
+    
+    /* Estilos para gráficos */
     .stPlotlyChart {
         background-color: white !important;
-        border-radius: 8px;
-        padding: 15px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin: 10px 0;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+        margin: 15px 0;
     }
+    
     .js-plotly-plot .plotly .modebar {
         display: block !important;
     }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+    
+    /* Estilos para tabelas */
+    [data-testid="stDataFrame"] table {
+        font-size: 18px !important;
     }
+    
+    [data-testid="stDataFrame"] th {
+        font-weight: 800 !important;
+        background-color: #F5F5F5 !important;
+        color: #1A237E !important;
+        text-transform: uppercase;
+        font-size: 16px !important;
+        padding: 14px !important;
+    }
+    
+    [data-testid="stDataFrame"] td {
+        font-size: 17px !important;
+        padding: 12px !important;
+        font-weight: 600;
+    }
+    
+    [data-testid="stDataFrame"] tr:hover td {
+        background-color: rgba(25, 118, 210, 0.05) !important;
+    }
+    
+    /* Estilos para tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    
     .stTabs [data-baseweb="tab"] {
-        height: 50px;
+        height: 60px;
         white-space: pre-wrap;
         background-color: #FFFFFF;
-        border-radius: 4px;
+        border-radius: 8px;
         color: #1976D2;
-        font-weight: 500;
+        font-weight: 700;
+        font-size: 18px !important;
+        border: 2px solid #E0E0E0;
     }
+    
     .stTabs [aria-selected="true"] {
         background-color: #1976D2 !important;
         color: white !important;
+        border: 2px solid #1976D2 !important;
     }
+    
+    /* Estilos para containers de métricas */
     .metrics-container {
         background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 10px;
-        margin-top: 20px;
+        padding: 25px;
+        border-radius: 12px;
+        margin-top: 25px;
         border: 1px solid #e9ecef;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
     }
+    
     .metric-box {
         background-color: white;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border-left: 4px solid #1976D2;
-        margin: 5px 0;
+        padding: 22px;
+        border-radius: 10px;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.08);
+        border-left: 6px solid #1976D2;
+        margin: 10px 0;
+        transition: transform 0.2s;
     }
+    
+    .metric-box:hover {
+        transform: translateY(-3px);
+    }
+    
     .metric-box h3 {
         color: #1976D2;
-        font-size: 16px;
+        font-size: 20px !important;
         margin: 0;
-        font-weight: 500;
+        font-weight: 700 !important;
     }
+    
     .metric-box p {
         color: #333;
-        font-size: 24px;
-        margin: 5px 0;
-        font-weight: bold;
+        font-size: 36px !important;
+        margin: 8px 0;
+        font-weight: 900 !important;
     }
+    
     .metric-box small {
         color: #666;
-        font-size: 14px;
+        font-size: 16px !important;
+        font-style: italic;
+    }
+    
+    /* Estilo para labels dos controles */
+    label.css-109ww5y {
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        color: #333333 !important;
+    }
+    
+    /* Estilo para expandir/colapsar */
+    details {
+        margin: 1rem 0;
+    }
+    
+    details summary {
+        font-weight: 700;
+        cursor: pointer;
+        padding: 12px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+    }
+    
+    /* Estilo para informações adicionais */
+    .info-text {
+        font-size: 18px;
+        line-height: 1.6;
+        background-color: #f8f9fa;
+        padding: 18px;
+        border-radius: 8px;
+        border-left: 5px solid #1976D2;
+        margin: 16px 0;
+        font-weight: 600;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -429,10 +619,14 @@ def mostrar_metricas_destaque(df, df_todos, date_from, date_to):
     """
     Exibe as métricas de destaque em cards
     """
-    st.subheader("Métricas de Destaque")
+    # Adicionar mensagem de verificação
+    st.success("RECALCULADO: Médias baseadas em dias úteis a partir da primeira conclusão registrada v4.0")
     
-    # Calcular métricas apenas com dados filtrados por data
-    total_conclusoes = len(df)
+    # Usar dados originais sem filtro
+    df_filtrado = df
+    
+    # Calcular métricas com dados originais
+    total_conclusoes = len(df_filtrado)
     
     # Carregar dados totais da página inicial
     try:
@@ -442,20 +636,35 @@ def mostrar_metricas_destaque(df, df_todos, date_from, date_to):
             total_negocios = len(df_inicio)
             
             # Total de concluídos
-            concluidos = len(df)
+            concluidos = len(df_filtrado)
             
             # Calcular taxa de conclusão
             taxa_conclusao = round((concluidos / max(1, total_negocios)) * 100, 1)
             
-            # Adicionar informações detalhadas
+            # Adicionar informações detalhadas com mais destaque
             col_info1, col_info2, col_info3 = st.columns(3)
             with col_info1:
-                st.info(f"Total de Negócios: {total_negocios}")
+                st.markdown("""
+                <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; box-shadow: 0 3px 8px rgba(0,0,0,0.1); border-left: 5px solid #1976D2;">
+                    <p style="font-size: 17px; margin: 0; font-weight: 600; color: #1565C0;">Total de Negócios:</p>
+                    <p style="font-size: 24px; margin: 5px 0 0 0; font-weight: 800; color: #0D47A1;">{}</p>
+                </div>
+                """.format(f"{total_negocios:,}".replace(",", ".")), unsafe_allow_html=True)
             with col_info2:
-                st.info(f"Total de Conclusões: {concluidos}")
+                st.markdown("""
+                <div style="background-color: #e8f5e9; padding: 15px; border-radius: 8px; box-shadow: 0 3px 8px rgba(0,0,0,0.1); border-left: 5px solid #4CAF50;">
+                    <p style="font-size: 17px; margin: 0; font-weight: 600; color: #2E7D32;">Total de Conclusões:</p>
+                    <p style="font-size: 24px; margin: 5px 0 0 0; font-weight: 800; color: #1B5E20;">{}</p>
+                </div>
+                """.format(f"{concluidos:,}".replace(",", ".")), unsafe_allow_html=True)
             with col_info3:
                 pendentes = total_negocios - concluidos
-                st.warning(f"Pendentes/Incompletos: {pendentes}")
+                st.markdown("""
+                <div style="background-color: #fff8e1; padding: 15px; border-radius: 8px; box-shadow: 0 3px 8px rgba(0,0,0,0.1); border-left: 5px solid #FFC107;">
+                    <p style="font-size: 17px; margin: 0; font-weight: 600; color: #F57F17;">Pendentes/Incompletos:</p>
+                    <p style="font-size: 24px; margin: 5px 0 0 0; font-weight: 800; color: #E65100;">{}</p>
+                </div>
+                """.format(f"{pendentes:,}".replace(",", ".")), unsafe_allow_html=True)
         else:
             taxa_conclusao = 0
             st.warning("Não foi possível carregar os dados totais")
@@ -463,29 +672,106 @@ def mostrar_metricas_destaque(df, df_todos, date_from, date_to):
         st.warning(f"Erro ao calcular taxa de conclusão: {str(e)}")
         taxa_conclusao = 0
     
-    # Calcular médias
-    dias_uteis = calcular_dias_uteis(date_from, date_to)
-    media_diaria = round(total_conclusoes / max(1, dias_uteis), 1)
-    media_horaria = round(media_diaria / 8, 1)
+    # Converter para datetime se não for
+    if not isinstance(date_from, datetime):
+        date_from = datetime.combine(date_from, datetime.min.time())
+    if not isinstance(date_to, datetime):
+        date_to = datetime.combine(date_to, datetime.min.time())
     
-    # Exibir métricas em cards
+    # Encontrar a data da primeira conclusão (se houver registros)
+    data_primeira_conclusao = None
+    if not df_filtrado.empty and 'DATA_CONCLUSAO' in df_filtrado.columns:
+        df_com_data = df_filtrado.dropna(subset=['DATA_CONCLUSAO'])
+        if not df_com_data.empty:
+            data_primeira_conclusao = df_com_data['DATA_CONCLUSAO'].min().date()
+    
+    # Se não houver conclusões, usar a data inicial
+    if data_primeira_conclusao is None:
+        data_primeira_conclusao = date_from.date()
+    
+    # Ajustar a data inicial para ser a data da primeira conclusão
+    data_inicio_efetiva = max(date_from.date(), data_primeira_conclusao)
+    
+    # SIMPLIFICAR: Contar dias úteis naturais (dias em que houve trabalho)
+    dias_uteis_naturais = 0
+    horas_uteis = 0
+    
+    # Criar uma lista para debug com detalhes de cada dia
+    dias_debug = []
+    
+    # Calcular dia a dia a partir da primeira conclusão
+    data_atual = datetime.combine(data_inicio_efetiva, datetime.min.time())
+    while data_atual.date() <= date_to.date():
+        # Dia da semana: 0 = segunda, 6 = domingo
+        dia_semana = data_atual.weekday()
+        
+        # Segunda a sábado são considerados dias úteis
+        if 0 <= dia_semana <= 5:  # Segunda a sábado
+            dias_uteis_naturais += 1
+            
+            # Registrar horas para média horária
+            if 0 <= dia_semana <= 4:  # Segunda a sexta
+                horas_uteis += 12  # 7h - 19h (12 horas)
+                dias_debug.append(f"{data_atual.strftime('%d/%m/%Y')} ({['Seg', 'Ter', 'Qua', 'Qui', 'Sex'][dia_semana]}): +1 dia, +12h")
+            else:  # Sábado
+                horas_uteis += 3   # 9h - 12h (3 horas)
+                dias_debug.append(f"{data_atual.strftime('%d/%m/%Y')} (Sáb): +1 dia, +3h")
+        else:  # Domingo
+            dias_debug.append(f"{data_atual.strftime('%d/%m/%Y')} (Dom): +0 dias, +0h")
+        
+        # Avançar para o próximo dia
+        data_atual += timedelta(days=1)
+    
+    # Calcular médias
+    # Média diária baseada em dias naturais (dias em que houve trabalho)
+    media_diaria = round(total_conclusoes / max(1, dias_uteis_naturais), 2)
+    
+    # Média horária
+    media_horaria = round(total_conclusoes / max(1, horas_uteis), 2)
+    
+    # Exibir métricas em cards com destaque extra
     col1, col2, col3, col4 = st.columns(4)
     
     metricas = [
-        ("Total de Conclusões", total_conclusoes, "total"),
-        ("Média Diária", media_diaria, "media-diaria"),
-        ("Média por Hora", media_horaria, "media-hora"),
-        ("Taxa de Conclusão", f"{taxa_conclusao}%", "taxa")
+        ("Total de Conclusões", f"{total_conclusoes:,}".replace(",", "."), "total", "#2E7D32"),
+        ("Média Diária", f"{media_diaria:,.2f}".replace(",", "."), "media-diaria", "#1565C0"),
+        ("Média por Hora", f"{media_horaria:,.2f}".replace(",", "."), "media-hora", "#6A1B9A"),
+        ("Taxa de Conclusão", f"{taxa_conclusao}%", "taxa", "#E65100")
     ]
     
-    for col, (titulo, valor, classe) in zip([col1, col2, col3, col4], metricas):
+    for col, (titulo, valor, classe, cor) in zip([col1, col2, col3, col4], metricas):
         with col:
             st.markdown(f"""
-            <div class="metric-card {classe}">
-                <div class="metric-value">{valor}</div>
-                <div class="metric-title">{titulo}</div>
+            <div class="metric-card {classe}" style="background: linear-gradient(to bottom, white, #f8f9fa); border-width: 3px; border-color: {cor}; border-left-width: 10px; box-shadow: 0 8px 16px rgba(0,0,0,0.12); font-family: Arial, Helvetica, sans-serif;">
+                <div class="metric-value" style="font-size: 58px; font-weight: 900; color: {cor}; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);">{valor}</div>
+                <div class="metric-title" style="font-size: 20px; font-weight: 800; color: {cor}; text-transform: uppercase; letter-spacing: 0.5px;">{titulo}</div>
             </div>
             """, unsafe_allow_html=True)
+    
+    # Destacar a data inicial efetiva (primeira conclusão)
+    if data_inicio_efetiva > date_from.date():
+        st.warning(f"⚠️ **Primeira conclusão registrada em {data_inicio_efetiva.strftime('%d/%m/%Y')}**. Médias calculadas a partir desta data.")
+    
+    # Informações sobre o cálculo com mais destaque
+    st.markdown(f"""
+    <div class="info-text" style="background-color: #f3e5f5; border-left: 6px solid #7B1FA2; padding: 20px; margin: 20px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.08); font-family: Arial, Helvetica, sans-serif;">
+        <div style="font-size: 18px; margin-bottom: 10px;">
+            <strong style="font-size: 19px; color: #4A148C;">Período considerado:</strong> 
+            <span style="font-weight: 700;">{data_inicio_efetiva.strftime('%d/%m/%Y')} a {date_to.strftime('%d/%m/%Y')}</span>
+        </div>
+        <div style="font-size: 18px; margin-bottom: 10px;">
+            <strong style="color: #4A148C;">Dias úteis (seg-sáb):</strong> 
+            <span style="font-weight: 800; font-size: 20px;">{dias_uteis_naturais}</span> dias | 
+            <strong style="color: #4A148C;">Horas úteis:</strong> 
+            <span style="font-weight: 800; font-size: 20px;">{horas_uteis}h</span>
+        </div>
+        <div style="font-size: 18px;">
+            <strong style="color: #4A148C;">Cálculo da média:</strong> 
+            <span style="font-weight: 700;">{total_conclusoes:,} conclusões ÷ {dias_uteis_naturais} dias = 
+            <span style="font-weight: 900; font-size: 20px; color: #1565C0;">{media_diaria:,.2f}</span> conclusões/dia</span>
+        </div>
+    </div>
+    """.replace(",", "."), unsafe_allow_html=True)
 
 def calcular_dias_uteis(data_inicio, data_fim):
     """
@@ -534,14 +820,17 @@ def mostrar_ranking_produtividade(df, df_todos):
         df_todos (pandas.DataFrame): DataFrame com todos os dados (incluindo não concluídos)
     """
     try:
+        # Usar os dados originais sem filtragem
+        df_filtrado = df
+        
         # Verificar se a coluna de responsáveis existe em df_todos
         if 'ASSIGNED_BY_NAME' not in df_todos.columns:
             st.error("Não foi possível gerar o ranking: coluna de responsáveis não encontrada.")
             return
         
         # Agrupar por responsável e contar o número de conclusões para os que concluíram
-        if not df.empty and 'ASSIGNED_BY_NAME' in df.columns:
-            ranking_conclusoes = df.groupby('ASSIGNED_BY_NAME').size().reset_index(name='TOTAL_CONCLUSOES')
+        if not df_filtrado.empty and 'ASSIGNED_BY_NAME' in df_filtrado.columns:
+            ranking_conclusoes = df_filtrado.groupby('ASSIGNED_BY_NAME').size().reset_index(name='TOTAL_CONCLUSOES')
         else:
             # Se não há conclusões, criar DataFrame vazio com as colunas necessárias
             ranking_conclusoes = pd.DataFrame(columns=['ASSIGNED_BY_NAME', 'TOTAL_CONCLUSOES'])
@@ -558,14 +847,66 @@ def mostrar_ranking_produtividade(df, df_todos):
         # Converter para inteiro
         ranking['TOTAL_CONCLUSOES'] = ranking['TOTAL_CONCLUSOES'].astype(int)
         
+        # Calcular pendentes
+        ranking['PENDENTES'] = ranking['TOTAL_ATRIBUIDOS'] - ranking['TOTAL_CONCLUSOES']
+        
         # Calcular taxa de conclusão
         ranking['TAXA_CONCLUSAO'] = (ranking['TOTAL_CONCLUSOES'] / ranking['TOTAL_ATRIBUIDOS'] * 100).round(1)
         
-        # Calcular média de conclusões por dia útil (dias que o responsável trabalhou)
-        if not df.empty and 'DATA_CONCLUSAO' in df.columns:
-            dias_trabalhados = df.groupby(['ASSIGNED_BY_NAME', df['DATA_CONCLUSAO'].dt.date]).size().reset_index()
-            dias_por_responsavel = dias_trabalhados.groupby('ASSIGNED_BY_NAME').size().reset_index(name='DIAS_TRABALHADOS')
-            ranking = pd.merge(ranking, dias_por_responsavel, on='ASSIGNED_BY_NAME', how='left')
+        # Calcular dias trabalhados (dias em que cada responsável teve pelo menos uma conclusão)
+        if not df_filtrado.empty and 'DATA_CONCLUSAO' in df_filtrado.columns:
+            # Criar colunas auxiliares
+            df_temp = df_filtrado.copy()
+            df_temp['DATA'] = df_temp['DATA_CONCLUSAO'].dt.date
+            df_temp['DIA_SEMANA'] = df_temp['DATA_CONCLUSAO'].dt.weekday
+            
+            # Lista para armazenar os dados de dias trabalhados com primeira conclusão
+            dados_dias_trabalhados = []
+            
+            # Para cada responsável, calcular dias úteis a partir da primeira conclusão
+            for responsavel in df_temp['ASSIGNED_BY_NAME'].unique():
+                # Filtrar dados do responsável
+                df_resp = df_temp[df_temp['ASSIGNED_BY_NAME'] == responsavel]
+                
+                # Encontrar data da primeira conclusão
+                primeira_conclusao = df_resp['DATA'].min()
+                
+                # Encontrar data da última conclusão
+                ultima_conclusao = df_resp['DATA'].max()
+                
+                # Calcular dias úteis entre a primeira e a última conclusão
+                dias_uteis = 0
+                data_atual = datetime.combine(primeira_conclusao, datetime.min.time())
+                
+                while data_atual.date() <= ultima_conclusao:
+                    dia_semana = data_atual.weekday()
+                    if dia_semana <= 5:  # Segunda a sábado
+                        dias_uteis += 1
+                    data_atual += timedelta(days=1)
+                
+                # Dias em que o responsável realmente trabalhou (com conclusões)
+                dias_com_conclusao = df_resp['DATA'].nunique()
+                
+                # Adicionar à lista de dados
+                dados_dias_trabalhados.append({
+                    'ASSIGNED_BY_NAME': responsavel,
+                    'PRIMEIRA_CONCLUSAO': primeira_conclusao,
+                    'ULTIMA_CONCLUSAO': ultima_conclusao,
+                    'DIAS_UTEIS_PERIODO': dias_uteis,
+                    'DIAS_COM_CONCLUSAO': dias_com_conclusao
+                })
+            
+            # Converter para DataFrame
+            df_dias = pd.DataFrame(dados_dias_trabalhados)
+            
+            # Mesclar com o ranking
+            if not df_dias.empty:
+                ranking = pd.merge(ranking, df_dias, on='ASSIGNED_BY_NAME', how='left')
+                
+                # Usar os dias úteis do período como dias trabalhados
+                ranking['DIAS_TRABALHADOS'] = ranking['DIAS_UTEIS_PERIODO']
+            else:
+                ranking['DIAS_TRABALHADOS'] = 0
         else:
             ranking['DIAS_TRABALHADOS'] = 0
         
@@ -575,7 +916,15 @@ def mostrar_ranking_produtividade(df, df_todos):
         # Calcular média diária (evitando divisão por zero)
         ranking['MEDIA_DIARIA'] = 0.0  # Valor padrão
         mask = ranking['DIAS_TRABALHADOS'] > 0
-        ranking.loc[mask, 'MEDIA_DIARIA'] = (ranking.loc[mask, 'TOTAL_CONCLUSOES'] / ranking.loc[mask, 'DIAS_TRABALHADOS']).round(1)
+        ranking.loc[mask, 'MEDIA_DIARIA'] = (ranking.loc[mask, 'TOTAL_CONCLUSOES'] / ranking.loc[mask, 'DIAS_TRABALHADOS']).round(2)
+        
+        # Determinar o melhor valor para destaque (maior média diária)
+        if not ranking.empty and 'MEDIA_DIARIA' in ranking.columns:
+            melhor_media = ranking['MEDIA_DIARIA'].max()
+            
+            # Criar coluna de status para destacar
+            ranking['STATUS'] = ''
+            ranking.loc[ranking['MEDIA_DIARIA'] == melhor_media, 'STATUS'] = '🏆'
         
         # Ordenar pelo total de conclusões em ordem decrescente
         ranking = ranking.sort_values('TOTAL_CONCLUSOES', ascending=False).reset_index(drop=True)
@@ -583,17 +932,31 @@ def mostrar_ranking_produtividade(df, df_todos):
         # Adicionar coluna de posição
         ranking.insert(0, 'POSICAO', ranking.index + 1)
         
+        # Formatação dos valores numéricos para exibição
+        ranking['POSICAO_FORMATADA'] = ranking['POSICAO'].apply(lambda x: f"{x}º")
+        ranking['MEDIA_DIARIA_FORMATADA'] = ranking['MEDIA_DIARIA'].apply(lambda x: f"{x:.2f}".replace('.', ','))
+        
         # Configuração das colunas para exibição com st.column_config
         colunas = {
-            "POSICAO": st.column_config.NumberColumn(
+            "POSICAO_FORMATADA": st.column_config.TextColumn(
                 "Posição",
                 help="Ranking de produtividade",
-                format="%d",
+                width="small"
+            ),
+            "STATUS": st.column_config.TextColumn(
+                " ",
+                help="Destaque",
                 width="small"
             ),
             "ASSIGNED_BY_NAME": st.column_config.TextColumn(
                 "Responsável",
                 width="medium"
+            ),
+            "PENDENTES": st.column_config.NumberColumn(
+                "Pendentes",
+                help="Demandas ainda não concluídas",
+                format="%d",
+                width="small"
             ),
             "TOTAL_CONCLUSOES": st.column_config.NumberColumn(
                 "Conclusões",
@@ -601,10 +964,21 @@ def mostrar_ranking_produtividade(df, df_todos):
                 format="%d",
                 width="small"
             ),
-            "MEDIA_DIARIA": st.column_config.NumberColumn(
+            "MEDIA_DIARIA_FORMATADA": st.column_config.TextColumn(
                 "Média Diária",
-                help="Média de conclusões por dia trabalhado",
-                format="%.1f",
+                help="Média de conclusões por dia útil do período (seg-sáb)",
+                width="small"
+            ),
+            "DIAS_TRABALHADOS": st.column_config.NumberColumn(
+                "Dias Úteis",
+                help="Quantidade de dias úteis (seg-sáb) entre a primeira e última conclusão",
+                format="%d",
+                width="small"
+            ),
+            "DIAS_COM_CONCLUSAO": st.column_config.NumberColumn(
+                "Dias c/ Conclusão",
+                help="Quantidade de dias em que houve pelo menos uma conclusão",
+                format="%d",
                 width="small"
             ),
             "TAXA_CONCLUSAO": st.column_config.ProgressColumn(
@@ -617,17 +991,73 @@ def mostrar_ranking_produtividade(df, df_todos):
             )
         }
         
+        # Colunas a exibir - invertendo a ordem de Pendentes e Conclusões
+        colunas_exibir = ['POSICAO_FORMATADA', 'STATUS', 'ASSIGNED_BY_NAME', 'PENDENTES', 
+                          'TOTAL_CONCLUSOES', 'MEDIA_DIARIA_FORMATADA', 'DIAS_TRABALHADOS', 'DIAS_COM_CONCLUSAO', 'TAXA_CONCLUSAO']
+        
         # Exibir o ranking usando o st.dataframe com column_config
         st.dataframe(
-            ranking,
+            ranking[colunas_exibir],
             column_config=colunas,
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
+            height=min(400, len(ranking) * 50 + 60)  # Ajusta a altura com base no número de linhas
         )
+        
+        # Informação sobre o cálculo
+        st.markdown("""
+        <div class="info-text">
+          <strong>📊 Cálculo das médias:</strong> As médias são calculadas considerando os dias úteis (seg-sáb) entre a primeira e a última conclusão de cada responsável.<br>
+          <strong>🏆 Destaque:</strong> Indica o responsável com a melhor média diária.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Mostrar métricas dos 3 melhores (em um grid de métricas)
+        if len(ranking) >= 3:
+            # Usar o ranking já ordenado por total de conclusões (ranking principal)
+            top3 = ranking.head(3).copy()
+            
+            # Calcular percentual em relação ao melhor (primeiro = 100%)
+            melhor_total = top3['TOTAL_CONCLUSOES'].iloc[0]
+            top3['PERCENTUAL'] = (top3['TOTAL_CONCLUSOES'] / melhor_total * 100).round(1)
+            
+            st.markdown("""
+            <h3 style="font-size: 20px; margin-top: 30px; margin-bottom: 15px; color: #1A237E; font-weight: 800; font-family: Arial, Helvetica, sans-serif;">Top 3 - Maiores Totais de Conclusão</h3>
+            <p style="color: #616161; font-size: 16px; margin-bottom: 20px; font-family: Arial, Helvetica, sans-serif;">
+            Este ranking considera o <strong>total de conclusões</strong>, mantendo a mesma ordem da tabela acima.
+            </p>
+            """, unsafe_allow_html=True)
+            
+            col1, col2, col3 = st.columns(3)
+            for i, (idx, row) in enumerate(top3.iterrows()):
+                col = [col1, col2, col3][i]
+                with col:
+                    media = row['MEDIA_DIARIA']
+                    nome = row['ASSIGNED_BY_NAME']
+                    total = row['TOTAL_CONCLUSOES']
+                    dias = row['DIAS_TRABALHADOS']
+                    percentual = row['PERCENTUAL']
+                    percentual_texto = f"{percentual:.1f}%" if i > 0 else "100%"
+                    # A posição no ranking já é a correta, pois estamos usando o mesmo ranking
+                    posicao_ranking = int(row['POSICAO'])
+                    
+                    st.markdown(f"""
+                    <div style="background-color: white; border-radius: 10px; padding: 20px; box-shadow: 0 3px 10px rgba(0,0,0,0.1); height: 100%; border-top: 5px solid {'#FFD700' if i == 0 else '#C0C0C0' if i == 1 else '#CD7F32'}; font-family: Arial, Helvetica, sans-serif;">
+                        <div style="font-size: 24px; text-align: center; margin-bottom: 10px;">{"🥇" if i == 0 else "🥈" if i == 1 else "🥉"}</div>
+                        <div style="font-size: 18px; font-weight: 600; text-align: center; margin-bottom: 10px; color: #1A237E;">{nome}</div>
+                        <div style="position: absolute; top: 10px; right: 10px; background-color: #f0f0f0; border-radius: 50%; width: 24px; height: 24px; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; color: #333;">{posicao_ranking}º</div>
+                        <div style="font-size: 32px; font-weight: 800; text-align: center; margin-bottom: 5px; color: {'#FF6F00' if i == 0 else '#455A64' if i == 1 else '#6D4C41'};">{total}</div>
+                        <div style="font-size: 14px; text-align: center; color: #757575;">conclusões</div>
+                        <div style="font-size: 24px; font-weight: 800; text-align: center; margin-top: 15px; color: {'#FF6F00' if i == 0 else '#455A64' if i == 1 else '#6D4C41'};">{percentual_texto}</div>
+                        <div style="font-size: 14px; text-align: center; color: #757575; margin-bottom: 10px;">produtividade</div>
+                        <div style="font-size: 14px; text-align: center; margin-top: 15px; color: #616161;">média de {media:.2f} por dia em {dias} dias úteis</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
     except Exception as e:
         st.error(f"Erro ao gerar ranking de produtividade: {str(e)}")
 
-def mostrar_analises_temporais(df):
+def mostrar_analises_temporais(df, date_from, date_to):
     """
     Exibe análises temporais de dados de conclusão de tarefas.
     """
@@ -643,11 +1073,66 @@ def mostrar_analises_temporais(df):
         # Preparar dados
         df_valido = df.dropna(subset=['DATA_CONCLUSAO']).copy()
         df_valido['DATA_CONCLUSAO'] = pd.to_datetime(df_valido['DATA_CONCLUSAO'])
+        
+        if df_valido.empty:
+            st.warning("Não há dados disponíveis para análises temporais.")
+            return
+
+        # Encontrar a data da primeira conclusão
+        data_primeira_conclusao = df_valido['DATA_CONCLUSAO'].min().date()
+        
+        # Ajustar a data inicial para ser a data da primeira conclusão
+        if isinstance(date_from, datetime):
+            data_inicio_efetiva = max(date_from.date(), data_primeira_conclusao)
+        else:
+            data_inicio_efetiva = max(date_from, data_primeira_conclusao)
+        
+        # Garantir que date_from e date_to sejam datetime
+        if not isinstance(date_from, datetime):
+            date_from = datetime.combine(date_from, datetime.min.time())
+        if not isinstance(date_to, datetime):
+            date_to = datetime.combine(date_to, datetime.min.time())
+        
+        # Calcular dias úteis (dias em que houve trabalho) a partir da primeira conclusão
+        dias_uteis_naturais = 0
+        horas_uteis = 0
+        
+        # Calcular dias úteis e horas úteis
+        data_atual = datetime.combine(data_inicio_efetiva, datetime.min.time())
+        while data_atual.date() <= date_to.date():
+            dia_semana = data_atual.weekday()
+            if dia_semana <= 5:  # Segunda a sábado
+                dias_uteis_naturais += 1
+                if dia_semana <= 4:  # Segunda a sexta
+                    horas_uteis += 12
+                else:  # Sábado
+                    horas_uteis += 3
+            # Domingo não conta
+            data_atual += timedelta(days=1)
+        
+        # Mostrar informações sobre o período com destaque
+        st.markdown(f"""
+        <div class="info-text" style="background-color: #f1f8e9; border-color: #558B2F; font-family: Arial, Helvetica, sans-serif;">
+            <strong style="font-size: 20px; color: #33691E;">Análise do período:</strong> 
+            <span style="font-weight: 700; font-size: 19px;">{data_inicio_efetiva.strftime('%d/%m/%Y')} a {date_to.strftime('%d/%m/%Y')}</span> | 
+            <strong style="color: #33691E;">Dias úteis:</strong> 
+            <span style="font-weight: 800; font-size: 20px;">{dias_uteis_naturais}</span> | 
+            <strong style="color: #33691E;">Horas úteis:</strong> 
+            <span style="font-weight: 800; font-size: 20px;">{horas_uteis}h</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Destacar a data inicial efetiva (primeira conclusão)
+        if isinstance(date_from, datetime) and data_inicio_efetiva > date_from.date():
+            st.info(f"ℹ️ **Análises temporais consideram dados a partir da primeira conclusão** ({data_inicio_efetiva.strftime('%d/%m/%Y')}).")
+        elif not isinstance(date_from, datetime) and data_inicio_efetiva > date_from:
+            st.info(f"ℹ️ **Análises temporais consideram dados a partir da primeira conclusão** ({data_inicio_efetiva.strftime('%d/%m/%Y')}).")
 
         # Definir cores para melhor contraste
         cores = {
             'principal': '#000000',  # Preto para linha principal
             'media': '#FF5722',      # Laranja para média
+            'media_ajustada': '#9C27B0',  # Roxo para média ajustada
             'tendencia': '#1976D2',  # Azul para tendência
             'grid': '#E0E0E0',       # Cinza claro para grid
             'texto': '#212121',      # Cinza escuro para texto
@@ -661,10 +1146,50 @@ def mostrar_analises_temporais(df):
             horizontal=True
         )
 
+        # Fonte nativa para todos os gráficos
+        fonte_nativa = "Arial, Helvetica, sans-serif"
+
         # 1. Análise por Dia
         if tipo_analise == "Análise por Dia":
-            df_diario = df_valido.groupby(df_valido['DATA_CONCLUSAO'].dt.date).size().reset_index(name='CONCLUSOES')
-            media_diaria = df_diario['CONCLUSOES'].mean()
+            # Agrupar dados por dia para contar conclusões
+            df_diario_original = df_valido.groupby(df_valido['DATA_CONCLUSAO'].dt.date).size().reset_index(name='CONCLUSOES')
+            
+            # Criar um DataFrame com todos os dias do período (incluindo dias sem conclusões)
+            # Converter para datetime se não for
+            if not isinstance(date_from, datetime):
+                date_from_dt = datetime.combine(date_from, datetime.min.time())
+            else:
+                date_from_dt = date_from
+                
+            if not isinstance(date_to, datetime):
+                date_to_dt = datetime.combine(date_to, datetime.min.time())
+            else:
+                date_to_dt = date_to
+            
+            # Definir data mínima fixa (04/03 do ano atual)
+            data_minima = datetime(date_to_dt.year, 3, 4)
+            if data_minima > date_to_dt:  # Se 04/03 deste ano for futuro, usa ano anterior
+                data_minima = datetime(date_to_dt.year - 1, 3, 4)
+            
+            # Usar a data máxima entre a data mínima fixa e a data escolhida pelo usuário
+            date_from_efetiva = max(date_from_dt, data_minima)
+            
+            # Gerar lista de todos os dias no período
+            todas_datas = pd.date_range(start=date_from_efetiva, end=date_to_dt, freq='D')
+            df_todos_dias = pd.DataFrame({'DATA_CONCLUSAO': todas_datas.date})
+            
+            # Mesclar com dados originais (preservando todos os dias)
+            df_diario = pd.merge(df_todos_dias, df_diario_original, how='left', on='DATA_CONCLUSAO')
+            
+            # Preencher NaN com 0 (dias sem conclusões)
+            df_diario['CONCLUSOES'] = df_diario['CONCLUSOES'].fillna(0).astype(int)
+            
+            # Média simples (média aritmética diária)
+            media_diaria_simples = df_diario['CONCLUSOES'].mean()
+            
+            # Média ajustada (por dia útil natural a partir da primeira conclusão)
+            total_conclusoes = df_diario['CONCLUSOES'].sum()
+            media_diaria_ajustada = round(total_conclusoes / dias_uteis_naturais, 2)
             
             # Calcular linha de tendência
             x = np.arange(len(df_diario))
@@ -674,14 +1199,24 @@ def mostrar_analises_temporais(df):
             
             fig = go.Figure()
             
-            # Adicionar linha de média
+            # Adicionar linha de média simples
             fig.add_trace(go.Scatter(
                 x=df_diario['DATA_CONCLUSAO'],
-                y=[media_diaria] * len(df_diario),
+                y=[media_diaria_simples] * len(df_diario),
                 fill=None,
                 mode='lines',
                 line=dict(color=cores['media'], width=3, dash='dash'),
-                name='Média Diária'
+                name='Média Simples'
+            ))
+            
+            # Adicionar linha de média ajustada por dias úteis
+            fig.add_trace(go.Scatter(
+                x=df_diario['DATA_CONCLUSAO'],
+                y=[media_diaria_ajustada] * len(df_diario),
+                fill=None,
+                mode='lines',
+                line=dict(color=cores['media_ajustada'], width=3, dash='dot'),
+                name='Média por Dia Útil'
             ))
             
             # Adicionar linha de tendência
@@ -701,17 +1236,18 @@ def mostrar_analises_temporais(df):
                 mode='lines+markers+text',
                 line=dict(color=cores['principal'], width=4),
                 marker=dict(
-                    size=12,
+                    size=16,
                     symbol='circle',
                     line=dict(width=3, color=cores['tendencia'])
                 ),
                 text=df_diario['CONCLUSOES'],
                 textposition='top center',
+                textfont=dict(size=16, color='black', family=fonte_nativa),
                 name='Conclusões',
                 fillcolor=cores['area']
             ))
             
-            # Atualizar layout
+            # Atualizar layout com fontes nativas
             fig.update_layout(
                 title={
                     'text': 'Conclusões por Dia',
@@ -719,11 +1255,17 @@ def mostrar_analises_temporais(df):
                     'x':0.5,
                     'xanchor': 'center',
                     'yanchor': 'top',
-                    'font': dict(size=24, color=cores['texto'])
+                    'font': dict(size=28, color=cores['texto'], family=fonte_nativa)
                 },
-                xaxis_title='Data',
-                yaxis_title='Número de Conclusões',
-                height=500,
+                xaxis_title={
+                    'text': 'Data',
+                    'font': dict(size=18, family=fonte_nativa)
+                },
+                yaxis_title={
+                    'text': 'Número de Conclusões',
+                    'font': dict(size=18, family=fonte_nativa)
+                },
+                height=550,
                 showlegend=True,
                 plot_bgcolor='white',
                 paper_bgcolor='white',
@@ -735,7 +1277,8 @@ def mostrar_analises_temporais(df):
                     x=0.01,
                     bgcolor='rgba(255, 255, 255, 0.9)',
                     bordercolor=cores['tendencia'],
-                    borderwidth=2
+                    borderwidth=2,
+                    font=dict(size=16, family=fonte_nativa)
                 )
             )
             
@@ -749,7 +1292,12 @@ def mostrar_analises_temporais(df):
                 zerolinecolor=cores['grid'],
                 showline=True,
                 linewidth=2,
-                linecolor=cores['texto']
+                linecolor=cores['texto'],
+                tickfont=dict(size=16, family=fonte_nativa),
+                tickmode='array',  # Forçar exibição de todos os valores
+                tickvals=df_diario['DATA_CONCLUSAO'].tolist(),  # Usar todos os dias como valores de ticks
+                ticktext=[d.strftime('%d/%m') for d in df_diario['DATA_CONCLUSAO']],  # Formatar datas como DD/MM
+                tickangle=45  # Rotacionar rótulos para evitar sobreposição
             )
             fig.update_yaxes(
                 showgrid=True,
@@ -760,11 +1308,12 @@ def mostrar_analises_temporais(df):
                 zerolinecolor=cores['grid'],
                 showline=True,
                 linewidth=2,
-                linecolor=cores['texto']
+                linecolor=cores['texto'],
+                tickfont=dict(size=16, family=fonte_nativa)
             )
             
             st.plotly_chart(fig, use_container_width=True)
-
+        
         # 2. Análise por Dia da Semana
         elif tipo_analise == "Análise por Dia da Semana":
             dias_semana_pt = {
@@ -805,6 +1354,7 @@ def mostrar_analises_temporais(df):
                 y=df_dia_semana['CONCLUSOES'],
                 text=df_dia_semana['CONCLUSOES'],
                 textposition='auto',
+                textfont=dict(family=fonte_nativa, size=16),
                 name='Conclusões',
                 marker=dict(
                     color='#1976D2',
@@ -856,10 +1406,16 @@ def mostrar_analises_temporais(df):
                     'x':0.5,
                     'xanchor': 'center',
                     'yanchor': 'top',
-                    'font': dict(size=24, color='#212121')
+                    'font': dict(size=28, color='#212121', family=fonte_nativa)
                 },
-                xaxis_title='Dia da Semana',
-                yaxis_title='Número de Conclusões',
+                xaxis_title={
+                    'text': 'Dia da Semana',
+                    'font': dict(size=18, family=fonte_nativa)
+                },
+                yaxis_title={
+                    'text': 'Número de Conclusões',
+                    'font': dict(size=18, family=fonte_nativa)
+                },
                 height=500,
                 showlegend=True,
                 plot_bgcolor='white',
@@ -873,7 +1429,8 @@ def mostrar_analises_temporais(df):
                     x=0.01,
                     bgcolor='rgba(255, 255, 255, 0.9)',
                     bordercolor='#1976D2',
-                    borderwidth=2
+                    borderwidth=2,
+                    font=dict(size=16, family=fonte_nativa)
                 )
             )
             
@@ -887,7 +1444,8 @@ def mostrar_analises_temporais(df):
                 zerolinecolor='#E0E0E0',
                 showline=True,
                 linewidth=2,
-                linecolor='#212121'
+                linecolor='#212121',
+                tickfont=dict(size=16, family=fonte_nativa)
             )
             fig.update_yaxes(
                 showgrid=True,
@@ -898,10 +1456,37 @@ def mostrar_analises_temporais(df):
                 zerolinecolor='#E0E0E0',
                 showline=True,
                 linewidth=2,
-                linecolor='#212121'
+                linecolor='#212121',
+                tickfont=dict(size=16, family=fonte_nativa)
             )
             
             st.plotly_chart(fig, use_container_width=True)
+            
+            # Mostrar métricas sobre dia da semana
+            dia_mais_produtivo = df_dia_semana.loc[df_dia_semana['CONCLUSOES'].idxmax()]
+            
+            st.markdown(f"""
+            <div class="metrics-container" style="background-color: #f5f5f5; border: 2px solid #e0e0e0; box-shadow: 0 6px 15px rgba(0,0,0,0.1); font-family: Arial, Helvetica, sans-serif;">
+                <h3 style="font-size: 24px; margin-bottom: 18px; color: #1A237E; font-weight: 800; text-transform: uppercase;">Métricas por Dia da Semana</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;">
+                    <div class="metric-box" style="border-left: 8px solid #1976D2; box-shadow: 0 5px 12px rgba(25, 118, 210, 0.1); font-family: Arial, Helvetica, sans-serif;">
+                        <h3 style="font-size: 21px; font-weight: 800;">Dia Mais Produtivo</h3>
+                        <p style="font-size: 28px; font-weight: 900; color: #1976D2;">{dia_mais_produtivo['DIA_SEMANA']}</p>
+                        <small style="font-size: 17px; font-weight: 600;">{int(dia_mais_produtivo['CONCLUSOES'])} conclusões</small>
+                    </div>
+                    <div class="metric-box" style="border-left: 8px solid #FF5722; box-shadow: 0 5px 12px rgba(255, 87, 34, 0.1); font-family: Arial, Helvetica, sans-serif;">
+                        <h3 style="font-size: 21px; font-weight: 800; color: #E64A19;">Média por Dia</h3>
+                        <p style="font-size: 38px; font-weight: 900; color: #FF5722;">{media_semanal:.2f}</p>
+                        <small style="font-size: 17px; font-weight: 600;">conclusões/dia</small>
+                    </div>
+                    <div class="metric-box" style="border-left: 8px solid #4CAF50; box-shadow: 0 5px 12px rgba(76, 175, 80, 0.1); font-family: Arial, Helvetica, sans-serif;">
+                        <h3 style="font-size: 21px; font-weight: 800; color: #2E7D32;">Processos Únicos</h3>
+                        <p style="font-size: 38px; font-weight: 900; color: #4CAF50;">{int(dia_mais_produtivo['PROCESSOS_UNICOS'])}</p>
+                        <small style="font-size: 17px; font-weight: 600;">no dia mais produtivo</small>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
         # 3. Análise por Hora
         elif tipo_analise == "Análise por Hora":
@@ -925,6 +1510,7 @@ def mostrar_analises_temporais(df):
                 y=df_hora['CONCLUSOES'],
                 text=df_hora['CONCLUSOES'],
                 textposition='auto',
+                textfont=dict(family=fonte_nativa, size=16),
                 name='Conclusões',
                 marker=dict(
                     color='#1976D2',
@@ -976,10 +1562,16 @@ def mostrar_analises_temporais(df):
                     'x':0.5,
                     'xanchor': 'center',
                     'yanchor': 'top',
-                    'font': dict(size=24, color='#212121')
+                    'font': dict(size=28, color='#212121', family=fonte_nativa)
                 },
-                xaxis_title='Hora',
-                yaxis_title='Número de Conclusões',
+                xaxis_title={
+                    'text': 'Hora',
+                    'font': dict(size=18, family=fonte_nativa)
+                },
+                yaxis_title={
+                    'text': 'Número de Conclusões',
+                    'font': dict(size=18, family=fonte_nativa)
+                },
                 height=500,
                 showlegend=True,
                 plot_bgcolor='white',
@@ -993,7 +1585,8 @@ def mostrar_analises_temporais(df):
                     x=0.01,
                     bgcolor='rgba(255, 255, 255, 0.9)',
                     bordercolor='#1976D2',
-                    borderwidth=2
+                    borderwidth=2,
+                    font=dict(size=16, family=fonte_nativa)
                 )
             )
             
@@ -1009,7 +1602,8 @@ def mostrar_analises_temporais(df):
                 zerolinecolor='#E0E0E0',
                 showline=True,
                 linewidth=2,
-                linecolor='#212121'
+                linecolor='#212121',
+                tickfont=dict(size=16, family=fonte_nativa)
             )
             fig.update_yaxes(
                 showgrid=True,
@@ -1020,11 +1614,55 @@ def mostrar_analises_temporais(df):
                 zerolinecolor='#E0E0E0',
                 showline=True,
                 linewidth=2,
-                linecolor='#212121'
+                linecolor='#212121',
+                tickfont=dict(size=16, family=fonte_nativa)
             )
             
             st.plotly_chart(fig, use_container_width=True)
-
+            
+            # Mostrar métricas sobre horários
+            hora_mais_produtiva = df_hora.loc[df_hora['CONCLUSOES'].idxmax()]
+            
+            # Categorizar períodos do dia
+            manha = df_hora[df_hora['HORA'].between(6, 11)]['CONCLUSOES'].sum()
+            tarde = df_hora[df_hora['HORA'].between(12, 17)]['CONCLUSOES'].sum()
+            noite = df_hora[df_hora['HORA'].between(18, 23)]['CONCLUSOES'].sum()
+            madrugada = df_hora[df_hora['HORA'].between(0, 5)]['CONCLUSOES'].sum()
+            
+            periodo_mais_produtivo = max(
+                [("Manhã", manha), ("Tarde", tarde), 
+                 ("Noite", noite), ("Madrugada", madrugada)],
+                key=lambda x: x[1]
+            )
+            
+            st.markdown(f"""
+            <div class="metrics-container" style="background-color: #f5f5f5; border: 2px solid #e0e0e0; box-shadow: 0 6px 15px rgba(0,0,0,0.1); font-family: Arial, Helvetica, sans-serif;">
+                <h3 style="font-size: 24px; margin-bottom: 18px; color: #1A237E; font-weight: 800; text-transform: uppercase;">Métricas por Hora</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;">
+                    <div class="metric-box" style="border-left: 8px solid #1976D2; box-shadow: 0 5px 12px rgba(25, 118, 210, 0.1); font-family: Arial, Helvetica, sans-serif;">
+                        <h3 style="font-size: 21px; font-weight: 800;">Horário Mais Produtivo</h3>
+                        <p style="font-size: 38px; font-weight: 900; color: #1976D2;">{hora_mais_produtiva['HORA']:02d}:00</p>
+                        <small style="font-size: 17px; font-weight: 600;">{int(hora_mais_produtiva['CONCLUSOES'])} conclusões</small>
+                    </div>
+                    <div class="metric-box" style="border-left: 8px solid #FF5722; box-shadow: 0 5px 12px rgba(255, 87, 34, 0.1); font-family: Arial, Helvetica, sans-serif;">
+                        <h3 style="font-size: 21px; font-weight: 800; color: #E64A19;">Período Mais Produtivo</h3>
+                        <p style="font-size: 38px; font-weight: 900; color: #FF5722;">{periodo_mais_produtivo[0]}</p>
+                        <small style="font-size: 17px; font-weight: 600;">{int(periodo_mais_produtivo[1])} conclusões</small>
+                    </div>
+                    <div class="metric-box" style="border-left: 8px solid #4CAF50; box-shadow: 0 5px 12px rgba(76, 175, 80, 0.1); font-family: Arial, Helvetica, sans-serif;">
+                        <h3 style="font-size: 21px; font-weight: 800; color: #2E7D32;">Média por Hora</h3>
+                        <p style="font-size: 38px; font-weight: 900; color: #4CAF50;">{media_hora:.2f}</p>
+                        <small style="font-size: 17px; font-weight: 600;">conclusões/hora</small>
+                    </div>
+                    <div class="metric-box" style="border-left: 8px solid #9C27B0; box-shadow: 0 5px 12px rgba(156, 39, 176, 0.1); font-family: Arial, Helvetica, sans-serif;">
+                        <h3 style="font-size: 21px; font-weight: 800; color: #7B1FA2;">Horas Produtivas</h3>
+                        <p style="font-size: 38px; font-weight: 900; color: #9C27B0;">{len(df_hora[df_hora['CONCLUSOES'] > media_hora])}</p>
+                        <small style="font-size: 17px; font-weight: 600;">acima da média</small>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        
         # 4. Análise por Semana
         else:
             df_valido['SEMANA'] = df_valido['DATA_CONCLUSAO'].dt.strftime('%Y-%V')
@@ -1047,6 +1685,7 @@ def mostrar_analises_temporais(df):
                 y=df_semanal['CONCLUSOES'],
                 text=df_semanal['CONCLUSOES'],
                 textposition='auto',
+                textfont=dict(family=fonte_nativa, size=16),
                 name='Conclusões',
                 marker=dict(
                     color='#1976D2',
@@ -1098,10 +1737,16 @@ def mostrar_analises_temporais(df):
                     'x':0.5,
                     'xanchor': 'center',
                     'yanchor': 'top',
-                    'font': dict(size=24, color='#212121')
+                    'font': dict(size=28, color='#212121', family=fonte_nativa)
                 },
-                xaxis_title='Semana',
-                yaxis_title='Número de Conclusões',
+                xaxis_title={
+                    'text': 'Semana',
+                    'font': dict(size=18, family=fonte_nativa)
+                },
+                yaxis_title={
+                    'text': 'Número de Conclusões',
+                    'font': dict(size=18, family=fonte_nativa)
+                },
                 height=500,
                 showlegend=True,
                 plot_bgcolor='white',
@@ -1115,7 +1760,8 @@ def mostrar_analises_temporais(df):
                     x=0.01,
                     bgcolor='rgba(255, 255, 255, 0.9)',
                     bordercolor='#1976D2',
-                    borderwidth=2
+                    borderwidth=2,
+                    font=dict(size=16, family=fonte_nativa)
                 )
             )
             
@@ -1129,7 +1775,8 @@ def mostrar_analises_temporais(df):
                 zerolinecolor='#E0E0E0',
                 showline=True,
                 linewidth=2,
-                linecolor='#212121'
+                linecolor='#212121',
+                tickfont=dict(size=16, family=fonte_nativa)
             )
             fig.update_yaxes(
                 showgrid=True,
@@ -1140,117 +1787,39 @@ def mostrar_analises_temporais(df):
                 zerolinecolor='#E0E0E0',
                 showline=True,
                 linewidth=2,
-                linecolor='#212121'
+                linecolor='#212121',
+                tickfont=dict(size=16, family=fonte_nativa)
             )
             
             st.plotly_chart(fig, use_container_width=True)
-
-        # Mostrar métricas abaixo do gráfico
-        if tipo_analise == "Análise por Dia":
-            dia_maior_prod = df_diario.loc[df_diario['CONCLUSOES'].idxmax()]
-            tendencia = df_diario['CONCLUSOES'].iloc[-1] - df_diario['CONCLUSOES'].iloc[0]
             
-            metricas = [
-                {
-                    "titulo": "Dia de Maior Produção",
-                    "valor": f"{dia_maior_prod['DATA_CONCLUSAO'].strftime('%d/%m/%Y')}",
-                    "subtitulo": f"{int(dia_maior_prod['CONCLUSOES'])} conclusões"
-                },
-                {
-                    "titulo": "Média Diária",
-                    "valor": f"{media_diaria:.1f}",
-                    "subtitulo": "conclusões/dia"
-                },
-                {
-                    "titulo": "Tendência",
-                    "valor": "↑ Crescente" if tendencia > 0 else "↓ Decrescente",
-                    "subtitulo": f"Diferença de {abs(tendencia):.1f} conclusões"
-                }
-            ]
-            
-            mostrar_metricas_analise("Métricas da Análise Diária", metricas)
-            
-        elif tipo_analise == "Análise por Dia da Semana":
-            dia_mais_produtivo = df_dia_semana.loc[df_dia_semana['CONCLUSOES'].idxmax()]
-            
-            metricas = [
-                {
-                    "titulo": "Dia Mais Produtivo",
-                    "valor": dia_mais_produtivo['DIA_SEMANA'],
-                    "subtitulo": f"{int(dia_mais_produtivo['CONCLUSOES'])} conclusões"
-                },
-                {
-                    "titulo": "Média por Dia da Semana",
-                    "valor": f"{media_semanal:.1f}",
-                    "subtitulo": "conclusões/dia"
-                },
-                {
-                    "titulo": "Processos Únicos",
-                    "valor": f"{int(dia_mais_produtivo['PROCESSOS_UNICOS'])}",
-                    "subtitulo": "no dia mais produtivo"
-                }
-            ]
-            
-            mostrar_metricas_analise("Métricas da Análise por Dia da Semana", metricas)
-            
-        elif tipo_analise == "Análise por Hora":
-            hora_mais_produtiva = df_hora.loc[df_hora['CONCLUSOES'].idxmax()]
-            
-            # Categorizar períodos do dia
-            manha = df_hora[df_hora['HORA'].between(6, 11)]['CONCLUSOES'].sum()
-            tarde = df_hora[df_hora['HORA'].between(12, 17)]['CONCLUSOES'].sum()
-            noite = df_hora[df_hora['HORA'].between(18, 23)]['CONCLUSOES'].sum()
-            madrugada = df_hora[df_hora['HORA'].between(0, 5)]['CONCLUSOES'].sum()
-            
-            periodo_mais_produtivo = max(
-                [("Manhã", manha), ("Tarde", tarde), 
-                 ("Noite", noite), ("Madrugada", madrugada)],
-                key=lambda x: x[1]
-            )
-            
-            metricas = [
-                {
-                    "titulo": "Horário Mais Produtivo",
-                    "valor": f"{hora_mais_produtiva['HORA']:02d}:00",
-                    "subtitulo": f"{int(hora_mais_produtiva['CONCLUSOES'])} conclusões"
-                },
-                {
-                    "titulo": "Período Mais Produtivo",
-                    "valor": periodo_mais_produtivo[0],
-                    "subtitulo": f"{int(periodo_mais_produtivo[1])} conclusões"
-                },
-                {
-                    "titulo": "Média por Hora",
-                    "valor": f"{media_hora:.1f}",
-                    "subtitulo": "conclusões/hora"
-                },
-                {
-                    "titulo": "Horas Produtivas",
-                    "valor": f"{len(df_hora[df_hora['CONCLUSOES'] > media_hora])}",
-                    "subtitulo": "acima da média"
-                }
-            ]
-            
-            mostrar_metricas_analise("Métricas da Análise por Hora", metricas)
-            
-        else:
+            # Mostrar métricas por semana
             semana_mais_produtiva = df_semanal.loc[df_semanal['CONCLUSOES'].idxmax()]
             
-            metricas = [
-                {
-                    "titulo": "Semana Mais Produtiva",
-                    "valor": semana_mais_produtiva['SEMANA'],
-                    "subtitulo": f"{int(semana_mais_produtiva['CONCLUSOES'])} conclusões"
-                },
-                {
-                    "titulo": "Média por Semana",
-                    "valor": f"{media_semanal:.1f}",
-                    "subtitulo": "conclusões/semana"
-                }
-            ]
-            
-            mostrar_metricas_analise("Métricas da Análise Semanal", metricas)
-
+            st.markdown(f"""
+            <div class="metrics-container" style="background-color: #f5f5f5; border: 2px solid #e0e0e0; box-shadow: 0 6px 15px rgba(0,0,0,0.1); font-family: Arial, Helvetica, sans-serif;">
+                <h3 style="font-size: 24px; margin-bottom: 18px; color: #1A237E; font-weight: 800; text-transform: uppercase;">Métricas por Semana</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;">
+                    <div class="metric-box" style="border-left: 8px solid #1976D2; box-shadow: 0 5px 12px rgba(25, 118, 210, 0.1); font-family: Arial, Helvetica, sans-serif;">
+                        <h3 style="font-size: 21px; font-weight: 800;">Semana Mais Produtiva</h3>
+                        <p style="font-size: 28px; font-weight: 900; color: #1976D2;">{semana_mais_produtiva['SEMANA']}</p>
+                        <small style="font-size: 17px; font-weight: 600;">{int(semana_mais_produtiva['CONCLUSOES'])} conclusões</small>
+                    </div>
+                    <div class="metric-box" style="border-left: 8px solid #FF5722; box-shadow: 0 5px 12px rgba(255, 87, 34, 0.1); font-family: Arial, Helvetica, sans-serif;">
+                        <h3 style="font-size: 21px; font-weight: 800; color: #E64A19;">Média por Semana</h3>
+                        <p style="font-size: 38px; font-weight: 900; color: #FF5722;">{media_semanal:.2f}</p>
+                        <small style="font-size: 17px; font-weight: 600;">conclusões/semana</small>
+                    </div>
+                    <div class="metric-box" style="border-left: 8px solid #4CAF50; box-shadow: 0 5px 12px rgba(76, 175, 80, 0.1); font-family: Arial, Helvetica, sans-serif;">
+                        <h3 style="font-size: 21px; font-weight: 800; color: #2E7D32;">Total de Semanas</h3>
+                        <p style="font-size: 38px; font-weight: 900; color: #4CAF50;">{len(df_semanal)}</p>
+                        <small style="font-size: 17px; font-weight: 600;">com registros</small>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
     except Exception as e:
-        st.error(f"Erro ao gerar análises temporais: {str(e)}")
-        st.write("Detalhes do erro para debug:", str(e))
+        st.error(f"Erro ao exibir análises temporais: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())

@@ -2,14 +2,18 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 
-def date_filter_section():
+def date_filter_section(title="Filtro de Período", on_change=None):
     """
     Renderiza seção de filtro por data
+    
+    Args:
+        title (str): Título personalizado para a seção de filtro
+        on_change (callable, optional): Função para chamar quando as datas são alteradas
     
     Returns:
         tuple: (data_inicial, data_final) selecionadas
     """
-    st.markdown("### Filtro de Período")
+    st.markdown(f"### {title}")
     
     col1, col2 = st.columns(2)
     
@@ -21,14 +25,16 @@ def date_filter_section():
         start_date = st.date_input(
             "Data Inicial",
             value=default_start,
-            format="DD/MM/YYYY"
+            format="DD/MM/YYYY",
+            on_change=on_change if on_change else None
         )
     
     with col2:
         end_date = st.date_input(
             "Data Final",
             value=default_end,
-            format="DD/MM/YYYY"
+            format="DD/MM/YYYY",
+            on_change=on_change if on_change else None
         )
     
     # Converter para datetime para comparações

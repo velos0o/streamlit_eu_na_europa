@@ -6,7 +6,15 @@ from datetime import datetime
 import time
 import os
 from dotenv import load_dotenv
-from utils.animation_utils import update_progress
+import sys
+from pathlib import Path
+
+# Obter o caminho absoluto para a pasta utils
+utils_path = os.path.join(Path(__file__).parents[1], 'utils')
+sys.path.insert(0, str(utils_path))
+
+# Agora importa diretamente do arquivo animation_utils
+from animation_utils import update_progress
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -19,53 +27,24 @@ def get_credentials():
     2. Se não encontrar, tenta das variáveis de ambiente (.env)
     3. Se não encontrar, usa os valores padrão (que devem ser substituídos em produção)
     """
-    token = None
-    url = None
-    
-    # Log para depuração - será exibido somente no Streamlit Cloud
-    if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-        st.info("🔍 Iniciando processo de obtenção de credenciais")
-    
-    # Verificar se estamos em ambiente Streamlit Cloud
     try:
-        if hasattr(st, 'secrets'):
-            try:
-                # Verificar se as chaves existem no secrets
-                if 'BITRIX_TOKEN' in st.secrets:
-                    token = st.secrets.BITRIX_TOKEN
-                    url = st.secrets.BITRIX_URL
-                    
-                    if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-                        st.success("✅ Credenciais obtidas do Streamlit Secrets")
-                else:
-                    if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-                        st.warning("⚠️ Chave 'BITRIX_TOKEN' não encontrada em Streamlit Secrets")
-            except Exception as secrets_error:
-                if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-                    st.error(f"❌ Erro ao acessar Streamlit Secrets: {str(secrets_error)}")
-    except Exception as attr_error:
-        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-            st.error(f"❌ Erro ao verificar atributo 'secrets': {str(attr_error)}")
-    
-    # Se não conseguiu do Streamlit Secrets, tentar variáveis de ambiente
-    if not token or not url:
-        try:
+        # Verificar se estamos em ambiente Streamlit Cloud
+        if hasattr(st, 'secrets') and 'BITRIX_TOKEN' in st.secrets:
+            token = st.secrets.BITRIX_TOKEN
+            url = st.secrets.BITRIX_URL
+        else:
+            # Usar variáveis de ambiente locais
             token = os.getenv('BITRIX_TOKEN')
             url = os.getenv('BITRIX_URL')
-            
-            if token and url and 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-                st.success("✅ Credenciais obtidas das variáveis de ambiente (.env)")
-        except Exception as env_error:
-            if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-                st.error(f"❌ Erro ao acessar variáveis de ambiente: {str(env_error)}")
+    except Exception as e:
+        # Se ocorrer qualquer erro ao tentar acessar secrets, usar variáveis de ambiente
+        token = os.getenv('BITRIX_TOKEN')
+        url = os.getenv('BITRIX_URL')
     
-    # Se ainda não encontrou, usar valores padrão
+    # Retornar valores padrão se não encontrados
     if not token or not url:
-        token = "RuUSETRkbFD3whitfgMbioX8qjLgcdPubr"  # Token padrão
-        url = "https://eunaeuropacidadania.bitrix24.com.br"  # URL padrão
-        
-        if 'BITRIX_DEBUG' in st.session_state and st.session_state['BITRIX_DEBUG']:
-            st.warning("⚠️ Usando credenciais padrão (fallback)")
+        token = "RuUSETRkbFD3whitfgMbioX8qjLgcdPubr"  # Token padrão - substitua em produção
+        url = "https://eunaeuropacidadania.bitrix24.com.br"  # URL padrão - substitua em produção
     
     return token, url
 
@@ -95,20 +74,8 @@ def load_bitrix_data(url, filters=None, show_logs=False):
     """
     try:
         if show_logs:
-            st.info(f"Tentando acessar: {url.split('token=')[0]}token=***&{url.split('&', 1)[1] if '&' in url else ''}")
-        
-        # Cabeçalhos HTTP completos para evitar problemas de segurança
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Content-Type": "application/json",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
-            "Cache-Control": "no-cache"
-        }
-        
-        # Contornar possíveis problemas de URL
-        safe_url = url.replace(" ", "%20")
+            st.info(f"Tentando acessar: {url}")
+        headers = {"Content-Type": "application/json"}
         
         # Tentar até 3 vezes em caso de falha
         max_attempts = 3
@@ -117,49 +84,14 @@ def load_bitrix_data(url, filters=None, show_logs=False):
                 if filters:
                     if show_logs:
                         st.write(f"Enviando filtros: {json.dumps(filters)}")
-                    response = requests.post(safe_url, data=json.dumps(filters), headers=headers, timeout=60)
+                    response = requests.post(url, data=json.dumps(filters), headers=headers, timeout=30)
                 else:
-                    response = requests.get(safe_url, headers=headers, timeout=60)
+                    response = requests.get(url, timeout=30)
                 
                 if response.status_code == 200:
-                    # Registrar detalhes da resposta nos logs
-                    if show_logs:
-                        st.success(f"Resposta recebida com sucesso (Status: {response.status_code})")
-                        st.write(f"Tamanho da resposta: {len(response.content)} bytes")
-                        st.write(f"Tipo de conteúdo: {response.headers.get('Content-Type', 'Não especificado')}")
-                    
-                    # Verificar o tipo de conteúdo da resposta
-                    content_type = response.headers.get('Content-Type', '').lower()
-                    
                     # Tentar interpretar a resposta como JSON
                     try:
-                        # Se for JSON, processar normalmente
-                        if 'application/json' in content_type or response.text.strip().startswith(('[', '{')):
-                            data = response.json()
-                        # Se for CSV, HTML ou outro formato, tentar converter
-                        else:
-                            if show_logs:
-                                st.warning(f"Resposta não é JSON. Tipo: {content_type}")
-                                st.code(response.text[:500] + "..." if len(response.text) > 500 else response.text)
-                            
-                            # Tentar processar como CSV
-                            if 'text/csv' in content_type:
-                                import io
-                                return pd.read_csv(io.StringIO(response.text))
-                            
-                            # Tentar extrair tabelas de HTML
-                            elif 'text/html' in content_type:
-                                try:
-                                    dfs = pd.read_html(response.text)
-                                    if dfs and len(dfs) > 0:
-                                        return dfs[0]
-                                except:
-                                    pass
-                            
-                            # Se não conseguir interpretar, retornar DataFrame vazio
-                            if show_logs:
-                                st.error("Não foi possível interpretar a resposta como dados estruturados")
-                            return pd.DataFrame()
+                        data = response.json()
                         
                         # Verificar se obtivemos dados
                         if data:
@@ -202,9 +134,9 @@ def load_bitrix_data(url, filters=None, show_logs=False):
                                         df = pd.DataFrame(data)
                                     else:
                                         if show_logs:
-                                            st.write(f"Formato não reconhecido: {type(first_item)}")
-                                            st.write("Exemplo do primeiro item:")
-                                            st.write(str(first_item)[:500])
+                                            st.write(f"Colunas disponíveis: ['Item não é um dicionário']")
+                                            st.write("Exemplo do primeiro registro:")
+                                            st.json(first_item)
                                         # Tentar criar um DataFrame mesmo assim
                                         df = pd.DataFrame(data)
                             else:
@@ -230,21 +162,7 @@ def load_bitrix_data(url, filters=None, show_logs=False):
                         if show_logs:
                             st.error(f"Erro ao decodificar JSON: {str(je)}")
                             st.write(f"Resposta da API (primeiros 500 caracteres): {response.text[:500]}")
-                        if attempt < max_attempts - 1:
-                            time.sleep(2)  # Aguardar antes de tentar novamente
-                        else:
-                            # Tentar extrair informações de erro da resposta
-                            if "error" in response.text.lower() or "unauthorized" in response.text.lower():
-                                if show_logs:
-                                    st.error("Possível erro de autenticação detectado na resposta")
-                            return pd.DataFrame()
-                elif response.status_code == 401 or response.status_code == 403:
-                    # Erro de autenticação
-                    if show_logs:
-                        st.error(f"Erro de autenticação na API Bitrix24: Código {response.status_code}")
-                        st.write(f"Resposta da API: {response.text[:500]}")
-                    # Não tentar novamente em caso de erro de autenticação
-                    return pd.DataFrame()
+                        return pd.DataFrame()
                 else:
                     if show_logs:
                         st.error(f"Erro ao acessar a API Bitrix24 na tentativa {attempt + 1}: Código {response.status_code}")
@@ -266,8 +184,6 @@ def load_bitrix_data(url, filters=None, show_logs=False):
     except Exception as e:
         if show_logs:
             st.error(f"Erro ao carregar dados do Bitrix24: {str(e)}")
-            import traceback
-            st.code(traceback.format_exc())
         return pd.DataFrame()
 
 def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=None, debug=False, progress_bar=None, message_container=None):

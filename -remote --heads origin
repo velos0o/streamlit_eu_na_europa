@@ -1,0 +1,3 @@
+[33m82d6d91[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m)[m Melhoria no tratamento de erros e sistema de animações no módulo cartório
+[33m41c5bb6[m Corrigir caminhos dos arquivos de animação após reorganização
+[33mc6618d2[m Corrigir erro UnboundLocalError referente à variável requests

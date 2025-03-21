@@ -4,14 +4,23 @@ from datetime import datetime, timedelta
 import time
 import re
 import io
+import os
+import sys
+from pathlib import Path
 
 # Importações internas
 from api.bitrix_connector import load_merged_data, get_higilizacao_fields
 from components.metrics import render_metrics_section
 from components.tables import render_styled_table, create_pendencias_table, create_production_table
 from components.filters import date_filter_section, responsible_filter, status_filter
-from utils.data_processor import calculate_status_counts, filter_dataframe_by_date, create_responsible_status_table
-from utils.animation_utils import display_loading_animation, clear_loading_animation, update_progress
+
+# Obter o caminho absoluto para a pasta utils
+utils_path = os.path.join(Path(__file__).parents[1], 'utils')
+sys.path.insert(0, str(utils_path))
+
+# Agora importa diretamente dos arquivos na pasta utils
+from data_processor import calculate_status_counts, filter_dataframe_by_date, create_responsible_status_table
+from animation_utils import display_loading_animation, clear_loading_animation, update_progress
 
 def generate_demo_data():
     """
@@ -264,7 +273,16 @@ def show_producao():
             
             # Coluna 1: Filtro de Período
             with col1:
-                start_date, end_date = date_filter_section()
+                # Função para ser chamada quando as datas são alteradas
+                def atualizar_filtro_data():
+                    # Sinalizar que os filtros foram alterados
+                    st.session_state['filtros_alterados'] = True
+                
+                # Chamar o filtro de data com callback automático
+                start_date, end_date = date_filter_section(
+                    title="Filtro de Período Por Conclusão",
+                    on_change=atualizar_filtro_data
+                )
                 st.session_state['start_date'] = start_date
                 st.session_state['end_date'] = end_date
             
@@ -289,7 +307,7 @@ def show_producao():
         
         # Se temos dados carregados, exibi-los
         if loading_state == 'completed' and 'filtered_df' in st.session_state:
-            filtered_df = st.session_state['filtered_df']
+            filtered_df = st.session_state['filtered_df'].copy()
             
             # Verificar e corrigir colunas necessárias
             for field in get_higilizacao_fields().keys():
@@ -307,18 +325,26 @@ def show_producao():
                 status_filter_condition = filtered_df['UF_CRM_HIGILIZACAO_STATUS'].fillna('PENDENCIA').isin(selected_status)
                 filtered_df = filtered_df[status_filter_condition]
             
-            # Aplicar filtro de data apenas para registros concluídos
+            # Aplicar filtro de data APENAS para registros com status COMPLETO
             if 'UF_CRM_1741206763' in filtered_df.columns:
+                # Converter para datetime
                 date_mask = pd.isna(filtered_df['UF_CRM_1741206763'])
                 filtered_df.loc[~date_mask, 'UF_CRM_1741206763'] = pd.to_datetime(filtered_df.loc[~date_mask, 'UF_CRM_1741206763'])
                 
+                # Criar uma cópia do DataFrame original
+                completos_df = filtered_df[filtered_df['UF_CRM_HIGILIZACAO_STATUS'] == 'COMPLETO'].copy()
+                outros_df = filtered_df[filtered_df['UF_CRM_HIGILIZACAO_STATUS'] != 'COMPLETO'].copy()
+                
+                # Aplicar o filtro de data APENAS nos registros COMPLETOS
                 if start_date and end_date:
                     date_filter = (
-                        ((filtered_df['UF_CRM_1741206763'] >= start_date) & 
-                         (filtered_df['UF_CRM_1741206763'] <= end_date)) |
-                        (filtered_df['UF_CRM_HIGILIZACAO_STATUS'] != 'COMPLETO')
+                        (completos_df['UF_CRM_1741206763'] >= start_date) & 
+                        (completos_df['UF_CRM_1741206763'] <= end_date)
                     )
-                    filtered_df = filtered_df[date_filter]
+                    completos_df = completos_df[date_filter]
+                
+                # Combinar os DataFrames novamente
+                filtered_df = pd.concat([completos_df, outros_df])
             
             # Verificar se temos dados para exibir
             if filtered_df.empty:
@@ -349,25 +375,57 @@ def show_producao():
             # Mostrar o relatório selecionado
             if relatorio_selecionado == "Status por Responsável":
                 st.subheader("Status por Responsável")
-                cross_tab = create_responsible_status_table(filtered_df)
                 
-                if not cross_tab.empty:
-                    # Criar uma cópia do DataFrame para adicionar a coluna de progresso
-                    display_df = cross_tab.copy().reset_index()
+                # SOLUÇÃO RADICAL: Criar manualmente a tabela de status por responsável
+                if not filtered_df.empty and 'ASSIGNED_BY_NAME' in filtered_df.columns and 'UF_CRM_HIGILIZACAO_STATUS' in filtered_df.columns:
+                    # Substituir valores nulos no status por 'PENDENCIA'
+                    filtered_df['UF_CRM_HIGILIZACAO_STATUS'] = filtered_df['UF_CRM_HIGILIZACAO_STATUS'].fillna('PENDENCIA')
                     
-                    # Renomear a coluna de índice
-                    display_df = display_df.rename(columns={'index': 'Responsável'})
+                    # 1. Agrupar por responsável e status e contar ocorrências
+                    status_counts = filtered_df.groupby(['ASSIGNED_BY_NAME', 'UF_CRM_HIGILIZACAO_STATUS']).size().unstack(fill_value=0)
                     
-                    # Calcular o percentual de conclusão
-                    display_df['% Conclusão'] = (display_df['COMPLETO'] / display_df['Total'] * 100).round(1)
+                    # 2. Certificar que todas as colunas de status existem
+                    for status in ['COMPLETO', 'INCOMPLETO', 'PENDENCIA']:
+                        if status not in status_counts.columns:
+                            status_counts[status] = 0
                     
-                    # Criar a coluna de barra de progresso
-                    display_df['Progresso'] = display_df.apply(
-                        lambda row: row['COMPLETO'] / row['Total'] if row['Total'] > 0 else 0, 
-                        axis=1
-                    )
+                    # 3. Selecionar apenas as colunas que nos interessam
+                    if 'COMPLETO' in status_counts.columns and 'INCOMPLETO' in status_counts.columns and 'PENDENCIA' in status_counts.columns:
+                        display_df = status_counts[['COMPLETO', 'INCOMPLETO', 'PENDENCIA']].copy()
+                    else:
+                        cols = [col for col in ['COMPLETO', 'INCOMPLETO', 'PENDENCIA'] if col in status_counts.columns]
+                        display_df = status_counts[cols].copy()
                     
-                    # Configurar as colunas para exibição
+                    # 4. Resetar o índice
+                    display_df = display_df.reset_index()
+                    
+                    # 5. Renomear a coluna de índice
+                    display_df = display_df.rename(columns={'ASSIGNED_BY_NAME': 'Responsável'})
+                    
+                    # 6. REMOVER EXPLICITAMENTE QUALQUER LINHA QUE CONTENHA 'TOTAL'
+                    display_df = display_df[~display_df['Responsável'].astype(str).str.lower().str.contains('total')]
+                    
+                    # 7. Calcular o total para cada linha (soma de PENDENCIA, INCOMPLETO e COMPLETO)
+                    # Garantir que estamos usando os nomes corretos das colunas
+                    cols_to_sum = [col for col in ['COMPLETO', 'INCOMPLETO', 'PENDENCIA'] if col in display_df.columns]
+                    total_por_linha = display_df[cols_to_sum].sum(axis=1)
+                    
+                    # 8. Calcular o percentual de conclusão
+                    if 'COMPLETO' in display_df.columns:
+                        display_df['% Conclusão'] = (display_df['COMPLETO'] / total_por_linha * 100).round(1)
+                    else:
+                        display_df['% Conclusão'] = 0
+                    
+                    # 9. Criar a coluna de barra de progresso
+                    if 'COMPLETO' in display_df.columns:
+                        display_df['Progresso'] = display_df.apply(
+                            lambda row: row['COMPLETO'] / total_por_linha[row.name] if total_por_linha[row.name] > 0 else 0, 
+                            axis=1
+                        )
+                    else:
+                        display_df['Progresso'] = 0
+                    
+                    # 10. Configurar as colunas para exibição
                     column_config = {
                         "Responsável": st.column_config.TextColumn(
                             "Responsável",
@@ -392,12 +450,6 @@ def show_producao():
                             width="small",
                             help="Número de processos completos"
                         ),
-                        "Total": st.column_config.NumberColumn(
-                            "Total",
-                            format="%d",
-                            width="small",
-                            help="Total de processos"
-                        ),
                         "% Conclusão": st.column_config.NumberColumn(
                             "% Conclusão",
                             format="%.1f%%",
@@ -414,7 +466,12 @@ def show_producao():
                         )
                     }
                     
-                    # Exibir o DataFrame com as configurações de coluna
+                    # 11. Ordenar por total em ordem decrescente
+                    display_df['_total'] = total_por_linha
+                    display_df = display_df.sort_values('_total', ascending=False)
+                    display_df = display_df.drop(columns=['_total'])
+                    
+                    # 12. Exibir o DataFrame com as configurações de coluna
                     st.dataframe(
                         display_df,
                         column_config=column_config,
@@ -429,59 +486,75 @@ def show_producao():
                 st.subheader("Pendências por Responsável")
                 pendencias_df = create_pendencias_table(filtered_df)
                 if not pendencias_df.empty:
-                    # Configurar as colunas para exibição
-                    column_config = {
-                        "Responsável": st.column_config.TextColumn(
-                            "Responsável",
-                            width="medium",
-                            help="Nome do responsável"
-                        ),
-                        "Documentação": st.column_config.NumberColumn(
-                            "Documentação",
-                            format="%d",
-                            width="small",
-                            help="Número de pendências em Documentação"
-                        ),
-                        "Cadastro": st.column_config.NumberColumn(
-                            "Cadastro",
-                            format="%d",
-                            width="small",
-                            help="Número de pendências em Cadastro"
-                        ),
-                        "Estrutura": st.column_config.NumberColumn(
-                            "Estrutura",
-                            format="%d",
-                            width="small",
-                            help="Número de pendências em Estrutura"
-                        ),
-                        "Requerimento": st.column_config.NumberColumn(
-                            "Requerimento",
-                            format="%d",
-                            width="small",
-                            help="Número de pendências em Requerimento"
-                        ),
-                        "Emissões": st.column_config.NumberColumn(
-                            "Emissões",
-                            format="%d",
-                            width="small",
-                            help="Número de pendências em Emissões"
-                        ),
-                        "Total": st.column_config.NumberColumn(
-                            "Total",
-                            format="%d",
-                            width="small",
-                            help="Total de pendências"
-                        )
-                    }
-
                     # Exibir o DataFrame com as configurações de coluna
                     st.dataframe(
                         pendencias_df,
-                        column_config=column_config,
+                        column_config={
+                            "Responsável": st.column_config.TextColumn(
+                                "Responsável",
+                                width="medium",
+                                help="Nome do responsável"
+                            ),
+                            "Documentação": st.column_config.NumberColumn(
+                                "Documentação",
+                                format="%d",
+                                width="small",
+                                help="Número de pendências em Documentação"
+                            ),
+                            "Cadastro": st.column_config.NumberColumn(
+                                "Cadastro",
+                                format="%d",
+                                width="small",
+                                help="Número de pendências em Cadastro"
+                            ),
+                            "Estrutura": st.column_config.NumberColumn(
+                                "Estrutura",
+                                format="%d",
+                                width="small",
+                                help="Número de pendências em Estrutura"
+                            ),
+                            "Requerimento": st.column_config.NumberColumn(
+                                "Requerimento",
+                                format="%d",
+                                width="small",
+                                help="Número de pendências em Requerimento"
+                            ),
+                            "Emissões": st.column_config.NumberColumn(
+                                "Emissões",
+                                format="%d",
+                                width="small",
+                                help="Número de pendências em Emissões"
+                            ),
+                            "Total": st.column_config.NumberColumn(
+                                "Total",
+                                format="%d",
+                                width="small",
+                                help="Total de pendências"
+                            )
+                        },
                         use_container_width=True,
                         height=500,
                         hide_index=True
                     )
+                    
+                    # Exibir a linha de total separada logo abaixo da tabela
+                    st.markdown("<div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; font-weight: bold;'>", unsafe_allow_html=True)
+                    cols = st.columns([3, 1, 1, 1, 1, 1, 1])
+                    with cols[0]:
+                        st.markdown("<div style='text-align: left; font-weight: bold;'>Total:</div>", unsafe_allow_html=True)
+                    with cols[1]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{pendencias_df['Documentação'].sum()}</div>", unsafe_allow_html=True)
+                    with cols[2]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{pendencias_df['Cadastro'].sum()}</div>", unsafe_allow_html=True)
+                    with cols[3]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{pendencias_df['Estrutura'].sum()}</div>", unsafe_allow_html=True)
+                    with cols[4]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{pendencias_df['Requerimento'].sum()}</div>", unsafe_allow_html=True)
+                    with cols[5]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{pendencias_df['Emissões'].sum()}</div>", unsafe_allow_html=True)
+                    with cols[6]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{pendencias_df['Total'].sum()}</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
                 else:
                     st.success("Não há pendências! Todos os processos estão completos ou em andamento.")
             
@@ -489,59 +562,75 @@ def show_producao():
                 st.subheader("Produção Geral")
                 production_df = create_production_table(filtered_df)
                 if not production_df.empty:
-                    # Configurar as colunas para exibição
-                    column_config = {
-                        "Responsável": st.column_config.TextColumn(
-                            "Responsável",
-                            width="medium",
-                            help="Nome do responsável"
-                        ),
-                        "Documentação": st.column_config.NumberColumn(
-                            "Documentação",
-                            format="%d",
-                            width="small",
-                            help="Número de itens concluídos em Documentação"
-                        ),
-                        "Cadastro": st.column_config.NumberColumn(
-                            "Cadastro",
-                            format="%d",
-                            width="small",
-                            help="Número de itens concluídos em Cadastro"
-                        ),
-                        "Estrutura": st.column_config.NumberColumn(
-                            "Estrutura",
-                            format="%d",
-                            width="small",
-                            help="Número de itens concluídos em Estrutura"
-                        ),
-                        "Requerimento": st.column_config.NumberColumn(
-                            "Requerimento",
-                            format="%d",
-                            width="small",
-                            help="Número de itens concluídos em Requerimento"
-                        ),
-                        "Emissões": st.column_config.NumberColumn(
-                            "Emissões",
-                            format="%d",
-                            width="small",
-                            help="Número de itens concluídos em Emissões"
-                        ),
-                        "Total": st.column_config.NumberColumn(
-                            "Total",
-                            format="%d",
-                            width="small",
-                            help="Total de itens concluídos"
-                        )
-                    }
-
                     # Exibir o DataFrame com as configurações de coluna
                     st.dataframe(
                         production_df,
-                        column_config=column_config,
+                        column_config={
+                            "Responsável": st.column_config.TextColumn(
+                                "Responsável",
+                                width="medium",
+                                help="Nome do responsável"
+                            ),
+                            "Documentação": st.column_config.NumberColumn(
+                                "Documentação",
+                                format="%d",
+                                width="small",
+                                help="Número de itens concluídos em Documentação"
+                            ),
+                            "Cadastro": st.column_config.NumberColumn(
+                                "Cadastro",
+                                format="%d",
+                                width="small",
+                                help="Número de itens concluídos em Cadastro"
+                            ),
+                            "Estrutura": st.column_config.NumberColumn(
+                                "Estrutura",
+                                format="%d",
+                                width="small",
+                                help="Número de itens concluídos em Estrutura"
+                            ),
+                            "Requerimento": st.column_config.NumberColumn(
+                                "Requerimento",
+                                format="%d",
+                                width="small",
+                                help="Número de itens concluídos em Requerimento"
+                            ),
+                            "Emissões": st.column_config.NumberColumn(
+                                "Emissões",
+                                format="%d",
+                                width="small",
+                                help="Número de itens concluídos em Emissões"
+                            ),
+                            "Total": st.column_config.NumberColumn(
+                                "Total",
+                                format="%d",
+                                width="small",
+                                help="Total de itens concluídos"
+                            )
+                        },
                         use_container_width=True,
                         height=500,
                         hide_index=True
                     )
+                    
+                    # Exibir a linha de total separada logo abaixo da tabela
+                    st.markdown("<div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; font-weight: bold;'>", unsafe_allow_html=True)
+                    cols = st.columns([3, 1, 1, 1, 1, 1, 1])
+                    with cols[0]:
+                        st.markdown("<div style='text-align: left; font-weight: bold;'>Total:</div>", unsafe_allow_html=True)
+                    with cols[1]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{production_df['Documentação'].sum()}</div>", unsafe_allow_html=True)
+                    with cols[2]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{production_df['Cadastro'].sum()}</div>", unsafe_allow_html=True)
+                    with cols[3]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{production_df['Estrutura'].sum()}</div>", unsafe_allow_html=True)
+                    with cols[4]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{production_df['Requerimento'].sum()}</div>", unsafe_allow_html=True)
+                    with cols[5]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{production_df['Emissões'].sum()}</div>", unsafe_allow_html=True)
+                    with cols[6]:
+                        st.markdown(f"<div style='text-align: center; font-weight: bold;'>{production_df['Total'].sum()}</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
                 else:
                     st.info("Não há dados suficientes para criar a tabela de produção.")
             

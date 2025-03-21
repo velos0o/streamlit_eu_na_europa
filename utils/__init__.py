@@ -1,10 +1,5 @@
-# Arquivo de inicialização para o pacote utils
-# Torna a pasta utils um módulo Python importável
+"""
+Arquivo __init__.py para transformar o diretório utils em um pacote Python.
+"""
 
-# Importar funções úteis para serem acessíveis diretamente através do pacote
-from .animation_utils import (
-    load_lottieurl,
-    display_loading_animation,
-    update_progress,
-    clear_loading_animation
-) 
+# Qualquer importação necessária pode ser adicionada aqui 

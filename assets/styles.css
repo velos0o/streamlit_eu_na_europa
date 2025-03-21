@@ -3,6 +3,9 @@
    Esquema de cores: Azul e branco (com opção para tema escuro)
 */
 
+/* Importar fonte Montserrat do Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+
 /* Variáveis CSS para cores */
 :root {
     --primary-color: #1E88E5;
@@ -17,6 +20,7 @@
     --error-color: #F44336;
     --background-color: #FFFFFF;
     --card-background: #FFFFFF;
+    --font-family: 'Montserrat', sans-serif;
 }
 
 /* Tema escuro */
@@ -37,7 +41,7 @@
 
 /* Estilos gerais */
 body {
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-family);
     color: var(--text-primary);
     background-color: var(--background-color);
 }
@@ -45,13 +49,20 @@ body {
 /* Cabeçalhos */
 h1, h2, h3, h4, h5, h6 {
     color: var(--primary-dark);
-    font-weight: 500;
+    font-weight: 600;
+    font-family: var(--font-family);
+}
+
+/* Parágrafos e textos */
+p, span, div, label, button, input, select, textarea {
+    font-family: var(--font-family);
 }
 
 /* Links */
 a {
     color: var(--primary-color);
     text-decoration: none;
+    font-family: var(--font-family);
 }
 
 a:hover {

@@ -1,5 +1,0 @@
-# Este arquivo configura o comportamento das páginas do Streamlit.
-# Ao usar o valor false, desativamos a detecção automática de páginas.
-[pages]
-# Desativar a detecção automática de páginas
-enablePagesWithoutScripts = false 
