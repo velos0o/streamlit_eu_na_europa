@@ -1,7 +1,7 @@
 import streamlit as st
 from .data_loader import carregar_dados_comune, carregar_dados_negocios, carregar_estagios_bitrix
-from .analysis import criar_visao_geral_comune, criar_visao_macro, cruzar_comune_deal, analisar_distribuicao_deals, analisar_registros_sem_correspondencia, calcular_tempo_solicitacao
-from .visualization import visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro, visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia, visualizar_tempo_solicitacao
+from .analysis import criar_visao_geral_comune, criar_visao_macro, cruzar_comune_deal, analisar_distribuicao_deals, analisar_registros_sem_correspondencia, calcular_tempo_solicitacao, criar_metricas_certidoes, criar_metricas_tempo_dias
+from .visualization import visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro, visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia, visualizar_tempo_solicitacao, visualizar_metricas_certidoes, visualizar_metricas_tempo_dias
 import pandas as pd
 import io
 from datetime import datetime
@@ -61,11 +61,13 @@ def show_comune():
     # Mostrar todas as informações relevantes em abas
     if not df_comune.empty:
         # Criar abas para organizar o conteúdo
-        tab1, tab2, tab3, tab4, tab_tempo_solicitacao = st.tabs([
+        tab1, tab2, tab3, tab4, tab_metricas, tab_tempo_dias, tab_tempo_solicitacao = st.tabs([
             "Distribuição por Estágio", 
             "Dados Detalhados", 
             "Funil Detalhado", 
             "Cruzamento CRM_DEAL",
+            "📊 Métricas de Certidões",
+            "⏳ Tempo em Dias",
             "⏱️ Tempo de Solicitação"
         ])
         
@@ -366,7 +368,23 @@ def show_comune():
                 else:
                     st.success(f"Encontrados {len(df_deal_uf)} registros em CRM_DEAL_UF")
         
-        # Aba de Tempo de Solicitação
+        # Aba: Métricas de Certidões
+        with tab_metricas:
+            # Criar métricas de certidões
+            metricas_certidoes = criar_metricas_certidoes(df_comune)
+            
+            # Exibir métricas de certidões
+            visualizar_metricas_certidoes(metricas_certidoes)
+        
+        # Nova Aba: Tempo em Dias
+        with tab_tempo_dias:
+            # Criar métricas de tempo em dias
+            metricas_tempo_dias = criar_metricas_tempo_dias(df_comune)
+            
+            # Exibir métricas de tempo em dias
+            visualizar_metricas_tempo_dias(metricas_tempo_dias)
+        
+        # Aba: Tempo de Solicitação
         with tab_tempo_solicitacao:
             # Adicionar descrição da análise
             st.markdown("""

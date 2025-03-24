@@ -132,7 +132,7 @@ def visualizar_grafico_macro(df_visao_macro):
     
     # Calcular percentuais para exibir nos rótulos
     total = df_ordenado['QUANTIDADE'].sum()
-    df_ordenado['PERCENTUAL'] = (df_ordenado['QUANTIDADE'] / total * 100).round(1) if total > 0 else 0
+    df_ordenado['PERCENTUAL'] = (df_ordenado['QUANTIDADE'] / total * 100).round(1)
     df_ordenado['ROTULO'] = df_ordenado.apply(lambda x: f"{int(x['QUANTIDADE'])} ({x['PERCENTUAL']}%)", axis=1)
     
     # Definir cores para cada estágio
@@ -806,13 +806,13 @@ def visualizar_tempo_solicitacao(df_tempo_solicitacao):
     # Formatar a tabela para exibição
     # Aplicar formatação para tempo em horas/dias/meses
     def formatar_tempo_meses(meses):
-        return f"{int(meses)} meses"
+        return f"{int(meses)} {'mês' if int(meses) == 1 else 'meses'}"
     
     def formatar_tempo_dias(dias):
-        return f"{int(dias)} dias"
+        return f"{int(dias)} {'dia' if int(dias) == 1 else 'dias'}"
     
     def formatar_tempo_horas(horas):
-        return f"{int(horas)} h"
+        return f"{int(horas)} {'hora' if int(horas) == 1 else 'horas'}"
     
     df_display['Meses'] = df_display['Meses'].apply(formatar_tempo_meses)
     df_display['Dias'] = df_display['Dias'].apply(formatar_tempo_dias)
@@ -838,4 +838,254 @@ def visualizar_tempo_solicitacao(df_tempo_solicitacao):
         data=csv_str,
         file_name=f"tempo_solicitacao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv",
-    ) 
+    )
+
+def visualizar_metricas_certidoes(metricas):
+    """
+    Exibe as métricas de certidões agrupadas por categoria
+    """
+    if not metricas:
+        st.warning("Não há dados disponíveis para visualização das métricas.")
+        return
+    
+    st.markdown("""
+    <h2 style="font-size: 2.2rem; font-weight: 800; color: #1A237E; text-align: center; 
+    margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 3px solid #1976D2;
+    font-family: Arial, Helvetica, sans-serif;">
+    RESUMO DE CERTIDÕES</h2>
+    <p style="text-align: center; font-size: 16px; color: #555; margin-bottom: 25px; font-family: Arial, Helvetica, sans-serif;">
+    Visão consolidada do status das certidões por categoria</p>
+    """, unsafe_allow_html=True)
+    
+    # Layout em duas colunas para os cards
+    col1, col2 = st.columns(2)
+    
+    # Cores para os cards de cada categoria
+    cores = {
+        "Solicitado - Aguardando Retorno": "#3F51B5",  # Azul
+        "Pendência de Solicitação Comune - Parceiro": "#FF9800",  # Laranja
+        "Pendência de Solicitação Comune - Empresa": "#F44336",  # Vermelho
+        "Entregas": "#4CAF50"  # Verde
+    }
+    
+    # Exibir métricas em cards com tabelas
+    for i, (categoria, metrica) in enumerate(metricas.items()):
+        # Alternar entre colunas
+        col = col1 if i % 2 == 0 else col2
+        
+        with col:
+            st.markdown(f"""
+            <div style="background-color: white; 
+                        padding: 15px; 
+                        border-radius: 10px; 
+                        margin-bottom: 20px;
+                        border-top: 5px solid {cores.get(categoria, '#1976D2')};
+                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                <h3 style="font-size: 18px; 
+                           color: {cores.get(categoria, '#1976D2')}; 
+                           margin-bottom: 15px;
+                           text-align: center;
+                           font-weight: bold;">
+                    {categoria}
+                </h3>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Exibir tabela com os dados desta categoria
+            df = metrica['dados']
+            df_formatado = df.copy()
+            
+            # Exibir a tabela com os dados
+            st.dataframe(
+                df_formatado,
+                column_config={
+                    "STAGE_NAME": "Etapa",
+                    "Certidões": st.column_config.NumberColumn(
+                        "Certidões",
+                        format="%d",
+                    )
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # Mostrar total na parte inferior
+            st.markdown(f"""
+            <div style="background-color: {cores.get(categoria, '#1976D2')}; 
+                        color: white; 
+                        padding: 10px; 
+                        border-radius: 5px; 
+                        margin-top: 5px;
+                        text-align: center;
+                        font-weight: bold;">
+                Total: {metrica['total']} certidões
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Exibir total geral
+    total_geral = sum(metrica['total'] for metrica in metricas.values())
+    
+    st.markdown(f"""
+    <div style="background-color: #263238; 
+                color: white; 
+                padding: 15px; 
+                border-radius: 10px; 
+                margin: 30px 0 15px 0;
+                text-align: center;
+                font-size: 20px;
+                font-weight: bold;">
+        Total Geral: {total_geral} certidões
+    </div>
+    """, unsafe_allow_html=True)
+
+def visualizar_metricas_tempo_dias(metricas_tempo):
+    """
+    Exibe as métricas de tempo em dias agrupadas por faixas de tempo
+    """
+    if not metricas_tempo:
+        st.warning("Não há dados disponíveis para visualização das métricas de tempo.")
+        return
+    
+    st.markdown("""
+    <h2 style="font-size: 2.2rem; font-weight: 800; color: #1A237E; text-align: center; 
+    margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 3px solid #1976D2;
+    font-family: Arial, Helvetica, sans-serif;">
+    CERTIDÕES POR TEMPO DE PROCESSAMENTO</h2>
+    <p style="text-align: center; font-size: 16px; color: #555; margin-bottom: 25px; font-family: Arial, Helvetica, sans-serif;">
+    Visão por faixas de tempo (em dias) baseado no campo MOVED_TIME</p>
+    """, unsafe_allow_html=True)
+    
+    # Layout em duas colunas para os cards
+    col1, col2 = st.columns(2)
+    
+    # Cores para os cards de cada categoria de tempo
+    cores = {
+        "Até 7 dias": "#4CAF50",          # Verde
+        "8 a 15 dias": "#8BC34A",         # Verde claro
+        "16 a 30 dias": "#FFEB3B",        # Amarelo
+        "31 a 60 dias": "#FF9800",        # Laranja
+        "Mais de 60 dias": "#F44336"      # Vermelho
+    }
+    
+    # Exibir métricas em cards com tabelas
+    for i, (categoria, metrica) in enumerate(metricas_tempo.items()):
+        # Alternar entre colunas
+        col = col1 if i % 2 == 0 else col2
+        
+        with col:
+            st.markdown(f"""
+            <div style="background-color: white; 
+                        padding: 15px; 
+                        border-radius: 10px; 
+                        margin-bottom: 20px;
+                        border-top: 5px solid {cores.get(categoria, '#1976D2')};
+                        box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                <h3 style="font-size: 18px; 
+                           color: {cores.get(categoria, '#1976D2')}; 
+                           margin-bottom: 15px;
+                           text-align: center;
+                           font-weight: bold;">
+                    {categoria}
+                </h3>
+                <p style="text-align: center; font-size: 14px; color: #666; margin-bottom: 10px;">
+                    Tempo médio: {metrica['tempo_medio']} dias
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Exibir tabela com os dados desta categoria de tempo
+            df = metrica['dados']
+            
+            if not df.empty:
+                st.dataframe(
+                    df,
+                    column_config={
+                        "STAGE_NAME": "Etapa",
+                        "Certidões": st.column_config.NumberColumn(
+                            "Certidões",
+                            format="%d",
+                        )
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.info(f"Não há certidões na faixa de tempo: {categoria}")
+            
+            # Mostrar total na parte inferior
+            st.markdown(f"""
+            <div style="background-color: {cores.get(categoria, '#1976D2')}; 
+                        color: white; 
+                        padding: 10px; 
+                        border-radius: 5px; 
+                        margin-top: 5px;
+                        text-align: center;
+                        font-weight: bold;">
+                Total: {metrica['total']} certidões
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Exibir total geral
+    total_geral = sum(metrica['total'] for metrica in metricas_tempo.values())
+    
+    # Calcular o tempo médio geral ponderado
+    soma_produto = sum(metrica['tempo_medio'] * metrica['total'] for metrica in metricas_tempo.values())
+    tempo_medio_geral = round(soma_produto / total_geral, 1) if total_geral > 0 else 0
+    
+    st.markdown(f"""
+    <div style="background-color: #263238; 
+                color: white; 
+                padding: 15px; 
+                border-radius: 10px; 
+                margin: 30px 0 15px 0;
+                text-align: center;
+                font-size: 20px;
+                font-weight: bold;">
+        Total Geral: {total_geral} certidões | Tempo Médio: {tempo_medio_geral} dias
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Adicionar gráfico de distribuição
+    if total_geral > 0:
+        st.markdown("### Distribuição por Faixa de Tempo")
+        
+        # Preparar dados para o gráfico
+        labels = list(metricas_tempo.keys())
+        valores = [metrica['total'] for metrica in metricas_tempo.values()]
+        cores_grafico = [cores.get(categoria, '#1976D2') for categoria in metricas_tempo.keys()]
+        
+        # Criar gráfico de barras
+        fig = go.Figure(data=[
+            go.Bar(
+                x=labels,
+                y=valores,
+                marker_color=cores_grafico,
+                text=valores,
+                textposition='auto',
+            )
+        ])
+        
+        # Configurar layout
+        fig.update_layout(
+            title="Distribuição de Certidões por Tempo de Processamento",
+            xaxis_title="Faixa de Tempo",
+            yaxis_title="Número de Certidões",
+            height=400,
+            margin=dict(l=20, r=20, t=40, b=20),
+            paper_bgcolor='white',
+            plot_bgcolor='white',
+            font=dict(family="Arial, Helvetica, sans-serif")
+        )
+        
+        # Exibir o gráfico
+        st.plotly_chart(fig, use_container_width=True)
+
+# Funções auxiliares para formatação de tempo
+def formatar_tempo_meses(meses):
+    return f"{int(meses)} {'mês' if int(meses) == 1 else 'meses'}"
+
+def formatar_tempo_dias(dias):
+    return f"{int(dias)} {'dia' if int(dias) == 1 else 'dias'}"
+
+def formatar_tempo_horas(horas):
+    return f"{int(horas)} {'hora' if int(horas) == 1 else 'horas'}" 

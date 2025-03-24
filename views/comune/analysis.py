@@ -369,13 +369,7 @@ def analisar_registros_sem_correspondencia(df_cruzado):
 
 def calcular_tempo_solicitacao(df_comune):
     """
-    Calcula o tempo médio de solicitação baseado nos campos MOVED_TIME (DT1052_22:NEW) e UF_CRM_12_1723552666
-    
-    Args:
-        df_comune: DataFrame com os dados de COMUNE
-        
-    Returns:
-        DataFrame com tempo de solicitação agrupado por UF_CRM_12_1723552666
+    Calcula o tempo entre a data de criação e a última modificação dos registros
     """
     if df_comune.empty:
         return pd.DataFrame()
@@ -422,4 +416,131 @@ def calcular_tempo_solicitacao(df_comune):
     # Ordenar do maior tempo para o menor
     resultado = resultado.sort_values('TEMPO_SOLICITACAO_HORAS', ascending=False)
     
-    return resultado 
+    return resultado
+
+def criar_metricas_certidoes(df_comune):
+    """
+    Cria métricas agregadas para monitoramento das certidões, agrupadas por categoria
+    """
+    if df_comune.empty:
+        return {}
+    
+    # Adicionar nomes legíveis dos estágios
+    mapa_estagios = mapear_estagios_comune()
+    df_comune['STAGE_NAME'] = df_comune['STAGE_ID'].map(mapa_estagios)
+    
+    # Definir as categorias e os estágios que pertencem a cada uma
+    categorias = {
+        "Solicitado - Aguardando Retorno": [
+            "AGUARDANDO COMUNE/PARÓQUIA - TEM INFO",
+            "AGUARDANDO COMUNE/PARÓQUIA",
+            "AGUARDANDO PDF"
+        ],
+        "Pendência de Solicitação Comune - Parceiro": [
+            "PENDENTE",
+            "PESQUISA NÃO FINALIZADA",
+            "SOLICITAR",
+            "SOLICITAR - TEM INFO"
+        ],
+        "Pendência de Solicitação Comune - Empresa": [
+            "NEGATIVA COMUNE",
+            "CANCELADO",
+            "DEVOLUTIVA EMISSOR"
+        ],
+        "Entregas": [
+            "DOCUMENTO FISICO ENTREGUE",
+            "ENTREGUE PDF"
+        ]
+    }
+    
+    # Inicializar dicionário para armazenar as métricas
+    metricas = {}
+    
+    # Computar as métricas para cada categoria
+    for categoria, estagios in categorias.items():
+        # Filtrar o dataframe pelos estágios da categoria
+        df_categoria = df_comune[df_comune['STAGE_NAME'].isin(estagios)]
+        
+        # Agrupar por estágio e contar
+        contagem = df_categoria.groupby('STAGE_NAME').size().reset_index(name='Certidões')
+        
+        # Adicionar total
+        total = contagem['Certidões'].sum()
+        
+        # Ordernar por contagem (decrescente)
+        contagem = contagem.sort_values('Certidões', ascending=False)
+        
+        # Armazenar métricas
+        metricas[categoria] = {
+            'dados': contagem, 
+            'total': total
+        }
+    
+    return metricas
+
+def criar_metricas_tempo_dias(df_comune):
+    """
+    Cria métricas de tempo em dias, agrupadas por faixas de tempo
+    """
+    if df_comune.empty:
+        return {}
+    
+    # Verificar se as colunas necessárias existem
+    if 'MOVED_TIME' not in df_comune.columns:
+        print("Coluna MOVED_TIME não encontrada no DataFrame")
+        return {}
+    
+    # Copiar o dataframe para não modificar o original
+    df_tempo = df_comune.copy()
+    
+    # Converter a coluna de data/hora para datetime
+    df_tempo['MOVED_TIME'] = pd.to_datetime(df_tempo['MOVED_TIME'], errors='coerce')
+    
+    # Filtrar apenas registros que possuem valores válidos para MOVED_TIME
+    df_tempo = df_tempo.dropna(subset=['MOVED_TIME'])
+    
+    # Adicionar nomes legíveis dos estágios
+    mapa_estagios = mapear_estagios_comune()
+    df_tempo['STAGE_NAME'] = df_tempo['STAGE_ID'].map(mapa_estagios)
+    
+    # Calcular o tempo em dias
+    df_tempo['TEMPO_ATUAL'] = pd.Timestamp.now()
+    df_tempo['TEMPO_DIAS'] = (df_tempo['TEMPO_ATUAL'] - df_tempo['MOVED_TIME']).dt.total_seconds() / (24 * 3600)
+    
+    # Definir as categorias por faixas de tempo em dias
+    categorias_tempo = {
+        "Até 7 dias": (0, 7),
+        "8 a 15 dias": (7, 15),
+        "16 a 30 dias": (15, 30),
+        "31 a 60 dias": (30, 60),
+        "Mais de 60 dias": (60, float('inf'))
+    }
+    
+    # Inicializar dicionário para armazenar as métricas
+    metricas_tempo = {}
+    
+    # Computar as métricas para cada categoria de tempo
+    for categoria, (min_dias, max_dias) in categorias_tempo.items():
+        # Filtrar o dataframe pela faixa de dias
+        df_faixa = df_tempo[(df_tempo['TEMPO_DIAS'] > min_dias) & (df_tempo['TEMPO_DIAS'] <= max_dias)]
+        
+        # Agrupar por estágio e contar
+        contagem = df_faixa.groupby('STAGE_NAME').size().reset_index(name='Certidões')
+        
+        # Adicionar total
+        total = contagem['Certidões'].sum()
+        
+        # Ordenar por contagem (decrescente)
+        contagem = contagem.sort_values('Certidões', ascending=False)
+        
+        # Calcular tempo médio da categoria
+        tempo_medio = df_faixa['TEMPO_DIAS'].mean() if not df_faixa.empty else 0
+        
+        # Armazenar métricas
+        metricas_tempo[categoria] = {
+            'dados': contagem,
+            'total': total,
+            'tempo_medio': round(tempo_medio, 1)
+        }
+    
+    return metricas_tempo 
