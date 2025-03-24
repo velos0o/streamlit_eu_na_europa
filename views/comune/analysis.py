@@ -365,4 +365,61 @@ def analisar_registros_sem_correspondencia(df_cruzado):
     if 'DATE_CREATE' in df_sem_match.columns and 'MES_ANO' in df_sem_match.columns:
         resumo['por_periodo'] = por_periodo
     
-    return resumo 
+    return resumo
+
+def calcular_tempo_solicitacao(df_comune):
+    """
+    Calcula o tempo médio de solicitação baseado nos campos MOVED_TIME (DT1052_22:NEW) e UF_CRM_12_1723552666
+    
+    Args:
+        df_comune: DataFrame com os dados de COMUNE
+        
+    Returns:
+        DataFrame com tempo de solicitação agrupado por UF_CRM_12_1723552666
+    """
+    if df_comune.empty:
+        return pd.DataFrame()
+    
+    # Verificar se as colunas necessárias existem
+    colunas_necessarias = ['MOVED_TIME', 'UF_CRM_12_1723552666']
+    if not all(col in df_comune.columns for col in colunas_necessarias):
+        missing_cols = [col for col in colunas_necessarias if col not in df_comune.columns]
+        print(f"Colunas ausentes: {missing_cols}")
+        # Criar colunas faltantes com NaN para evitar erros
+        for col in missing_cols:
+            df_comune[col] = np.nan
+    
+    # Copiar o dataframe para não modificar o original
+    df_calculo = df_comune.copy()
+    
+    # Converter as colunas de data/hora para datetime (se não forem)
+    if 'MOVED_TIME' in df_calculo.columns:
+        df_calculo['MOVED_TIME'] = pd.to_datetime(df_calculo['MOVED_TIME'], errors='coerce')
+    
+    # Filtrar apenas registros que possuem valores válidos para as colunas necessárias
+    df_valido = df_calculo.dropna(subset=['MOVED_TIME', 'UF_CRM_12_1723552666'])
+    
+    # Verificar se há dados válidos após filtro
+    if df_valido.empty:
+        return pd.DataFrame(columns=['UF_CRM_12_1723552666', 'TEMPO_SOLICITACAO_HORAS', 'QUANTIDADE'])
+    
+    # Calcular o tempo de solicitação (assumindo que MOVED_TIME é quando o item entrou no estágio "NEW")
+    df_valido['TEMPO_ATUAL'] = pd.Timestamp.now()
+    df_valido['TEMPO_SOLICITACAO'] = df_valido['TEMPO_ATUAL'] - df_valido['MOVED_TIME']
+    
+    # Converter para horas
+    df_valido['TEMPO_SOLICITACAO_HORAS'] = df_valido['TEMPO_SOLICITACAO'].dt.total_seconds() / 3600
+    
+    # Agrupar por UF_CRM_12_1723552666 e calcular média do tempo
+    resultado = df_valido.groupby('UF_CRM_12_1723552666').agg(
+        TEMPO_SOLICITACAO_HORAS=('TEMPO_SOLICITACAO_HORAS', 'mean'),
+        QUANTIDADE=('TEMPO_SOLICITACAO_HORAS', 'count')
+    ).reset_index()
+    
+    # Arredondar para 2 casas decimais
+    resultado['TEMPO_SOLICITACAO_HORAS'] = resultado['TEMPO_SOLICITACAO_HORAS'].round(2)
+    
+    # Ordenar do maior tempo para o menor
+    resultado = resultado.sort_values('TEMPO_SOLICITACAO_HORAS', ascending=False)
+    
+    return resultado 

@@ -1,7 +1,7 @@
 import streamlit as st
 from .data_loader import carregar_dados_comune, carregar_dados_negocios, carregar_estagios_bitrix
-from .analysis import criar_visao_geral_comune, criar_visao_macro, cruzar_comune_deal, analisar_distribuicao_deals, analisar_registros_sem_correspondencia
-from .visualization import visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro, visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia
+from .analysis import criar_visao_geral_comune, criar_visao_macro, cruzar_comune_deal, analisar_distribuicao_deals, analisar_registros_sem_correspondencia, calcular_tempo_solicitacao
+from .visualization import visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro, visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia, visualizar_tempo_solicitacao
 import pandas as pd
 import io
 from datetime import datetime
@@ -61,11 +61,12 @@ def show_comune():
     # Mostrar todas as informações relevantes em abas
     if not df_comune.empty:
         # Criar abas para organizar o conteúdo
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab_tempo_solicitacao = st.tabs([
             "Distribuição por Estágio", 
             "Dados Detalhados", 
             "Funil Detalhado", 
-            "Cruzamento CRM_DEAL"
+            "Cruzamento CRM_DEAL",
+            "⏱️ Tempo de Solicitação"
         ])
         
         # Aba 1: Visão Macro
@@ -364,6 +365,22 @@ def show_comune():
                     st.error("Nenhum registro encontrado em CRM_DEAL_UF para os negócios filtrados")
                 else:
                     st.success(f"Encontrados {len(df_deal_uf)} registros em CRM_DEAL_UF")
+        
+        # Aba de Tempo de Solicitação
+        with tab_tempo_solicitacao:
+            # Adicionar descrição da análise
+            st.markdown("""
+            <p style='font-size: 16px; color: #444; margin-bottom: 20px;'>
+            Esta análise apresenta o tempo médio de solicitação calculado a partir do momento em que o registro entrou no estágio inicial (DT1052_22:NEW) até o momento atual,
+            agrupado pelo campo UF_CRM_12_1723552666.
+            </p>
+            """, unsafe_allow_html=True)
+            
+            # Calcular o tempo de solicitação
+            df_tempo_solicitacao = calcular_tempo_solicitacao(df_comune)
+            
+            # Visualizar os resultados
+            visualizar_tempo_solicitacao(df_tempo_solicitacao)
     
     # Adicionar download dos dados
     if not df_comune.empty:

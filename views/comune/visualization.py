@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime
+import io
 
 def visualizar_comune_dados(df_comune):
     """
@@ -174,8 +175,7 @@ def visualizar_grafico_macro(df_visao_macro):
                     color='rgba(0,0,0,0)',  # Transparente
                     line=dict(
                         color=cores.get(row['MACRO_STAGE'], '#888888'),
-                        width=2,
-                        dash='dot'  # Linha pontilhada
+                        width=2
                     ),
                     pattern=dict(shape="/", size=8)  # Padrão listrado
                 ),
@@ -745,4 +745,97 @@ def visualizar_estagios_detalhados(df_visao_geral):
                 </li>
             </ul>
         </div>
-        """, unsafe_allow_html=True) 
+        """, unsafe_allow_html=True)
+
+def visualizar_tempo_solicitacao(df_tempo_solicitacao):
+    """
+    Visualiza a tabela de tempo médio de solicitação agrupado por UF_CRM_12_1723552666
+    
+    Args:
+        df_tempo_solicitacao: DataFrame com o tempo médio de solicitação
+    """
+    if df_tempo_solicitacao.empty:
+        st.warning("Não há dados disponíveis para cálculo do tempo de solicitação.")
+        return
+    
+    # Título da seção
+    st.markdown("""
+    <h3 style="font-size: 1.5rem; font-weight: 700; color: #1A237E; 
+    margin-top: 2rem; margin-bottom: 1rem; padding-bottom: 5px; border-bottom: 2px solid #1976D2;">
+    Tempo Médio de Solicitação por Campo UF_CRM_12_1723552666</h3>
+    """, unsafe_allow_html=True)
+    
+    # Renomear colunas para melhor visualização
+    df_display = df_tempo_solicitacao.copy()
+    
+    # Adicionar colunas para meses, dias e horas
+    df_display['MESES'] = (df_display['TEMPO_SOLICITACAO_HORAS'] / (24 * 30)).round(1)
+    df_display['DIAS'] = (df_display['TEMPO_SOLICITACAO_HORAS'] / 24).round(1)
+    df_display['HORAS'] = df_display['TEMPO_SOLICITACAO_HORAS'].round(2)
+    
+    # Renomear colunas
+    df_display.columns = ['Campo UF_CRM_12_1723552666', 'Tempo Médio (horas)', 'Quantidade de Registros', 'Meses', 'Dias', 'Horas']
+    
+    # Adicionar métrica resumo
+    col1, col2, col3 = st.columns(3)
+    
+    # Tempo médio geral
+    tempo_medio_geral = df_tempo_solicitacao['TEMPO_SOLICITACAO_HORAS'].mean()
+    tempo_medio_dias = tempo_medio_geral / 24
+    
+    with col1:
+        st.metric(
+            label="Tempo Médio Geral de Solicitação", 
+            value=f"{int(tempo_medio_geral)} horas ({int(tempo_medio_dias)} dias)"
+        )
+    
+    with col2:
+        st.metric(
+            label="Total de Registros Analisados", 
+            value=f"{df_tempo_solicitacao['QUANTIDADE'].sum()}"
+        )
+    
+    with col3:
+        tempo_mediano = df_tempo_solicitacao['TEMPO_SOLICITACAO_HORAS'].median()
+        tempo_mediano_dias = tempo_mediano / 24
+        st.metric(
+            label="Tempo Mediano de Solicitação",
+            value=f"{int(tempo_mediano)} horas ({int(tempo_mediano_dias)} dias)"
+        )
+    
+    # Formatar a tabela para exibição
+    # Aplicar formatação para tempo em horas/dias/meses
+    def formatar_tempo_meses(meses):
+        return f"{int(meses)} meses"
+    
+    def formatar_tempo_dias(dias):
+        return f"{int(dias)} dias"
+    
+    def formatar_tempo_horas(horas):
+        return f"{int(horas)} h"
+    
+    df_display['Meses'] = df_display['Meses'].apply(formatar_tempo_meses)
+    df_display['Dias'] = df_display['Dias'].apply(formatar_tempo_dias)
+    df_display['Horas'] = df_display['Horas'].apply(formatar_tempo_horas)
+    
+    # Remover a coluna original de tempo médio em horas para não duplicar a informação
+    df_display = df_display.drop(columns=['Tempo Médio (horas)'])
+    
+    # Exibir tabela
+    st.dataframe(
+        df_display,
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    # Adicionar botão para download
+    csv_buffer = io.StringIO()
+    df_tempo_solicitacao.to_csv(csv_buffer, index=False)
+    csv_str = csv_buffer.getvalue()
+    
+    st.download_button(
+        label="📥 Baixar Dados em CSV",
+        data=csv_str,
+        file_name=f"tempo_solicitacao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv",
+    ) 
