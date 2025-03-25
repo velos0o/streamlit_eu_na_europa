@@ -2,6 +2,7 @@ import streamlit as st
 from .data_loader import carregar_dados_cartorio
 from .analysis import criar_visao_geral_cartorio, analyze_cartorio_ids, analisar_familias_ausentes, analisar_familia_certidoes
 from .visualization import visualizar_cartorio_dados, visualizar_grafico_cartorio
+from .produtividade import analisar_produtividade
 import pandas as pd
 import io
 from datetime import datetime
@@ -71,12 +72,13 @@ def show_cartorio():
     # Mostrar todas as informações relevantes em uma única página
     if not df_cartorio.empty:
         # Criar abas para organizar o conteúdo
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "Dados Detalhados", 
             "Visão Geral", 
             "Análise de Famílias", 
             "IDs de Família",
-            "Análises Famílias"
+            "Análises Famílias",
+            "Produtividade"
         ])
         
         # Aba 1: Dados Detalhados dos Cartórios
@@ -378,6 +380,11 @@ def show_cartorio():
                     st.error("Não foi possível realizar a análise. Verifique os logs para mais informações.")
             else:
                 st.info("Clique no botão acima para iniciar a análise detalhada de famílias.")
+        
+        # Aba 6: Produtividade
+        with tab6:
+            # 6. Análise de Produtividade
+            analisar_produtividade(df_cartorio)
     else:
         st.info("Nenhum dado disponível para exibir.")
         

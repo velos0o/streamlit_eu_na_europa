@@ -140,6 +140,135 @@ def analyze_family_ids(df):
     
     return summary, details
 
+def carregar_dados_categoria_34(date_from=None, date_to=None, debug=False, progress_bar=None, message_container=None):
+    """
+    Carrega dados da categoria 34 do Bitrix24
+    
+    Args:
+        date_from (str): Data inicial
+        date_to (str): Data final
+        debug (bool): Se deve mostrar logs de depuração
+        progress_bar: Barra de progresso opcional
+        message_container: Container de mensagem opcional
+        
+    Returns:
+        pandas.DataFrame: DataFrame com os dados da categoria 34
+    """
+    # Atualizar progresso se houver barra
+    if progress_bar and message_container:
+        update_progress(progress_bar, 0.2, message_container, "Carregando dados da categoria 34...")
+    
+    # Carregar dados da categoria 34
+    df_cat34 = load_merged_data(
+        category_id=34,
+        date_from=date_from,
+        date_to=date_to,
+        debug=debug,
+        progress_bar=progress_bar,
+        message_container=message_container
+    )
+    
+    # Verificar se temos dados válidos
+    if df_cat34.empty:
+        if debug:
+            st.warning("Não foi possível carregar dados da categoria 34")
+        return pd.DataFrame()
+    
+    # Filtrar e manter apenas as colunas necessárias para o cruzamento
+    colunas_necessarias = ['ID', 'TITLE', 'ASSIGNED_BY_NAME', 'UF_CRM_1722605592778']
+    
+    # Garantir que todas as colunas existam
+    for coluna in colunas_necessarias:
+        if coluna not in df_cat34.columns:
+            df_cat34[coluna] = None
+    
+    # Selecionar apenas as colunas necessárias
+    df_cat34 = df_cat34[colunas_necessarias]
+    
+    return df_cat34
+
+def cruzar_dados_categorias(df_cat32, df_cat34, debug=False):
+    """
+    Cruza os dados das categorias 32 e 34 pelo campo UF_CRM_1722605592778 (ID Família)
+    
+    Args:
+        df_cat32 (pandas.DataFrame): DataFrame com dados da categoria 32
+        df_cat34 (pandas.DataFrame): DataFrame com dados da categoria 34
+        debug (bool): Se deve mostrar logs de depuração
+        
+    Returns:
+        tuple: (DataFrame cruzado, DataFrame resumo)
+    """
+    # Verificar se temos os dados necessários
+    if df_cat32.empty or df_cat34.empty:
+        if debug:
+            st.warning("Dados vazios, não é possível realizar o cruzamento")
+        return pd.DataFrame(), pd.DataFrame()
+    
+    # Verificar se a coluna de ID Família existe
+    if 'UF_CRM_1722605592778' not in df_cat32.columns or 'UF_CRM_1722605592778' not in df_cat34.columns:
+        if debug:
+            st.warning("Campo UF_CRM_1722605592778 não encontrado nos dados")
+        return pd.DataFrame(), pd.DataFrame()
+    
+    # Criar cópias para não alterar os originais
+    df32 = df_cat32.copy()
+    df34 = df_cat34.copy()
+    
+    # Limpar valores nulos ou vazios
+    df32['UF_CRM_1722605592778'] = df32['UF_CRM_1722605592778'].fillna('')
+    df34['UF_CRM_1722605592778'] = df34['UF_CRM_1722605592778'].fillna('')
+    
+    # Padronizar o nome das colunas para facilitar o merge
+    df32 = df32.rename(columns={
+        'ID': 'ID_CAT32',
+        'TITLE': 'NOME_NEGOCIO_CAT32',
+        'ASSIGNED_BY_NAME': 'RESPONSAVEL_CAT32',
+        'UF_CRM_1722605592778': 'ID_FAMILIA'
+    })
+    
+    df34 = df34.rename(columns={
+        'ID': 'ID_CAT34',
+        'TITLE': 'NOME_NEGOCIO_CAT34',
+        'ASSIGNED_BY_NAME': 'RESPONSAVEL_CAT34',
+        'UF_CRM_1722605592778': 'ID_FAMILIA'
+    })
+    
+    # Adicionar status de higienização se não existir
+    if 'UF_CRM_HIGILIZACAO_STATUS' not in df32.columns:
+        df32['UF_CRM_HIGILIZACAO_STATUS'] = None
+    
+    # Filtrar apenas registros com ID_FAMILIA válido na categoria 34
+    df34_validos = df34[df34['ID_FAMILIA'] != '']
+    
+    if debug:
+        st.write(f"Total de registros na categoria 34: {len(df34)}")
+        st.write(f"Registros com ID_FAMILIA válido na categoria 34: {len(df34_validos)}")
+    
+    # Cruzar os dados pelo ID_FAMILIA
+    df_cruzado = pd.merge(
+        df34_validos,
+        df32[['ID_CAT32', 'NOME_NEGOCIO_CAT32', 'RESPONSAVEL_CAT32', 'ID_FAMILIA', 'UF_CRM_HIGILIZACAO_STATUS']],
+        on='ID_FAMILIA',
+        how='left'
+    )
+    
+    # Preencher valores nulos no status
+    df_cruzado['UF_CRM_HIGILIZACAO_STATUS'] = df_cruzado['UF_CRM_HIGILIZACAO_STATUS'].fillna('PENDENCIA')
+    
+    # Criar dataframe resumo com contagem por status
+    resumo = df_cruzado.groupby('UF_CRM_HIGILIZACAO_STATUS').size().reset_index()
+    resumo.columns = ['Status', 'Quantidade']
+    
+    # Adicionar linha para total
+    total = resumo['Quantidade'].sum()
+    resumo = pd.concat([
+        resumo, 
+        pd.DataFrame([{'Status': 'TOTAL', 'Quantidade': total}])
+    ], ignore_index=True)
+    
+    return df_cruzado, resumo
+
 def show_producao():
     """
     Exibe a página de produção e análise de higienização
@@ -195,6 +324,20 @@ def show_producao():
                         progress_bar=progress_bar,
                         message_container=message_container
                     )
+                    
+                    # Carregar dados da categoria 34 se não estiver em modo de demo
+                    # e se não estiver com filtro de IDs específicos
+                    if not use_id_filter:
+                        update_progress(progress_bar, 0.6, message_container, "Carregando dados da categoria 34...")
+                        filtered_df_cat34 = carregar_dados_categoria_34(
+                            date_from=date_from,
+                            date_to=date_to,
+                            debug=debug_mode,
+                            progress_bar=progress_bar,
+                            message_container=message_container
+                        )
+                        # Armazenar no estado da sessão
+                        st.session_state['filtered_df_cat34'] = filtered_df_cat34
                 
                 # Armazenar dados filtrados na sessão
                 st.session_state['filtered_df'] = filtered_df
@@ -368,7 +511,7 @@ def show_producao():
             # Usar radio buttons para selecionar o relatório
             relatorio_selecionado = st.radio(
                 "Selecione o relatório:",
-                ["Status por Responsável", "Pendências por Responsável", "Produção Geral"],
+                ["Status por Responsável", "Pendências por Responsável", "Produção Geral", "Cruzamento de Famílias"],
                 horizontal=True
             )
             
@@ -633,6 +776,136 @@ def show_producao():
                     st.markdown("</div>", unsafe_allow_html=True)
                 else:
                     st.info("Não há dados suficientes para criar a tabela de produção.")
+            
+            elif relatorio_selecionado == "Cruzamento de Famílias":
+                st.subheader("Cruzamento de Famílias entre Categorias 32 e 34")
+                
+                # Verificar se temos dados da categoria 34
+                if 'filtered_df_cat34' not in st.session_state or st.session_state['filtered_df_cat34'].empty:
+                    st.warning("Dados da categoria 34 não disponíveis. Por favor, desative o filtro de IDs específicos e recarregue os dados.")
+                    if st.button("Recarregar sem filtro de IDs", type="primary"):
+                        st.session_state['use_id_filter'] = False
+                        st.session_state['loading_state'] = 'loading'
+                        st.rerun()
+                    return
+                
+                # Realizar o cruzamento dos dados
+                df_cat32 = filtered_df
+                df_cat34 = st.session_state['filtered_df_cat34']
+                
+                # Mostrar contadores básicos
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Total registros categoria 32", len(df_cat32))
+                with col2:
+                    st.metric("Total registros categoria 34", len(df_cat34))
+                
+                # Realizar o cruzamento
+                df_cruzado, df_resumo = cruzar_dados_categorias(df_cat32, df_cat34, debug=debug_mode)
+                
+                if df_cruzado.empty:
+                    st.error("Não foi possível realizar o cruzamento dos dados. Verifique se o campo ID Família (UF_CRM_1722605592778) existe nos dados.")
+                    return
+                
+                # Exibir resumo de status
+                st.markdown("### Resumo de Status de Higienização")
+                
+                # Configurar colunas para exibição do resumo
+                resumo_config = {
+                    "Status": st.column_config.TextColumn(
+                        "Status",
+                        width="medium",
+                        help="Status de higienização"
+                    ),
+                    "Quantidade": st.column_config.NumberColumn(
+                        "Quantidade",
+                        format="%d",
+                        width="small",
+                        help="Número de registros"
+                    )
+                }
+                
+                # Exibir o resumo
+                st.dataframe(
+                    df_resumo,
+                    column_config=resumo_config,
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Mostrar a tabela detalhada
+                st.markdown("### Detalhamento do Cruzamento")
+                
+                # Configurar as colunas para exibição
+                cruzamento_config = {
+                    "ID_CAT34": st.column_config.TextColumn(
+                        "ID (Cat. 34)",
+                        width="small",
+                        help="ID do registro na categoria 34"
+                    ),
+                    "NOME_NEGOCIO_CAT34": st.column_config.TextColumn(
+                        "Nome (Cat. 34)",
+                        width="medium",
+                        help="Nome do negócio na categoria 34"
+                    ),
+                    "RESPONSAVEL_CAT34": st.column_config.TextColumn(
+                        "Responsável (Cat. 34)",
+                        width="medium",
+                        help="Responsável na categoria 34"
+                    ),
+                    "ID_FAMILIA": st.column_config.TextColumn(
+                        "ID Família",
+                        width="small",
+                        help="ID de Família compartilhado entre as categorias"
+                    ),
+                    "ID_CAT32": st.column_config.TextColumn(
+                        "ID (Cat. 32)",
+                        width="small",
+                        help="ID do registro na categoria 32"
+                    ),
+                    "NOME_NEGOCIO_CAT32": st.column_config.TextColumn(
+                        "Nome (Cat. 32)",
+                        width="medium",
+                        help="Nome do negócio na categoria 32"
+                    ),
+                    "RESPONSAVEL_CAT32": st.column_config.TextColumn(
+                        "Responsável (Cat. 32)",
+                        width="medium",
+                        help="Responsável na categoria 32"
+                    ),
+                    "UF_CRM_HIGILIZACAO_STATUS": st.column_config.TextColumn(
+                        "Status Higienização",
+                        width="medium",
+                        help="Status de higienização na categoria 32"
+                    )
+                }
+                
+                # Exibir a tabela detalhada com os cruzamentos
+                st.dataframe(
+                    df_cruzado,
+                    column_config=cruzamento_config,
+                    use_container_width=True,
+                    height=500,
+                    hide_index=True
+                )
+                
+                # Adicionar botão para exportar
+                if st.button("Exportar Cruzamento para Excel"):
+                    # Converter para Excel
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        # Aba de resumo
+                        df_resumo.to_excel(writer, sheet_name='Resumo', index=False)
+                        # Aba de detalhes
+                        df_cruzado.to_excel(writer, sheet_name='Detalhamento', index=False)
+                    
+                    # Oferecer para download
+                    st.download_button(
+                        label="Baixar arquivo Excel",
+                        data=output.getvalue(),
+                        file_name=f"cruzamento_categorias_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
             
             # Análise de IDs de Família (movida para o final)
             st.markdown("## Análise de IDs de Família")
