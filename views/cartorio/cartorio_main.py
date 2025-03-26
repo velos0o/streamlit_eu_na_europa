@@ -1,6 +1,6 @@
 import streamlit as st
 from .data_loader import carregar_dados_cartorio
-from .analysis import criar_visao_geral_cartorio, analyze_cartorio_ids, analisar_familias_ausentes, analisar_familia_certidoes
+from .analysis import criar_visao_geral_cartorio, analyze_cartorio_ids, analisar_familias_ausentes, analisar_familia_certidoes, analisar_acompanhamento_emissao_familia
 from .visualization import visualizar_cartorio_dados, visualizar_grafico_cartorio
 from .produtividade import analisar_produtividade
 import pandas as pd
@@ -72,13 +72,14 @@ def show_cartorio():
     # Mostrar todas as informações relevantes em uma única página
     if not df_cartorio.empty:
         # Criar abas para organizar o conteúdo
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
             "Dados Detalhados", 
             "Visão Geral", 
             "Análise de Famílias", 
             "IDs de Família",
             "Análises Famílias",
-            "Produtividade"
+            "Produtividade",
+            "Acompanhamento de Emissão família"
         ])
         
         # Aba 1: Dados Detalhados dos Cartórios
@@ -385,6 +386,192 @@ def show_cartorio():
         with tab6:
             # 6. Análise de Produtividade
             analisar_produtividade(df_cartorio)
+        
+        # Aba 7: Acompanhamento de Emissão família (Nova aba)
+        with tab7:
+            # Título e estilo personalizado
+            st.markdown("""
+            <h1 style="font-size: 2.2rem; font-weight: 800; color: #1A237E; text-align: center; 
+            margin-bottom: 1.2rem; padding-bottom: 8px; border-bottom: 3px solid #1976D2;">
+            <i class="material-icons" style="vertical-align: middle;">assessment</i>
+            Acompanhamento de Emissão por Família</h1>
+            """, unsafe_allow_html=True)
+            
+            # Explicação do processo com estilo aprimorado
+            st.markdown("""
+            <div style="background-color: #E8EAF6; padding: 18px; border-radius: 8px; margin-bottom: 20px; 
+            border-left: 5px solid #3F51B5; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <p style="margin: 0; font-size: 16px; color: #283593;">Esta visão apresenta o acompanhamento de emissão de certidões por família, 
+                mostrando o percentual de conclusão das certidões solicitadas.</p>
+                <p style="margin-top: 12px; font-size: 14px; color: #455A64;">
+                    <strong>Nota:</strong> São consideradas concluídas as certidões que estão em etapas de Sucesso no fluxo do Bitrix.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Carregar dados automaticamente ao abrir a aba
+            with st.spinner("Carregando dados de acompanhamento..."):
+                df_acompanhamento = analisar_acompanhamento_emissao_familia()
+            
+            if not df_acompanhamento.empty:
+                # Exibição de estatísticas gerais (métricas) com mais estilo
+                st.markdown("<h3 style='color: #1A237E; margin-top: 30px;'>Resumo Geral</h3>", unsafe_allow_html=True)
+                
+                # Calcular estatísticas
+                total_certidoes = df_acompanhamento['TOTAL_CERTIDOES'].sum()
+                total_concluidas = df_acompanhamento['CERTIDOES_CONCLUIDAS'].sum()
+                percentual_geral = (total_concluidas / total_certidoes * 100) if total_certidoes > 0 else 0
+                
+                # Métricas em cards com cores
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    # Card estilizado
+                    st.markdown(f"""
+                    <div style="background-color: #E3F2FD; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <h2 style="margin:0; color: #1565C0; font-size: 32px;">{len(df_acompanhamento)}</h2>
+                        <p style="margin:0; color: #1976D2; font-weight: bold;">Total de Famílias</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                with col2:
+                    st.markdown(f"""
+                    <div style="background-color: #E8F5E9; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <h2 style="margin:0; color: #2E7D32; font-size: 32px;">{total_certidoes}</h2>
+                        <p style="margin:0; color: #388E3C; font-weight: bold;">Total de Certidões</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                with col3:
+                    st.markdown(f"""
+                    <div style="background-color: #FFF8E1; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <h2 style="margin:0; color: #FF8F00; font-size: 32px;">{total_concluidas}</h2>
+                        <p style="margin:0; color: #FFA000; font-weight: bold;">Certidões Concluídas</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                with col4:
+                    st.markdown(f"""
+                    <div style="background-color: #FFEBEE; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <h2 style="margin:0; color: #C62828; font-size: 32px;">{percentual_geral:.1f}%</h2>
+                        <p style="margin:0; color: #D32F2F; font-weight: bold;">Percentual Geral</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Separador visual
+                st.markdown("<hr style='margin: 30px 0; border-color: #E0E0E0;'>", unsafe_allow_html=True)
+                
+                # Título da tabela com estilo
+                st.markdown("<h3 style='color: #1A237E;'>Detalhamento por Família</h3>", unsafe_allow_html=True)
+                
+                # Preparar dataframe para exibição
+                df_display = df_acompanhamento.copy()
+                
+                # Converter percentual para string formatado (para exibição)
+                df_display['PERCENTUAL_TEXTO'] = df_display['PERCENTUAL_CONCLUSAO'].apply(lambda x: f"{x:.1f}%")
+                
+                # Exibir tabela com os dados - com apenas a barra de progresso
+                st.dataframe(
+                    df_display,
+                    column_config={
+                        "ID_FAMILIA": st.column_config.TextColumn(
+                            "ID da Família", 
+                            help="Identificador único da família",
+                            width="medium"
+                        ),
+                        "NOME_FAMILIA": st.column_config.TextColumn(
+                            "Nome da Família", 
+                            help="Nome da família registrado no Bitrix",
+                            width="large"
+                        ),
+                        "TOTAL_REQUERENTES": st.column_config.NumberColumn(
+                            "Total de Requerentes", 
+                            format="%d", 
+                            help="Quantidade de requerentes únicos",
+                            width="small"
+                        ),
+                        "TOTAL_CERTIDOES": st.column_config.NumberColumn(
+                            "Total de Certidões", 
+                            format="%d", 
+                            help="Quantidade total de certidões solicitadas",
+                            width="small"
+                        ),
+                        "CERTIDOES_CONCLUIDAS": st.column_config.NumberColumn(
+                            "Certidões Concluídas", 
+                            format="%d", 
+                            help="Quantidade de certidões já concluídas",
+                            width="small"
+                        ),
+                        "PERCENTUAL_TEXTO": st.column_config.TextColumn(
+                            "Percentual", 
+                            help="Percentual de certidões concluídas",
+                            width="small"
+                        ),
+                        "PERCENTUAL_CONCLUSAO": st.column_config.ProgressColumn(
+                            "% Conclusão", 
+                            min_value=0, 
+                            max_value=100,
+                            format=None, # Removendo o formato para exibir apenas a barra
+                            help="Progresso visual de certidões concluídas"
+                        )
+                    },
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Adicionar botão para atualizar os dados
+                col1, col2 = st.columns([1, 4])
+                with col1:
+                    if st.button("🔄 Atualizar Dados", key="atualizar_acomp", type="primary"):
+                        st.rerun()
+                
+                # Adicionar botão para exportar os dados com estilo
+                with col2:
+                    csv = df_acompanhamento.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Exportar dados para CSV",
+                        data=csv,
+                        file_name=f"acompanhamento_emissao_familia_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                        mime="text/csv",
+                        help="Clique para baixar os dados em formato CSV"
+                    )
+                
+                # Mostrar informações sobre etapas de sucesso
+                with st.expander("Etapas consideradas como Sucesso", expanded=False):
+                    st.markdown("""
+                    <div style="background-color: #F5F5F5; padding: 15px; border-radius: 6px;">
+                        <h4 style="color: #1A237E; margin-top: 0;">Etapas que contam como certidões concluídas:</h4>
+                        <ul style="margin-bottom: 0; padding-left: 20px;">
+                            <li><code>SUCCESS</code> - Sucesso geral</li>
+                            <li><code>DT1052_16:SUCCESS</code> - Sucesso Casa Verde</li>
+                            <li><code>DT1052_34:SUCCESS</code> - Sucesso Tatuapé</li>
+                            <li><code>DT1052_16:UC_JRGCW3</code> - Certidão Pronta Casa Verde</li>
+                            <li><code>DT1052_34:UC_84B1S2</code> - Certidão Pronta Tatuapé</li>
+                            <li><code>UC_JRGCW3</code> - Certidão Pronta (genérico)</li>
+                            <li><code>UC_84B1S2</code> - Certidão Pronta (genérico)</li>
+                            <li><code>DT1052_16:CLIENT</code> - Entregue ao Cliente Casa Verde</li>
+                            <li><code>DT1052_34:CLIENT</code> - Entregue ao Cliente Tatuapé</li>
+                            <li><code>DT1052_34:UC_D0RG5P</code> - Finalização específica Tatuapé</li>
+                            <li><code>CLIENT</code> - Entregue ao Cliente (genérico)</li>
+                            <li><code>UC_D0RG5P</code> - Finalização específica (genérico)</li>
+                        </ul>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                # Mensagem de erro estilizada
+                st.markdown("""
+                <div style="background-color: #FFEBEE; padding: 15px; border-radius: 8px; margin-top: 20px; 
+                border-left: 5px solid #C62828; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <p style="margin: 0; color: #B71C1C; font-weight: bold;">Erro ao carregar dados</p>
+                    <p style="margin-top: 8px; color: #D32F2F;">
+                        Não foi possível carregar os dados de acompanhamento. Verifique os logs para mais informações.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Botão para tentar novamente
+                if st.button("🔄 Tentar Novamente", type="primary"):
+                    st.rerun()
     else:
         st.info("Nenhum dado disponível para exibir.")
         

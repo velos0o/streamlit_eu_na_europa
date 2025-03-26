@@ -564,4 +564,120 @@ def analisar_familia_certidoes():
         
     except Exception as e:
         st.error(f"Erro na análise de famílias: {str(e)}")
+        return pd.DataFrame()
+
+def analisar_acompanhamento_emissao_familia():
+    """
+    Cria uma visão de acompanhamento de emissão por família, mostrando:
+    - Nome da Família (UF_CRM_12_1722882763189)
+    - ID da Família (UF_CRM_12_1723552666)
+    - Total de Requerentes (contagem única por UF_CRM_12_1723552729)
+    - Total de Certidões (contagem total por UF_CRM_12_1723552729)
+    - Total de Certidões Concluídas (em etapas de Sucesso)
+    - Percentual de Conclusão (Certidões Concluídas / Total de Certidões)
+    
+    Returns:
+        pandas.DataFrame: Tabela com a análise de acompanhamento de emissão por família
+    """
+    try:
+        # Criar placeholders para o progresso
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        # Carregar dados dos cartórios
+        status_text.info("Carregando dados de famílias dos cartórios...")
+        from .data_loader import carregar_dados_cartorio
+        
+        df_cartorio = carregar_dados_cartorio()
+        progress_bar.progress(30)
+        
+        if df_cartorio.empty:
+            status_text.error("Não foi possível carregar os dados dos cartórios.")
+            progress_bar.progress(100)
+            return pd.DataFrame()
+        
+        # Verificar se as colunas necessárias existem no DataFrame
+        colunas_necessarias = ['UF_CRM_12_1723552666', 'UF_CRM_12_1722882763189', 'UF_CRM_12_1723552729', 'STAGE_ID']
+        colunas_faltando = [col for col in colunas_necessarias if col not in df_cartorio.columns]
+        
+        if colunas_faltando:
+            status_text.error(f"Colunas necessárias não encontradas: {', '.join(colunas_faltando)}")
+            progress_bar.progress(100)
+            return pd.DataFrame()
+        
+        # Filtrar apenas registros que possuem ID de família
+        df_cartorio = df_cartorio.dropna(subset=['UF_CRM_12_1723552666'])
+        
+        status_text.info(f"Processando {len(df_cartorio)} registros...")
+        progress_bar.progress(60)
+        
+        # Agrupar por ID de família para criar a análise
+        acompanhamento = df_cartorio.groupby('UF_CRM_12_1723552666').agg(
+            NOME_FAMILIA=('UF_CRM_12_1722882763189', 'first'),
+            TOTAL_CERTIDOES=('ID', 'count')
+        ).reset_index()
+        
+        # Renomear a coluna de ID
+        acompanhamento = acompanhamento.rename(columns={'UF_CRM_12_1723552666': 'ID_FAMILIA'})
+        
+        # Calcular total de requerentes únicos por família
+        def contar_requerentes_unicos(id_familia):
+            df_filtrado = df_cartorio[df_cartorio['UF_CRM_12_1723552666'] == id_familia]
+            requerentes_unicos = df_filtrado['UF_CRM_12_1723552729'].dropna().unique()
+            return len(requerentes_unicos)
+            
+        # Adicionar contagem de requerentes únicos
+        acompanhamento['TOTAL_REQUERENTES'] = acompanhamento['ID_FAMILIA'].apply(contar_requerentes_unicos)
+        
+        # Função para contar certidões concluídas (etapas de Sucesso)
+        def contar_certidoes_concluidas(id_familia):
+            # Filtrar pelo ID da família
+            df_filtrado = df_cartorio[df_cartorio['UF_CRM_12_1723552666'] == id_familia]
+            
+            # Lista de códigos de estágio que representam sucesso
+            success_codes = [
+                'SUCCESS', 
+                'DT1052_16:SUCCESS', 
+                'DT1052_34:SUCCESS',
+                'DT1052_16:UC_JRGCW3',
+                'DT1052_34:UC_84B1S2',
+                'UC_JRGCW3',
+                'UC_84B1S2',
+                'DT1052_16:CLIENT',
+                'DT1052_34:CLIENT',
+                'DT1052_34:UC_D0RG5P',
+                'CLIENT',
+                'UC_D0RG5P'
+            ]
+            
+            # Contar registros em estágios de sucesso
+            return sum(df_filtrado['STAGE_ID'].isin(success_codes))
+        
+        # Adicionar contagem de certidões concluídas
+        acompanhamento['CERTIDOES_CONCLUIDAS'] = acompanhamento['ID_FAMILIA'].apply(contar_certidoes_concluidas)
+        
+        # Calcular percentual de conclusão
+        acompanhamento['PERCENTUAL_CONCLUSAO'] = acompanhamento.apply(
+            lambda row: (row['CERTIDOES_CONCLUIDAS'] / row['TOTAL_CERTIDOES'] * 100) if row['TOTAL_CERTIDOES'] > 0 else 0, 
+            axis=1
+        )
+        
+        # Arredondar percentual para 2 casas decimais
+        acompanhamento['PERCENTUAL_CONCLUSAO'] = acompanhamento['PERCENTUAL_CONCLUSAO'].round(2)
+        
+        progress_bar.progress(100)
+        status_text.success(f"Análise concluída para {len(acompanhamento)} famílias")
+        
+        # Ordenar pelo número total de certidões (decrescente)
+        acompanhamento = acompanhamento.sort_values('TOTAL_CERTIDOES', ascending=False)
+        
+        # Preencher valores NaN
+        acompanhamento = acompanhamento.fillna('Não disponível')
+        
+        return acompanhamento
+        
+    except Exception as e:
+        st.error(f"Erro na análise de acompanhamento de emissão por família: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
         return pd.DataFrame() 
