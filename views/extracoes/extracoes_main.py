@@ -102,7 +102,8 @@ def mostrar_visualizacao_dados():
             data_inicial, data_final = st.date_input(
                 "Período:",
                 value=[pd.Timestamp.now() - pd.Timedelta(days=30), pd.Timestamp.now()],
-                format="DD/MM/YYYY"
+                format="DD/MM/YYYY",
+                key="extracao_visualizacao_periodo"
             )
     
     # Botão para carregar dados
@@ -175,7 +176,8 @@ def mostrar_exportar_csv():
         data_inicial, data_final = st.date_input(
             "Período:",
             value=[pd.Timestamp.now() - pd.Timedelta(days=30), pd.Timestamp.now()],
-            format="DD/MM/YYYY"
+            format="DD/MM/YYYY",
+            key="extracao_exportar_periodo"
         )
         
         colunas_padrao = ["ID", "TITLE", "ASSIGNED_BY_NAME", "DATE_CREATE", "UF_CRM_HIGILIZACAO_STATUS"]

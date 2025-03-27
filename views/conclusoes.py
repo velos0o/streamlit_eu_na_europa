@@ -88,7 +88,8 @@ def show_conclusoes():
             date_from = st.date_input(
                 "Data inicial", 
                 value=datetime.now() - timedelta(days=30),
-                format="DD/MM/YYYY"
+                format="DD/MM/YYYY",
+                key="conclusoes_date_from"
             )
         
         with col2:
@@ -96,7 +97,8 @@ def show_conclusoes():
             date_to = st.date_input(
                 "Data final", 
                 value=datetime.now(),
-                format="DD/MM/YYYY"
+                format="DD/MM/YYYY",
+                key="conclusoes_date_to"
             )
         
         # Segunda linha de filtros

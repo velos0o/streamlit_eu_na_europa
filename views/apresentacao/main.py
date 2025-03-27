@@ -96,14 +96,16 @@ def show_apresentacao_conclusoes(slide_inicial=0):
                 date_from = st.date_input(
                     "Data inicial", 
                     value=datetime.now() - timedelta(days=30),
-                    format="DD/MM/YYYY"
+                    format="DD/MM/YYYY",
+                    key="main_date_from"
                 )
             
             with col2:
                 date_to = st.date_input(
                     "Data final", 
                     value=datetime.now(),
-                    format="DD/MM/YYYY"
+                    format="DD/MM/YYYY",
+                    key="main_date_to"
                 )
             
             with col3:

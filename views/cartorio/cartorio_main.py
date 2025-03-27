@@ -2,7 +2,8 @@ import streamlit as st
 from .data_loader import carregar_dados_cartorio
 from .analysis import criar_visao_geral_cartorio, analyze_cartorio_ids, analisar_familias_ausentes, analisar_familia_certidoes, analisar_acompanhamento_emissao_familia
 from .visualization import visualizar_cartorio_dados, visualizar_grafico_cartorio
-from .produtividade import analisar_produtividade
+from .movimentacoes import analisar_produtividade
+from .produtividade import analisar_produtividade_etapas
 import pandas as pd
 import io
 from datetime import datetime
@@ -72,14 +73,15 @@ def show_cartorio():
     # Mostrar todas as informações relevantes em uma única página
     if not df_cartorio.empty:
         # Criar abas para organizar o conteúdo
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
             "Dados Detalhados", 
             "Visão Geral", 
             "Análise de Famílias", 
             "IDs de Família",
             "Análises Famílias",
-            "Produtividade",
-            "Acompanhamento de Emissão família"
+            "Movimentações",
+            "Acompanhamento de Emissão família",
+            "Produtividade"
         ])
         
         # Aba 1: Dados Detalhados dos Cartórios
@@ -382,9 +384,9 @@ def show_cartorio():
             else:
                 st.info("Clique no botão acima para iniciar a análise detalhada de famílias.")
         
-        # Aba 6: Produtividade
+        # Aba 6: Movimentações
         with tab6:
-            # 6. Análise de Produtividade
+            # 6. Análise de Movimentações
             analisar_produtividade(df_cartorio)
         
         # Aba 7: Acompanhamento de Emissão família (Nova aba)
@@ -572,6 +574,30 @@ def show_cartorio():
                 # Botão para tentar novamente
                 if st.button("🔄 Tentar Novamente", type="primary"):
                     st.rerun()
+        
+        # Aba 8: Produtividade por Etapas
+        with tab8:
+            # Título e estilo personalizado
+            st.markdown("""
+            <h1 style="font-size: 2.2rem; font-weight: 800; color: #1A237E; text-align: center; 
+            margin-bottom: 1.2rem; padding-bottom: 8px; border-bottom: 3px solid #1976D2;">
+            <i class="material-icons" style="vertical-align: middle;">speed</i>
+            Análise de Produtividade por Etapas</h1>
+            """, unsafe_allow_html=True)
+            
+            # Explicação do processo
+            st.markdown("""
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <p style="margin: 0;">Esta análise permite visualizar a produtividade baseada nas datas registradas em cada etapa do processo.
+                Você pode analisar por dia, semana e mês, e filtrar por responsável.</p>
+                <p style="margin-top: 10px; font-size: 14px; color: #666;">
+                    <strong>Nota:</strong> Os dados analisados consideram os campos de data de cada etapa do processo.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Chamar a função de análise de produtividade por etapas
+            analisar_produtividade_etapas(df_cartorio)
     else:
         st.info("Nenhum dado disponível para exibir.")
         

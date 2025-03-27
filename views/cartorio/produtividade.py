@@ -5,42 +5,67 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import numpy as np
 
-def analisar_produtividade(df):
+def formatar_nome_etapa(campo):
     """
-    Análise de produtividade baseada nos dados de movimentação de cards
+    Formata o nome de uma etapa do processo, removendo prefixos e substituindo underscores por espaços
+    
+    Args:
+        campo (str): Nome do campo original
+        
+    Returns:
+        str: Nome formatado da etapa
+    """
+    nome = campo.replace('UF_CRM_DATA_', '').replace('UF_CRM_', '')
+    # Garantir que todos os underlines são substituídos por espaços
+    while '_' in nome:
+        nome = nome.replace('_', ' ')
+    return nome.title()
+
+def analisar_produtividade_etapas(df):
+    """
+    Análise de produtividade baseada nas datas de cada etapa do processo
     
     Args:
         df (pandas.DataFrame): DataFrame com os dados dos cartórios
     """
-    # Verificar se temos as colunas necessárias para a análise
-    colunas_necessarias = [
-        'PREVIOUS_STAGE_ID',
-        'MOVED_TIME',
-        'CLOSEDATE',
-        'STAGE_ID',
-        'MOVED_BY_NAME',
-        'UPDATED_BY_NAME',
-        'UF_CRM_12_1723552666',  # ID da Familia
-        'UF_CRM_12_1723552729',  # ID de Requerente
-        'UF_CRM_12_1722534861891'  # Tipo de documento (Óbito, Casamento, Nascimento)
+    # Lista de campos de datas para análise
+    campos_data = [
+        'UF_CRM_DATA_AGUARDANDOCARTORIO_ORIGEM',
+        'UF_CRM_DATA_CERTIDAO_EMITIDA',
+        'UF_CRM_DATA_CERTIDAO_FISICA_ENTREGUE',
+        'UF_CRM_DATA_CERTIDAO_FISICA_ENVIADA',
+        'UF_CRM_DATA_MONTAR_REQUERIMENTO',
+        'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM',
+        'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM_PRIORIDADE',
+        'UF_CRM_DATA_SOLICITAR_REQUERIMENTO',
+        'UF_CRM_DEVOLUCAO_ADM',
+        'UF_CRM_DEVOLUCAO_ADM_VERIFICADO',
+        'UF_CRM_DEVOLUTIVA_BUSCA',
+        'UF_CRM_DEVOLUTIVA_REQUERIMENTO',
+        'UF_CRM_SOLICITACAO_DUPLICADO'
     ]
     
-    colunas_faltantes = [col for col in colunas_necessarias if col not in df.columns]
+    # Verificar se temos as colunas necessárias para a análise
+    colunas_faltantes = [col for col in campos_data if col not in df.columns]
     if colunas_faltantes:
-        st.error(f"Colunas necessárias não encontradas: {', '.join(colunas_faltantes)}")
-        st.write("Colunas disponíveis:", df.columns.tolist())
+        st.warning(f"Algumas colunas de datas não foram encontradas: {', '.join(colunas_faltantes)}")
+        campos_data = [col for col in campos_data if col in df.columns]
+        
+    if not campos_data:
+        st.error("Nenhuma coluna de data necessária para análise foi encontrada.")
         return
     
-    # Adicionar nomes dos estágios para melhor visualização
-    df = mapear_estagio_para_nome(df)
-    
-    st.markdown("## Visão de Produtividade")
+    st.markdown("## Análise de Produtividade por Etapas")
     st.info("""
-    **O que é a Visão de Produtividade?**
-    • Esta visão mostra a análise detalhada das movimentações dos cards entre etapas do fluxo de trabalho.
-    • Permite identificar padrões, gargalos e fluxos mais comuns no processo.
-    • Todas as análises consideram apenas movimentações entre etapas distintas, excluindo atualizações que não alteraram a etapa.
+    **O que é a Análise de Produtividade por Etapas?**
+    • Esta análise mostra os registros de datas e horas para cada etapa do processo.
+    • Permite identificar a velocidade de processamento, produtividade e distribuição do trabalho.
+    • Os dados são exibidos por dia, semana e mês para facilitar diferentes níveis de análise.
     """)
+    
+    # Converter todas as colunas de data para datetime
+    for campo in campos_data:
+        df[campo] = pd.to_datetime(df[campo], errors='coerce')
     
     # Aplicar filtros para análise
     st.sidebar.markdown("### Filtros de Produtividade")
@@ -50,1041 +75,541 @@ def analisar_produtividade(df):
     data_inicio = st.sidebar.date_input(
         "Data Inicial",
         value=hoje - timedelta(days=30),
-        max_value=hoje
+        max_value=hoje,
+        key="prod_data_inicio"
     )
     data_fim = st.sidebar.date_input(
         "Data Final",
         value=hoje,
         max_value=hoje,
-        min_value=data_inicio
+        min_value=data_inicio,
+        key="prod_data_fim"
     )
     
-    # Filtro de tipo de documento
-    tipos_documento = df['UF_CRM_12_1722534861891'].dropna().unique().tolist()
-    tipo_documento_selecionado = st.sidebar.multiselect(
-        "Tipo de Documento",
-        options=tipos_documento,
-        default=tipos_documento
-    )
-    
-    # Filtro de responsável
-    responsaveis = df['MOVED_BY_NAME'].dropna().unique().tolist()
-    responsavel_selecionado = st.sidebar.multiselect(
-        "Responsável",
-        options=responsaveis,
-        default=responsaveis
-    )
+    # Filtro de responsável se existir a coluna
+    responsavel_selecionado = None
+    if 'ASSIGNED_BY_NAME' in df.columns:
+        responsaveis = df['ASSIGNED_BY_NAME'].dropna().unique().tolist()
+        responsavel_selecionado = st.sidebar.multiselect(
+            "Responsável",
+            options=responsaveis,
+            default=[],
+            key="prod_responsavel"
+        )
     
     # Explicação sobre filtros
     with st.sidebar.expander("Sobre os Filtros", expanded=False):
         st.markdown("""
         **Como usar os filtros:**
         • **Data Inicial e Final**: Selecione o período que deseja analisar.
-        • **Tipo de Documento**: Filtre por tipos específicos de documento (Nascimento, Casamento, Óbito).
-        • **Responsável**: Filtre pelos colaboradores que realizaram movimentações.
+        • **Responsável**: Filtre pelos colaboradores responsáveis (se disponível).
         
         Todos os filtros são aplicados em conjunto (operação AND).
         """)
     
-    # Preparar os dados
-    # Converter colunas de data para datetime
-    df['MOVED_TIME'] = pd.to_datetime(df['MOVED_TIME'], errors='coerce')
-    df['CLOSEDATE'] = pd.to_datetime(df['CLOSEDATE'], errors='coerce')
-    
-    # Filtrar por período
+    # Preparar dados filtrados para o período selecionado
     periodo_inicio = pd.to_datetime(data_inicio)
     periodo_fim = pd.to_datetime(data_fim) + timedelta(days=1) - timedelta(seconds=1)
     
-    # Primeiro filtrar pelo período
-    df_filtrado = df[(df['MOVED_TIME'] >= periodo_inicio) & 
-                     (df['MOVED_TIME'] <= periodo_fim)]
+    # Criar dataframe apenas com as colunas de data e informações relevantes
+    colunas_selecionadas = campos_data.copy()
+    colunas_info = ['ID', 'TITLE', 'ASSIGNED_BY_NAME', 'UF_CRM_12_1723552666'] if 'UF_CRM_12_1723552666' in df.columns else ['ID', 'TITLE']
     
-    # Aplicar outros filtros se selecionados
-    if tipo_documento_selecionado:
-        df_filtrado = df_filtrado[df_filtrado['UF_CRM_12_1722534861891'].isin(tipo_documento_selecionado)]
+    for col in colunas_info:
+        if col in df.columns:
+            colunas_selecionadas.append(col)
     
-    if responsavel_selecionado:
-        df_filtrado = df_filtrado[df_filtrado['MOVED_BY_NAME'].isin(responsavel_selecionado)]
+    df_analise = df[colunas_selecionadas].copy()
+    
+    # Filtra por responsável se selecionado
+    if responsavel_selecionado and 'ASSIGNED_BY_NAME' in df_analise.columns:
+        df_analise = df_analise[df_analise['ASSIGNED_BY_NAME'].isin(responsavel_selecionado)]
+    
+    # Preparar para filtragem por data
+    df_filtrado = df_analise.copy()
+    
+    # Processar filtragem por data
+    dfs_por_campo = []
+    registros_filtrados = set()  # Para guardar IDs únicos
+    
+    if not df_filtrado.empty:
+        for campo in campos_data:
+            if campo not in df_filtrado.columns:
+                continue
+                
+            # Filtrar registros com data no período para este campo
+            filtro_campo = (df_filtrado[campo] >= periodo_inicio) & (df_filtrado[campo] <= periodo_fim)
+            df_campo = df_filtrado[filtro_campo].copy()
+            
+            if not df_campo.empty:
+                # Adicionar ao conjunto de IDs únicos se a coluna ID existir
+                if 'ID' in df_campo.columns:
+                    registros_filtrados.update(df_campo['ID'].unique())
+                dfs_por_campo.append(df_campo)
+        
+        # Unir todos os dataframes filtrados preservando todas as colunas
+        if dfs_por_campo:
+            # Preservar todas as colunas no dataframe unido, mantendo os dados originais
+            if 'ID' in df_filtrado.columns:
+                # Se temos a coluna ID, podemos filtrar por IDs mais facilmente
+                df_filtrado = df_filtrado[df_filtrado['ID'].isin(registros_filtrados)]
+            else:
+                # Caso contrário, fazer merge manual
+                df_filtrado = pd.concat(dfs_por_campo).drop_duplicates()
+        else:
+            st.warning("Nenhum registro encontrado no período selecionado.")
+            df_filtrado = pd.DataFrame()
+    else:
+        df_filtrado = pd.DataFrame()
     
     if df_filtrado.empty:
         st.warning("Não há dados disponíveis para o período e filtros selecionados.")
         return
     
-    # Criar abas para organizar as análises
-    tab1, tab2, tab3 = st.tabs([
-        "Produtividade Temporal",  # Alterada para primeira aba
-        "Movimentação por Etapa", 
-        "Produtividade por Responsável"
+    # Criar abas para diferentes visões
+    tab_metricas, tab_grafico_diario, tab_dia, tab_semana, tab_mes, tab_responsavel = st.tabs([
+        "Métricas por Etapa",
+        "Evolução Diária",
+        "Visão Diária", 
+        "Visão Semanal", 
+        "Visão Mensal",
+        "Por Responsável"
     ])
     
-    with tab1:
-        analisar_produtividade_temporal(df_filtrado)  # Agora é a primeira aba
+    # Aba de métricas por etapa
+    with tab_metricas:
+        mostrar_metricas_etapa(df_filtrado, campos_data, periodo_inicio, periodo_fim)
     
-    with tab2:
-        comparar_estagio_atual_anterior(df_filtrado)  # Agora é a segunda aba
+    # Aba de gráfico diário
+    with tab_grafico_diario:
+        mostrar_grafico_diario(df_filtrado, campos_data)
     
-    with tab3:
-        analisar_produtividade_responsavel(df_filtrado)
+    # Aba de visão diária
+    with tab_dia:
+        mostrar_visao_produtividade(df_filtrado, campos_data, 'Diária', 'D')
+    
+    # Aba de visão semanal
+    with tab_semana:
+        mostrar_visao_produtividade(df_filtrado, campos_data, 'Semanal', 'W')
+    
+    # Aba de visão mensal
+    with tab_mes:
+        mostrar_visao_produtividade(df_filtrado, campos_data, 'Mensal', 'M')
+    
+    # Aba de análise por responsável
+    with tab_responsavel:
+        if 'ASSIGNED_BY_NAME' in df_filtrado.columns:
+            analisar_produtividade_responsavel(df_filtrado, campos_data)
+        else:
+            st.info("Dados de responsável não disponíveis para análise.")
 
-def mapear_estagio_para_nome(df):
+def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
     """
-    Mapeia os IDs de estágio para nomes mais descritivos usando o mapeamento definido
+    Mostra as métricas de produtividade por etapa
     
     Args:
-        df (pandas.DataFrame): DataFrame com os dados dos cartórios
-        
-    Returns:
-        pandas.DataFrame: DataFrame com colunas adicionais para nomes de estágios
+        df (pandas.DataFrame): DataFrame com dados filtrados
+        campos_data (list): Lista de campos de data para análise
+        periodo_inicio (datetime): Data inicial do período
+        periodo_fim (datetime): Data final do período
     """
-    # Criar uma cópia do DataFrame para não modificar o original
-    df_modificado = df.copy()
-    
-    # Definir o mapeamento de estágios para nomes didáticos
-    # EM ANDAMENTO
-    em_andamento = {
-        'DT1052_16:NEW': 'Aguardando Certidão',
-        'DT1052_34:NEW': 'Aguardando Certidão',
-        'DT1052_16:UC_QRZ6JG': 'Busca CRC',
-        'DT1052_34:UC_68BLQ7': 'Busca CRC',
-        'DT1052_16:UC_7F0WK2': 'Apenas Ass. Req. Cliente P/ Montagem',
-        'DT1052_34:UC_HN9GMI': 'Apenas Ass. Req. Cliente P/ Montagem',
-        'DT1052_16:PREPARATION': 'Montagem Requerimento Cartório',
-        'DT1052_34:PREPARATION': 'Montagem Requerimento Cartório',
-        'DT1052_16:UC_IWZBMO': 'Solicitar Cart. Origem',
-        'DT1052_34:CLIENT': 'Certidão Emitida',
-        'DT1052_34:UC_8L5JUS': 'Solicitar Cart. Origem',
-        'DT1052_16:UC_8EGMU7': 'Cart. Origem Prioridade',
-        'DT1052_16:UC_KXHDOQ': 'Aguard. Cart. Origem',
-        'DT1052_34:UC_6KOYL5': 'Aguard. Cart. Origem',
-        'DT1052_16:CLIENT': 'Certidão Emitida',
-        'DT1052_34:UC_D0RG5P': 'Certidão Emitida',
-        'DT1052_16:UC_JRGCW3': 'Certidão Física',
-        'DT1052_34:UC_84B1S2': 'Certidão Física',
-        # Versões curtas dos nomes (sem prefixo)
-        'NEW': 'Aguard. Certidão',
-        'PREPARATION': 'Mont. Requerim.',
-        'CLIENT': 'Certidão Emitida',
-        'UC_QRZ6JG': 'Busca CRC',
-        'UC_68BLQ7': 'Busca CRC',
-        'UC_7F0WK2': 'Solic. Requerim.',
-        'UC_HN9GMI': 'Solic. Requerim.',
-        'UC_IWZBMO': 'Solic. C. Origem',
-        'UC_8L5JUS': 'Solic. C. Origem',
-        'UC_8EGMU7': 'C. Origem Prior.',
-        'UC_KXHDOQ': 'Aguard. C. Origem',
-        'UC_6KOYL5': 'Aguard. C. Origem',
-        'UC_D0RG5P': 'Certidão Emitida',
-        'UC_JRGCW3': 'Certidão Física',
-        'UC_84B1S2': 'Certidão Física'
-    }
-    
-    # SUCESSO
-    sucesso = {
-        'DT1052_16:SUCCESS': 'Certidão Entregue',
-        'DT1052_34:SUCCESS': 'Certidão Entregue',
-        'SUCCESS': 'Certidão Entregue'
-    }
-    
-    # FALHA
-    falha = {
-        'DT1052_16:FAIL': 'Devolução ADM',
-        'DT1052_34:FAIL': 'Devolução ADM',
-        'DT1052_16:UC_R5UEXF': 'Dev. ADM Verificado',
-        'DT1052_34:UC_Z3J98J': 'Dev. ADM Verificado',
-        'DT1052_16:UC_HYO7L2': 'Devolutiva Busca',
-        'DT1052_34:UC_5LAJNY': 'Devolutiva Busca',
-        'DT1052_16:UC_UG0UDZ': 'Solicitação Duplicada',
-        'DT1052_34:UC_LF04SU': 'Solicitação Duplicada',
-        'DT1052_16:UC_P61ZVH': 'Devolvido Requerimento',
-        'DT1052_34:UC_2BAINE': 'Devolvido Requerimento',
-        # Versões curtas dos nomes (sem prefixo)
-        'FAIL': 'Devolução ADM',
-        'UC_R5UEXF': 'Dev. ADM Verif.',
-        'UC_Z3J98J': 'Dev. ADM Verif.',
-        'UC_HYO7L2': 'Dev. Busca',
-        'UC_5LAJNY': 'Dev. Busca',
-        'UC_UG0UDZ': 'Solic. Duplicada',
-        'UC_LF04SU': 'Solic. Duplicada',
-        'UC_P61ZVH': 'Dev. Requerim.',
-        'UC_2BAINE': 'Dev. Requerim.'
-    }
-    
-    # Combinar todos os mapeamentos
-    mapeamento_completo = {**em_andamento, **sucesso, **falha}
-    
-    # Adicionar informação de categoria para cada estágio
-    categorias_estagios = {}
-    for estagio in em_andamento:
-        categorias_estagios[estagio] = 'EM ANDAMENTO'
-    for estagio in sucesso:
-        categorias_estagios[estagio] = 'SUCESSO'
-    for estagio in falha:
-        categorias_estagios[estagio] = 'FALHA'
-    
-    # Adicionar colunas com os nomes dos estágios
-    if 'STAGE_ID' in df_modificado.columns:
-        df_modificado['STAGE_NAME'] = df_modificado['STAGE_ID'].map(mapeamento_completo)
-        # Manter o ID original quando não houver mapeamento
-        df_modificado['STAGE_NAME'] = df_modificado['STAGE_NAME'].fillna(df_modificado['STAGE_ID'])
-        # Adicionar categoria do estágio
-        df_modificado['STAGE_CATEGORY'] = df_modificado['STAGE_ID'].map(categorias_estagios)
-    
-    if 'PREVIOUS_STAGE_ID' in df_modificado.columns:
-        df_modificado['PREVIOUS_STAGE_NAME'] = df_modificado['PREVIOUS_STAGE_ID'].map(mapeamento_completo)
-        # Manter o ID original quando não houver mapeamento
-        df_modificado['PREVIOUS_STAGE_NAME'] = df_modificado['PREVIOUS_STAGE_NAME'].fillna(df_modificado['PREVIOUS_STAGE_ID'])
-        # Adicionar categoria do estágio anterior
-        df_modificado['PREVIOUS_STAGE_CATEGORY'] = df_modificado['PREVIOUS_STAGE_ID'].map(categorias_estagios)
-    
-    return df_modificado
-
-def comparar_estagio_atual_anterior(df):
-    """
-    Compara o estágio atual com o estágio anterior
-    
-    Args:
-        df (pandas.DataFrame): DataFrame filtrado com os dados dos cartórios
-    """
-    st.subheader("Comparação entre Estágio Atual e Anterior")
-    
-    # Verificar se temos as colunas de nome de estágio
-    usar_nomes = 'STAGE_NAME' in df.columns and 'PREVIOUS_STAGE_NAME' in df.columns
-    
-    # Definir quais colunas usar para a análise
-    coluna_atual = 'STAGE_NAME' if usar_nomes else 'STAGE_ID'
-    coluna_anterior = 'PREVIOUS_STAGE_NAME' if usar_nomes else 'PREVIOUS_STAGE_ID'
-    
-    # Remover linhas onde estágio anterior ou atual são nulos
-    df_valido = df.dropna(subset=[coluna_anterior, coluna_atual]).copy()
-    
-    if df_valido.empty:
-        st.warning("Não há dados válidos para análise comparativa de estágios.")
-        return
-    
-    # Criar resumo visual do fluxo de trabalho
-    st.markdown("### Resumo do Fluxo de Trabalho")
-    
-    # Adicionar indicadores de resumo numérico no topo
-    total_movimentacoes = len(df_valido)
-    
-    # Criar layout de colunas para métricas de resumo
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric(
-            "Total de Movimentações",
-            f"{total_movimentacoes}",
-            help="Número total de movimentações de cards entre estágios"
-        )
-    
-    with col2:
-        # Calcular quantos cards diferentes foram movimentados
-        cards_unicos = df_valido['UF_CRM_12_1723552666'].nunique()
-        st.metric(
-            "Cards Únicos Movimentados",
-            f"{cards_unicos}",
-            help="Número de cards/famílias únicas que tiveram movimentação"
-        )
-    
-    with col3:
-        # Calcular média diária de movimentações
-        dias_periodo = df_valido['MOVED_TIME'].dt.date.nunique()
-        media_diaria = round(total_movimentacoes / max(dias_periodo, 1), 1)
-        st.metric(
-            "Média Diária",
-            f"{media_diaria}",
-            help="Média de movimentações por dia no período selecionado"
-        )
-    
-    # Adicionar explicação das métricas
-    st.info("""
-    **Interpretação das métricas:**
-    • **Total de Movimentações**: Número total de vezes que cards mudaram de uma etapa para outra no período.
-    • **Cards Únicos Movimentados**: Quantidade de processos distintos que tiveram alguma mudança de etapa.
-    • **Média Diária**: Quantidade média de movimentações ocorridas por dia no período analisado.
-    """)
-    
-    # Criar visualização mais didática das principais transições
-    st.markdown("### Principais Movimentações entre Etapas")
-
-    # Agrupar por estágio anterior e atual, contando a quantidade de movimentações
-    contagem_movimentacoes = df_valido.groupby([coluna_anterior, coluna_atual]).size().reset_index(name='QUANTIDADE')
-    
-    # Adicionar coluna com texto mais didático
-    contagem_movimentacoes['DESCRIÇÃO'] = contagem_movimentacoes.apply(
-        lambda row: f"{row['QUANTIDADE']} cards movidos de '{row[coluna_anterior]}' para '{row[coluna_atual]}'", 
-        axis=1
-    )
-    
-    # Ordenar por quantidade (maior para menor)
-    contagem_movimentacoes = contagem_movimentacoes.sort_values('QUANTIDADE', ascending=False)
-    
-    # Pegar apenas as 10 principais transições para melhor visualização
-    top_transicoes = contagem_movimentacoes.head(10)
-    
-    # Criar uma coluna de transição para o gráfico de barras
-    top_transicoes['TRANSICAO'] = top_transicoes.apply(lambda row: f"{row[coluna_anterior]} → {row[coluna_atual]}", axis=1)
-    
-    # Criar gráfico de barras horizontais para as principais transições
-    fig_top = px.bar(
-        top_transicoes,
-        y='TRANSICAO',
-        x='QUANTIDADE',
-        orientation='h',
-        text='QUANTIDADE',
-        labels={
-            'QUANTIDADE': 'Número de Movimentações',
-            'TRANSICAO': 'Transição entre Estágios'
-        },
-        title="Top 10 Movimentações mais Frequentes"
-    )
-    
-    # Melhorar a formatação do gráfico
-    fig_top.update_traces(
-        textposition='outside',
-        hovertemplate='<b>%{y}</b><br>Quantidade: %{x}<extra></extra>'
-    )
-    
-    fig_top.update_layout(
-        height=500,
-        yaxis={'categoryorder': 'total ascending'},
-        font=dict(size=14),
-        margin=dict(l=20, r=20, t=50, b=20)
-    )
-    
-    st.plotly_chart(fig_top, use_container_width=True)
-    
-    # Adicionar explicação do gráfico de barras
-    st.info("""
-    **Como interpretar este gráfico:**
-    • Mostra as 10 transições mais frequentes entre etapas específicas.
-    • Quanto mais longa a barra, maior o número de cards que seguiram aquele caminho.
-    • Ajuda a identificar os fluxos mais comuns no processo.
-    • A seta "→" indica a direção da movimentação (de qual etapa para qual etapa).
-    """)
-    
-    # Exibir tabela com as movimentações em formato mais didático
-    st.dataframe(
-        top_transicoes[['DESCRIÇÃO', coluna_anterior, coluna_atual, 'QUANTIDADE']],
-        column_config={
-            "DESCRIÇÃO": st.column_config.TextColumn("Descrição da Movimentação"),
-            coluna_anterior: st.column_config.TextColumn("Estágio Anterior"),
-            coluna_atual: st.column_config.TextColumn("Estágio Atual"),
-            "QUANTIDADE": st.column_config.NumberColumn("Quantidade", format="%d")
-        },
-        use_container_width=True,
-        hide_index=True
-    )
-    
-    # Criar tabela de todas as movimentações para referência
-    with st.expander("Ver todas as movimentações em detalhe", expanded=False):
-        st.dataframe(
-            contagem_movimentacoes[['DESCRIÇÃO', coluna_anterior, coluna_atual, 'QUANTIDADE']],
-            column_config={
-                "DESCRIÇÃO": st.column_config.TextColumn("Descrição da Movimentação"),
-                coluna_anterior: st.column_config.TextColumn("Estágio Anterior"),
-                coluna_atual: st.column_config.TextColumn("Estágio Atual"),
-                "QUANTIDADE": st.column_config.NumberColumn("Quantidade", format="%d")
-            },
-            use_container_width=True,
-            hide_index=True
-        )
-    
-    # Criar gráfico de sankey para visualizar fluxo entre estágios
-    st.markdown("### Fluxo entre Estágios")
-    
-    # Permitir ao usuário limitar o número de conexões para melhor visualização
-    num_conexoes = st.slider(
-        "Número de conexões a exibir:",
-        min_value=5,
-        max_value=min(30, len(contagem_movimentacoes)),
-        value=15,
-        step=5,
-        help="Ajuste para melhorar a legibilidade do gráfico"
-    )
-    
-    # Filtrar apenas as principais transições para o gráfico Sankey
-    top_sankey = contagem_movimentacoes.head(num_conexoes)
-    
-    # Criar lista de estágios únicos para indexação
-    estagios_unicos = pd.concat([
-        top_sankey[coluna_anterior], 
-        top_sankey[coluna_atual]
-    ]).unique()
-    
-    # Criar mapeamento de estágio para índice
-    estag_para_idx = {estagio: i for i, estagio in enumerate(estagios_unicos)}
-    
-    # Preparar dados para o gráfico Sankey
-    source = [estag_para_idx[estagio] for estagio in top_sankey[coluna_anterior]]
-    target = [estag_para_idx[estagio] for estagio in top_sankey[coluna_atual]]
-    value = top_sankey['QUANTIDADE'].tolist()
-    
-    # Criar o gráfico Sankey com configurações melhoradas
-    fig = go.Figure(data=[go.Sankey(
-        arrangement='snap',  # Melhor arranjo para visibilidade
-        node=dict(
-            pad=20,
-            thickness=30,
-            line=dict(color="black", width=0.5),
-            label=list(estagios_unicos),
-            color='rgba(31, 119, 180, 0.8)'  # Azul padrão
-        ),
-        link=dict(
-            source=source,
-            target=target,
-            value=value,
-            label=[f"{q}" for q in value],  # Simplificar labels
-            hovertemplate='<b>%{value}</b> cards movidos de <b>%{source.label}</b> para <b>%{target.label}</b><extra></extra>'
-        )
-    )])
-    
-    fig.update_layout(
-        title={
-            'text': f"Fluxo das {num_conexoes} Principais Movimentações entre Estágios",
-            'y':0.95,
-            'x':0.5,
-            'xanchor': 'center',
-            'yanchor': 'top',
-            'font': {'size': 20}
-        },
-        height=700,  # Aumentar altura
-        font=dict(size=14),  # Aumentar fonte
-        margin=dict(l=20, r=20, t=50, b=20)
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Adicionar explicação do gráfico Sankey detalhado
-    st.info("""
-    **Como interpretar este gráfico de fluxo:**
-    • Cada nó (retângulo) representa uma etapa do processo.
-    • As linhas de conexão mostram o volume de cards que se movem de uma etapa para outra.
-    • Quanto mais larga a conexão, maior o volume de movimentações naquele caminho.
-    • Use o controle deslizante acima para ajustar o número de conexões exibidas e melhorar a legibilidade.
-    • Passe o mouse sobre as conexões ou nós para ver detalhes.
-    """)
-    
-    # Análise por tipo de documento
-    if 'UF_CRM_12_1722534861891' in df_valido.columns:
-        st.markdown("### Movimentações por Tipo de Documento")
-        
-        # Agrupar por tipo de documento para mostrar volume
-        volume_por_tipo = df_valido.groupby('UF_CRM_12_1722534861891').size().reset_index(name='QUANTIDADE')
-        volume_por_tipo = volume_por_tipo.sort_values('QUANTIDADE', ascending=False)
-        
-        # Mostrar gráfico de volume por tipo de documento
-        fig_tipos = px.pie(
-            volume_por_tipo,
-            values='QUANTIDADE',
-            names='UF_CRM_12_1722534861891',
-            title="Volume de Movimentações por Tipo de Documento",
-            hole=0.4
-        )
-        
-        fig_tipos.update_layout(
-            height=500,
-            font=dict(size=14)
-        )
-        
-        st.plotly_chart(fig_tipos, use_container_width=True)
-        
-        # Adicionar explicação do gráfico de pizza
-        st.info("""
-        **Como interpretar este gráfico de pizza:**
-        • Mostra a distribuição de movimentações por tipo de documento (Nascimento, Casamento, Óbito, etc).
-        • Cada fatia representa o percentual de movimentações para aquele tipo de documento.
-        • Ajuda a identificar quais tipos de documento estão tendo mais movimento no período.
-        """)
-        
-        # Agrupar por tipo de documento, estágio anterior e atual
-        contagem_tipo_doc = df_valido.groupby(['UF_CRM_12_1722534861891', coluna_anterior, coluna_atual]).size().reset_index(name='QUANTIDADE')
-        
-        # Adicionar coluna com texto didático
-        contagem_tipo_doc['DESCRIÇÃO'] = contagem_tipo_doc.apply(
-            lambda row: f"{row['QUANTIDADE']} cards movidos de '{row[coluna_anterior]}' para '{row[coluna_atual]}'", 
-            axis=1
-        )
-        
-        # Criar seletores para filtrar por tipo de documento
-        tipos_doc = contagem_tipo_doc['UF_CRM_12_1722534861891'].unique().tolist()
-        tipo_selecionado = st.selectbox(
-            "Selecione o tipo de documento para análise detalhada:",
-            options=tipos_doc
-        )
-        
-        # Filtrar dados pelo tipo de documento selecionado
-        df_tipo = contagem_tipo_doc[contagem_tipo_doc['UF_CRM_12_1722534861891'] == tipo_selecionado]
-        
-        # Ordenar por quantidade (maior para menor)
-        df_tipo = df_tipo.sort_values('QUANTIDADE', ascending=False)
-        
-        # Exibir tabela com as movimentações para o tipo selecionado
-        st.dataframe(
-            df_tipo.head(10)[['DESCRIÇÃO', coluna_anterior, coluna_atual, 'QUANTIDADE']],
-            column_config={
-                "DESCRIÇÃO": st.column_config.TextColumn("Descrição da Movimentação"),
-                coluna_anterior: st.column_config.TextColumn("Estágio Anterior"),
-                coluna_atual: st.column_config.TextColumn("Estágio Atual"),
-                "QUANTIDADE": st.column_config.NumberColumn("Quantidade", format="%d")
-            },
-            use_container_width=True,
-            hide_index=True
-        )
-        
-        # Adicionar explicação da tabela por tipo de documento
-        st.info(f"""
-        **Como interpretar esta tabela para {tipo_selecionado}:**
-        • Mostra as movimentações mais frequentes para o tipo de documento selecionado.
-        • Permite identificar padrões específicos por tipo de documento.
-        • Ordenada por quantidade (maior para menor).
-        • Mostra apenas as 10 movimentações mais frequentes para melhor legibilidade.
-        """)
-        
-        # Adicionar gráfico de heatmap para visualizar melhor as transições
-        # Limitar para as top 10 etapas anteriores e atuais para melhor visualização
-        top_anterior = df_tipo[coluna_anterior].value_counts().nlargest(10).index.tolist()
-        top_atual = df_tipo[coluna_atual].value_counts().nlargest(10).index.tolist()
-        
-        df_tipo_filtered = df_tipo[
-            df_tipo[coluna_anterior].isin(top_anterior) & 
-            df_tipo[coluna_atual].isin(top_atual)
-        ]
-        
-        pivot_transicoes = df_tipo_filtered.pivot_table(
-            index=coluna_anterior,
-            columns=coluna_atual,
-            values='QUANTIDADE',
-            fill_value=0
-        )
-        
-        # Criar heatmap
-        fig_heatmap = px.imshow(
-            pivot_transicoes,
-            labels=dict(x="Estágio Atual", y="Estágio Anterior", color="Quantidade"),
-            title=f"Mapa de Calor das Principais Transições para {tipo_selecionado}",
-            color_continuous_scale="YlOrRd",
-            text_auto=True
-        )
-        
-        fig_heatmap.update_layout(
-            height=600,
-            xaxis_tickangle=-45,
-            font=dict(size=14)
-        )
-        
-        st.plotly_chart(fig_heatmap, use_container_width=True)
-        
-        # Adicionar explicação do mapa de calor
-        st.info(f"""
-        **Como interpretar este mapa de calor para {tipo_selecionado}:**
-        • As cores mais intensas (vermelho escuro) indicam mais movimentações entre aquelas etapas.
-        • O eixo Y mostra as etapas de origem (anteriores) e o eixo X as etapas de destino (atuais).
-        • Ajuda a visualizar padrões de movimentação específicos para este tipo de documento.
-        • Os números mostram a quantidade exata de movimentações em cada transição.
-        """)
-    else:
-        st.warning("Campo 'UF_CRM_12_1722534861891' (Tipo de documento) não encontrado para análise.")
-
-def analisar_produtividade_temporal(df):
-    """
-    Analisa a produtividade ao longo do tempo
-    
-    Args:
-        df (pandas.DataFrame): DataFrame filtrado com os dados dos cartórios
-    """
-    st.subheader("Produtividade ao Longo do Tempo")
-    
-    st.info("""
-    **Visão Geral da Produtividade Temporal** 📊📈
-    
-    Esta visão analisa apenas as **movimentações reais** entre etapas diferentes - quando um card realmente muda de status.
-    Não são consideradas:
-    • Atualizações que não alteraram a etapa do card
-    • Cards sem etapa anterior (primeira entrada no sistema)
-    • Movimentações onde a etapa atual é igual à anterior
-    
-    Isso permite uma visão mais precisa da produtividade efetiva do fluxo de trabalho.
-    """)
-    
+    # Adicionar estilo visual para a seção
     st.markdown("""
-    <div style='background-color:#EFEFEF; padding:10px; border-radius:5px; margin-bottom:15px'>
-    <strong>✅ Critérios de filtragem:</strong><br>
-    • Usamos <code>MOVED_TIME</code> como referência de data/hora da movimentação<br>
-    • Exigimos que exista um estágio anterior (<code>PREVIOUS_STAGE_ID</code> não nulo)<br>
-    • Garantimos que o estágio atual seja diferente do anterior (verdadeira mudança de status)<br>
-    • Todos os gráficos e métricas consideram apenas movimentações que atendam a estes critérios
+    <div style="background: linear-gradient(135deg, #1976D2 0%, #64B5F6 100%); padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+        <h3 style="margin-top: 0; color: white; font-size: 22px; font-weight: 700; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); color: #FFFFFF !important;">
+            📊 MÉTRICAS DE PRODUTIVIDADE POR ETAPA
+        </h3>
+        <p style="margin-bottom: 0; font-size: 14px; color: rgba(255,255,255,0.9); text-align: center; color: #FFFFFF !important;">
+            Resumo das principais métricas de produtividade para cada etapa do processo.
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
-    # Verificar se temos a coluna de data de movimentação
-    if 'MOVED_TIME' not in df.columns:
-        st.error("Coluna 'MOVED_TIME' não encontrada para análise temporal.")
+    # Verificar e exibir informações sobre as colunas existentes
+    colunas_existentes = [col for col in campos_data if col in df.columns]
+    colunas_faltantes = [col for col in campos_data if col not in df.columns]
+    
+    if colunas_faltantes:
+        st.warning(f"**Atenção:** Alguns campos não estão disponíveis nos dados: {', '.join(colunas_faltantes)}")
+    
+    # Calcular dados para cada campo
+    dados_campos = {}
+    dias_com_atividade = set()
+    total_geral = 0
+    
+    # Guardar IDs para verificar registros únicos
+    ids_por_etapa = {}
+    todos_ids = set()
+    
+    for campo in colunas_existentes:
+        # Obter série temporal filtrada
+        serie_data = df[campo].dropna()
+        
+        # Verificar se o campo tem algum dado
+        if serie_data.empty:
+            continue
+            
+        # Nome amigável para o campo
+        nome_etapa = formatar_nome_etapa(campo)
+        
+        # Calcular estatísticas básicas
+        total = len(serie_data)
+        total_geral += total
+        
+        # Guardar IDs únicos para esta etapa
+        if 'ID' in df.columns:
+            ids_etapa = set(df.loc[~df[campo].isna(), 'ID'].unique())
+            ids_por_etapa[nome_etapa] = ids_etapa
+            todos_ids.update(ids_etapa)
+        
+        # Calcular dados temporais
+        if not serie_data.empty:
+            datas_unicas = set(serie_data.dt.date)
+            dias_com_atividade.update(datas_unicas)
+            
+            # Agrupar por dia
+            contagem_diaria = serie_data.dt.date.value_counts().sort_index()
+            
+            # Encontrar dia com maior produtividade
+            if not contagem_diaria.empty:
+                dia_max = contagem_diaria.idxmax()
+                valor_max = contagem_diaria.max()
+                
+                # Calcular média diária (apenas para dias em que houve atividade)
+                media_diaria = total / len(contagem_diaria)
+                
+                # Guardar estatísticas
+                dados_campos[nome_etapa] = {
+                    'total': total,
+                    'dia_max': dia_max,
+                    'valor_max': valor_max,
+                    'media_diaria': media_diaria,
+                    'num_dias': len(contagem_diaria),
+                    'campo_original': campo
+                }
+    
+    # Se não houver dados, mostra mensagem e sai
+    if not dados_campos:
+        st.warning("Não há dados disponíveis para análise no período selecionado.")
         return
     
-    # Verificar quais colunas usar
-    usar_nomes = 'STAGE_NAME' in df.columns
-    coluna_estagio = 'STAGE_NAME' if usar_nomes else 'STAGE_ID'
-    coluna_estagio_anterior = 'PREVIOUS_STAGE_NAME' if usar_nomes else 'PREVIOUS_STAGE_ID'
+    # Calcular métricas gerais
+    num_dias_periodo = (periodo_fim.date() - periodo_inicio.date()).days + 1
+    num_dias_com_atividade = len(dias_com_atividade)
+    taxa_dias_ativos = num_dias_com_atividade / num_dias_periodo * 100
     
-    # Converter para datetime se necessário
-    df['MOVED_TIME'] = pd.to_datetime(df['MOVED_TIME'], errors='coerce')
+    # Métricas gerais no topo com estilo aprimorado
+    st.markdown("""
+    <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <h4 style="color: #1565C0; margin-top: 0; font-size: 18px; border-bottom: 2px solid #1976D2; padding-bottom: 8px; margin-bottom: 15px;">
+            📈 Métricas Gerais
+        </h4>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Remover linhas sem data de movimentação e sem estágio anterior (primeira etapa)
-    df_valido = df.dropna(subset=['MOVED_TIME']).copy()
+    # Cores para as métricas
+    col1, col2, col3 = st.columns(3)
     
-    # Uma movimentação ocorre quando há um estágio anterior (não é null)
-    df_movimentacoes = df_valido.dropna(subset=[coluna_estagio_anterior]).copy()
+    # Cores para os cards
+    cores_cards = ["#1E88E5", "#43A047", "#E53935"]
+    icones_cards = ["📊", "📅", "📈"]
+    titulos_cards = ["Total de Atividades", "Dias com Atividades", "Média Diária"]
     
-    # Filtrar apenas as verdadeiras mudanças de etapa (onde etapa anterior != etapa atual)
-    df_movimentacoes = df_movimentacoes[df_movimentacoes[coluna_estagio_anterior] != df_movimentacoes[coluna_estagio]].copy()
-    
-    df_movimentacoes['TIPO_ACAO'] = 'Movimentação'
-    
-    # Para este caso, só vamos considerar as movimentações para análise temporal
-    df_analise = df_movimentacoes.copy()
-    
-    if df_analise.empty:
-        st.warning("Não há dados válidos para análise temporal após filtrar por movimentações entre etapas.")
-        return
-    
-    # Criar nova coluna com data formatada para diferentes agrupamentos
-    df_analise['DATA'] = df_analise['MOVED_TIME'].dt.date
-    df_analise['SEMANA'] = df_analise['MOVED_TIME'].dt.strftime('%Y-%U')
-    df_analise['MES'] = df_analise['MOVED_TIME'].dt.strftime('%Y-%m')
-    
-    # Adicionar colunas mais amigáveis para exibição
-    df_analise['SEMANA_FORMATADA'] = df_analise['MOVED_TIME'].dt.strftime('Semana %U/%Y')
-    df_analise['MES_FORMATADO'] = df_analise['MOVED_TIME'].dt.strftime('%B/%Y')
-    
-    # Exibir estatísticas básicas sobre os dados filtrados
-    col1, col2 = st.columns(2)
     with col1:
-        st.metric(
-            "Total de Movimentações entre Etapas",
-            f"{len(df_analise)}",
-            help="Movimentações onde o card mudou de uma etapa para outra"
-        )
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, {cores_cards[0]} 0%, #64B5F6 100%); border-radius: 10px; padding: 15px; color: white; text-align: center; height: 130px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h4 style="margin:0; font-size: 16px; opacity: 0.9; color: #FFFFFF !important;">{icones_cards[0]} {titulos_cards[0]}</h4>
+            <p style="font-size: 36px; font-weight: bold; margin: 10px 0; color: #FFFFFF !important;">{total_geral:,}</p>
+            <p style="font-size: 12px; margin: 0; opacity: 0.8; color: #FFFFFF !important;">Total em todas as etapas</p>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        st.metric(
-            "Cards Únicos Movimentados",
-            f"{df_analise['UF_CRM_12_1723552666'].nunique()}",
-            help="Número de cards/famílias únicas que tiveram movimentação entre etapas"
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, {cores_cards[1]} 0%, #81C784 100%); border-radius: 10px; padding: 15px; color: white; text-align: center; height: 130px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h4 style="margin:0; font-size: 16px; opacity: 0.9; color: #FFFFFF !important;">{icones_cards[1]} {titulos_cards[1]}</h4>
+            <p style="font-size: 36px; font-weight: bold; margin: 10px 0; color: #FFFFFF !important;">{num_dias_com_atividade} <span style="font-size: 16px; color: #FFFFFF !important;">de {num_dias_periodo}</span></p>
+            <p style="font-size: 12px; margin: 0; opacity: 0.8; color: #FFFFFF !important;">{taxa_dias_ativos:.0f}% do período</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        media_valor = total_geral/num_dias_com_atividade if num_dias_com_atividade > 0 else 0
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, {cores_cards[2]} 0%, #EF5350 100%); border-radius: 10px; padding: 15px; color: white; text-align: center; height: 130px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <h4 style="margin:0; font-size: 16px; opacity: 0.9; color: #FFFFFF !important;">{icones_cards[2]} {titulos_cards[2]}</h4>
+            <p style="font-size: 36px; font-weight: bold; margin: 10px 0; color: #FFFFFF !important;">{media_valor:.1f}</p>
+            <p style="font-size: 12px; margin: 0; opacity: 0.8; color: #FFFFFF !important;">Atividades por dia</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Exibir informações sobre a contagem
+    if 'ID' in df.columns:
+        st.markdown(f"""
+        <div style="background-color: #e8f4fd; border-left: 4px solid #1976D2; padding: 12px; margin: 20px 0; border-radius: 4px; font-size: 14px;">
+            <p style="margin: 0;"><strong>Informações sobre a contagem:</strong></p>
+            <ul style="margin: 5px 0 0 20px; padding: 0;">
+                <li>Total de registros únicos: <strong>{len(todos_ids)}</strong></li>
+                <li>Total de atividades somadas: <strong>{total_geral}</strong></li>
+                <li>A diferença ocorre porque um mesmo registro pode estar em múltiplas etapas.</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Seção de métricas por etapa com estilo aprimorado
+    st.markdown("""
+    <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 25px 0 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <h4 style="color: #1565C0; margin-top: 0; font-size: 18px; border-bottom: 2px solid #1976D2; padding-bottom: 8px; margin-bottom: 15px;">
+            🔍 Produtividade por Etapa
+        </h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Definir cores para as etapas - cores mais próximas e harmônicas
+    cores_etapas = [
+        "#1976D2", "#1E88E5", "#2196F3", "#42A5F5", "#64B5F6", 
+        "#2979FF", "#2962FF", "#3949AB", "#3F51B5", "#5C6BC0", 
+        "#536DFE", "#5677FC", "#7986CB"
+    ]
+    
+    # Organizar campos em ordem de maior volume
+    campos_ordenados = sorted(dados_campos.keys(), key=lambda x: dados_campos[x]['total'], reverse=True)
+    
+    # Definir número de colunas
+    NUM_COLUNAS = 3
+    
+    # Criar linhas de cards
+    for i in range(0, len(campos_ordenados), NUM_COLUNAS):
+        # Obter o grupo de etapas para esta linha
+        etapas_linha = campos_ordenados[i:i+NUM_COLUNAS]
+        
+        # Criar colunas
+        cols = st.columns(NUM_COLUNAS)
+        
+        # Preencher cada coluna
+        for j, etapa in enumerate(etapas_linha):
+            if j < len(cols):  # Verificar se ainda há colunas disponíveis
+                with cols[j]:
+                    dados = dados_campos[etapa]
+                    cor_index = i + j % len(cores_etapas)
+                    cor_etapa = cores_etapas[cor_index % len(cores_etapas)]
+                    cor_gradient = cores_etapas[(cor_index + 1) % len(cores_etapas)]
+                    
+                    # Criar um card estilizado para cada etapa
+                    st.markdown(f"""
+                    <div style="background-color: {cor_etapa}; border-radius: 10px; padding: 15px; margin-bottom: 15px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                        <h4 style="margin-top: 0; font-size: 16px; font-weight: 700; color: #FFFFFF !important;">{etapa.replace('_', ' ')}</h4>
+                        <p style="font-size: 38px; font-weight: 800; margin: 10px 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); color: #FFFFFF !important;">{dados['total']:,}</p>
+                        <p style="font-size: 12px; margin: 0; font-weight: 500; color: #FFFFFF !important;">Total de registros</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Dados adicionais para a etapa
+                    col_a, col_b = st.columns(2)
+                    
+                    with col_a:
+                        st.markdown(f"""
+                        <div style="background: white; border-radius: 8px; padding: 10px; margin-bottom: 10px; text-align: center; height: 80px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid {cor_etapa};">
+                            <p style="margin: 0; font-size: 12px; color: #333; font-weight: 600;">Média por Dia Ativo</p>
+                            <p style="font-size: 22px; font-weight: bold; margin: 5px 0; color: {cor_etapa};">{dados['media_diaria']:.1f}</p>
+                            <p style="font-size: 10px; margin: 0; color: #666;">{dados['num_dias']} dias ativos</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col_b:
+                        st.markdown(f"""
+                        <div style="background: white; border-radius: 8px; padding: 10px; margin-bottom: 10px; text-align: center; height: 80px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid {cor_etapa};">
+                            <p style="margin: 0; font-size: 12px; color: #333; font-weight: 600;">Dia mais Produtivo</p>
+                            <p style="font-size: 22px; font-weight: bold; margin: 5px 0; color: {cor_etapa};">{dados['dia_max'].strftime('%d/%m')}</p>
+                            <p style="font-size: 10px; margin: 0; color: #666;">{dados['valor_max']} registros</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # Mostrar informação de registros únicos se disponível
+                    if 'ID' in df.columns and etapa in ids_por_etapa:
+                        num_ids = len(ids_por_etapa[etapa])
+                        st.markdown(f"""
+                        <div style="text-align: center; margin-top: 5px;">
+                            <span style="font-size: 12px; color: #666; background: #f0f0f0; padding: 3px 8px; border-radius: 10px;">
+                                Registros únicos: <b>{num_ids}</b>
+                            </span>
+                        </div>
+                        """, unsafe_allow_html=True)
+    
+    # Criar tabela de resumo com estilo aprimorado
+    st.markdown("""
+    <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 25px 0 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <h4 style="color: #1565C0; margin-top: 0; font-size: 18px; border-bottom: 2px solid #1976D2; padding-bottom: 8px; margin-bottom: 15px;">
+            📋 Resumo Consolidado
+        </h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Criar dataframe de resumo
+    df_resumo = pd.DataFrame([
+        {
+            'Etapa': etapa,
+            'Total': dados['total'],
+            'Média Diária': round(dados['media_diaria'], 1),
+            'Dia Mais Produtivo': dados['dia_max'].strftime('%d/%m/%Y'),
+            'Máximo em Um Dia': dados['valor_max'],
+            'Dias Com Atividade': dados['num_dias'],
+            'Percentual': dados['total'] / total_geral * 100 if total_geral > 0 else 0,
+            'Registros Únicos': len(ids_por_etapa.get(etapa, set())) if 'ID' in df.columns else None
+        }
+        for etapa, dados in dados_campos.items()
+    ])
+    
+    # Ordenar pelo total (maior para menor)
+    df_resumo = df_resumo.sort_values('Total', ascending=False)
+    
+    # Adicionar linha de totais
+    if 'ID' in df.columns:
+        df_totais = pd.DataFrame([{
+            'Etapa': 'TOTAL GERAL',
+            'Total': total_geral,
+            'Média Diária': None,
+            'Dia Mais Produtivo': None,
+            'Máximo em Um Dia': None,
+            'Dias Com Atividade': num_dias_com_atividade,
+            'Percentual': 100.0,
+            'Registros Únicos': len(todos_ids)
+        }])
+        
+        df_resumo = pd.concat([df_resumo, df_totais])
+    
+    # Configuração de colunas para a tabela
+    col_config = {
+        "Etapa": st.column_config.TextColumn("Etapa do Processo"),
+        "Total": st.column_config.NumberColumn("Total", format="%d"),
+        "Média Diária": st.column_config.NumberColumn("Média Diária", format="%.1f"),
+        "Dia Mais Produtivo": st.column_config.TextColumn("Dia Mais Produtivo"),
+        "Máximo em Um Dia": st.column_config.NumberColumn("Máximo", format="%d"),
+        "Dias Com Atividade": st.column_config.NumberColumn("Dias Ativos", format="%d"),
+        "Percentual": st.column_config.ProgressColumn(
+            "% do Total",
+            format="%.1f%%",
+            min_value=0,
+            max_value=100
         )
+    }
     
-    # Guias para escolher entre visão diária, semanal ou mensal
-    tab_dia, tab_semana, tab_mes = st.tabs(["Produtividade Diária", "Produtividade Semanal", "Produtividade Mensal"])
+    # Adicionar coluna de registros únicos se disponível
+    if 'ID' in df.columns:
+        col_config["Registros Únicos"] = st.column_config.NumberColumn("Registros Únicos", format="%d")
     
-    with tab_dia:
-        analisar_produtividade_por_periodo(df_analise, 'DATA', 'DATA', coluna_estagio, "Diária")
-        
-    with tab_semana:
-        analisar_produtividade_por_periodo(df_analise, 'SEMANA', 'SEMANA_FORMATADA', coluna_estagio, "Semanal")
-        
-    with tab_mes:
-        analisar_produtividade_por_periodo(df_analise, 'MES', 'MES_FORMATADO', coluna_estagio, "Mensal")
-    
-    # Análise de tempo médio entre estágios
-    if 'MOVED_TIME' in df.columns and 'CLOSEDATE' in df.columns:
-        st.markdown("### Tempo Médio entre Movimentações")
-        
-        # Agrupar por ID da Família e calcular estatísticas
-        if 'UF_CRM_12_1723552666' in df.columns:
-            # Ordenar os dados por ID da Família e data de movimentação
-            df_tempo = df_movimentacoes.dropna(subset=['UF_CRM_12_1723552666', 'MOVED_TIME']).copy()
-            df_tempo = df_tempo.sort_values(['UF_CRM_12_1723552666', 'MOVED_TIME'])
-            
-            # Calcular a diferença de tempo entre movimentações para o mesmo ID de família
-            df_tempo['PROXIMA_MOVIMENTACAO'] = df_tempo.groupby('UF_CRM_12_1723552666')['MOVED_TIME'].shift(-1)
-            df_tempo['TEMPO_ATE_PROXIMA'] = (df_tempo['PROXIMA_MOVIMENTACAO'] - df_tempo['MOVED_TIME']).dt.total_seconds() / 3600  # em horas
-            
-            # Remover outliers e valores negativos
-            df_tempo = df_tempo[(df_tempo['TEMPO_ATE_PROXIMA'] > 0) & (df_tempo['TEMPO_ATE_PROXIMA'] < 720)]  # Limitar a 30 dias (720 horas)
-            
-            # Agrupar por estágio atual e calcular tempo médio até a próxima movimentação
-            tempo_medio = df_tempo.groupby(coluna_estagio)['TEMPO_ATE_PROXIMA'].agg(['mean', 'median', 'count']).reset_index()
-            tempo_medio = tempo_medio.rename(columns={'mean': 'Média (horas)', 'median': 'Mediana (horas)', 'count': 'Quantidade'})
-            tempo_medio['Média (horas)'] = tempo_medio['Média (horas)'].round(2)
-            tempo_medio['Mediana (horas)'] = tempo_medio['Mediana (horas)'].round(2)
-            
-            # Calcular a média em dias também para melhor interpretação
-            tempo_medio['Média (dias)'] = (tempo_medio['Média (horas)'] / 24).round(2)
-            
-            # Ordenar por tempo médio (maior para menor)
-            tempo_medio = tempo_medio.sort_values('Média (horas)', ascending=False)
-            
-            # Exibir tabela com os tempos médios
-            st.dataframe(
-                tempo_medio,
-                column_config={
-                    coluna_estagio: st.column_config.TextColumn("Estágio"),
-                    "Média (horas)": st.column_config.NumberColumn("Média (horas)", format="%.2f"),
-                    "Média (dias)": st.column_config.NumberColumn("Média (dias)", format="%.2f"),
-                    "Mediana (horas)": st.column_config.NumberColumn("Mediana (horas)", format="%.2f"),
-                    "Quantidade": st.column_config.NumberColumn("Quantidade", format="%d")
-                },
-                use_container_width=True,
-                hide_index=True
-            )
-            
-            # Gráfico de barras para visualizar tempos médios (limitando aos 15 principais para legibilidade)
-            top_tempos = tempo_medio.head(15)
-            
-            fig_tempo = px.bar(
-                top_tempos,
-                x='Média (horas)',
-                y=coluna_estagio,
-                title="Tempo Médio de Permanência em Cada Estágio",
-                labels={coluna_estagio: 'Estágio', 'Média (horas)': 'Tempo Médio (horas)'},
-                text='Média (horas)',
-                orientation='h'
-            )
-            
-            fig_tempo.update_layout(
-                height=600,
-                yaxis={'categoryorder': 'total ascending'},
-                font=dict(size=14)
-            )
-            
-            st.plotly_chart(fig_tempo, use_container_width=True)
-        else:
-            st.warning("Campo 'UF_CRM_12_1723552666' (ID da Família) não encontrado para análise de tempo médio.")
+    # Exibir tabela formatada
+    st.dataframe(
+        df_resumo,
+        column_config=col_config,
+        use_container_width=True,
+        hide_index=True
+    )
 
-def analisar_produtividade_por_periodo(df, coluna_periodo, coluna_exibicao, coluna_estagio, tipo_periodo):
-    """
-    Analisa a produtividade para um período específico (dia, semana, mês)
-    """
-    try:
-        st.markdown(f"### Produtividade {tipo_periodo}")
-        
-        # Agrupar movimentações pelo período
-        contagem_periodo = df.groupby([coluna_periodo, coluna_estagio]).size().reset_index(name='QUANTIDADE')
-        
-        # Calcular total por período para todos os estágios
-        total_por_periodo = contagem_periodo.groupby(coluna_periodo)['QUANTIDADE'].sum().reset_index()
-        
-        # Garantir que as datas estejam em formato string para gráficos
-        if coluna_periodo == 'DATA':
-            total_por_periodo['PERIODO_STR'] = [d.strftime('%d/%m/%Y') if hasattr(d, 'strftime') else str(d) for d in total_por_periodo[coluna_periodo]]
-            coluna_para_grafico = 'PERIODO_STR'
-        elif coluna_exibicao != coluna_periodo and coluna_exibicao in df.columns:
-            periodo_para_formatado = {}
-            for idx, row in df.drop_duplicates([coluna_periodo, coluna_exibicao]).iterrows():
-                if pd.notna(row[coluna_periodo]) and pd.notna(row[coluna_exibicao]):
-                    periodo_para_formatado[row[coluna_periodo]] = str(row[coluna_exibicao])
-            total_por_periodo['PERIODO_STR'] = total_por_periodo[coluna_periodo].map(periodo_para_formatado)
-            total_por_periodo['PERIODO_STR'] = total_por_periodo['PERIODO_STR'].fillna(total_por_periodo[coluna_periodo].astype(str))
-            coluna_para_grafico = 'PERIODO_STR'
-        else:
-            total_por_periodo['PERIODO_STR'] = total_por_periodo[coluna_periodo].astype(str)
-            coluna_para_grafico = 'PERIODO_STR'
-        
-        # Ordenar por período
-        total_por_periodo = total_por_periodo.sort_values(coluna_periodo)
-        
-        # Criar gráfico de linha com mais detalhes visuais
-        fig_linha = px.line(
-            total_por_periodo, 
-            x=coluna_para_grafico, 
-            y='QUANTIDADE',
-            title=f"Volume Total de Movimentações ({tipo_periodo})",
-            labels={coluna_para_grafico: 'Período', 'QUANTIDADE': 'Quantidade'},
-            markers=True,
-            text='QUANTIDADE'
-        )
-        
-        fig_linha.update_traces(
-            textposition='top center',
-            line=dict(width=3),
-            marker=dict(size=8)
-        )
-        
-        fig_linha.update_layout(
-            height=500,
-            xaxis_tickangle=-45 if len(total_por_periodo) > 10 else 0,
-            font=dict(size=14),
-            margin=dict(l=20, r=20, t=50, b=100 if len(total_por_periodo) > 10 else 50)
-        )
-        
-        st.plotly_chart(fig_linha, use_container_width=True)
-        
-        # Criar visualização por etapa
-        st.markdown(f"### Movimentações por Etapa ({tipo_periodo})")
-        
-        # Usar apenas os 10 estágios mais comuns
-        top_estagios = contagem_periodo.groupby(coluna_estagio)['QUANTIDADE'].sum().nlargest(10).index
-        df_top = df[df[coluna_estagio].isin(top_estagios)].copy()
-        
-        # Agrupar novamente com apenas os top estágios
-        contagem_top = df_top.groupby([coluna_periodo, coluna_estagio]).size().reset_index(name='QUANTIDADE')
-        
-        # Criar pivot table
-        pivot = contagem_top.pivot(
-            index=coluna_periodo,
-            columns=coluna_estagio,
-            values='QUANTIDADE'
-        ).fillna(0)
-        
-        # Resetar índice
-        pivot = pivot.reset_index()
-        
-        # Adicionar coluna de período formatado
-        if coluna_periodo == 'DATA':
-            pivot['PERIODO_STR'] = [d.strftime('%d/%m/%Y') if hasattr(d, 'strftime') else str(d) for d in pivot[coluna_periodo]]
-        else:
-            pivot['PERIODO_STR'] = pivot[coluna_periodo].astype(str)
-        
-        # Ordenar por período
-        pivot = pivot.sort_values(coluna_periodo)
-        
-        # Preparar dados para o gráfico
-        df_plot = pd.melt(
-            pivot,
-            id_vars=['PERIODO_STR'],
-            value_vars=[col for col in pivot.columns if col not in [coluna_periodo, 'PERIODO_STR']],
-            var_name='ESTAGIO',
-            value_name='QUANTIDADE'
-        )
-        
-        # Criar gráfico de barras empilhadas
-        fig_barras = px.bar(
-            df_plot,
-            x='PERIODO_STR',
-            y='QUANTIDADE',
-            color='ESTAGIO',
-            title=f"Movimentações por Etapa ({tipo_periodo}) - Top 10 Estágios",
-            labels={
-                'PERIODO_STR': 'Período',
-                'QUANTIDADE': 'Quantidade',
-                'ESTAGIO': 'Estágio'
-            },
-            barmode='stack'
-        )
-        
-        # Melhorar a formatação do gráfico
-        fig_barras.update_layout(
-            height=600,
-            xaxis_tickangle=-45,
-            showlegend=True,
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1
-            ),
-            margin=dict(l=20, r=20, t=100, b=100),
-            yaxis_title="Quantidade de Movimentações",
-            xaxis_title="Período",
-            plot_bgcolor='white',
-            yaxis=dict(
-                gridcolor='lightgray',
-                gridwidth=1
-            ),
-            xaxis=dict(
-                gridcolor='lightgray',
-                gridwidth=1
-            )
-        )
-        
-        st.plotly_chart(fig_barras, use_container_width=True)
-        
-        # Adicionar explicação do gráfico
-        st.info("""
-        **Como interpretar este gráfico:**
-        • Cada barra representa um período
-        • As cores diferentes representam diferentes estágios
-        • A altura de cada segmento colorido mostra a quantidade de movimentações para aquele estágio
-        • A altura total da barra mostra o total de movimentações no período
-        """)
-        
-    except Exception as e:
-        st.error(f"Erro ao criar visualização: {str(e)}")
-        st.write("Por favor, entre em contato com o suporte técnico se o problema persistir.")
+    # Para o caso de precisar formatar nomes em colunas de resumo
+    if isinstance(df_resumo, pd.DataFrame) and 'Etapa' in df_resumo.columns:
+        df_resumo['Etapa'] = df_resumo['Etapa'].apply(lambda x: str(x).replace('_', ' ') if '_' in str(x) else x)
 
-def analisar_produtividade_responsavel(df):
+def mostrar_grafico_diario(df, campos_data):
     """
-    Analisa a produtividade por responsável
+    Mostra gráficos de evolução diária de produtividade
     
     Args:
-        df (pandas.DataFrame): DataFrame filtrado com os dados dos cartórios
+        df (pandas.DataFrame): DataFrame com dados filtrados
+        campos_data (list): Lista de campos de data para análise
     """
-    st.subheader("Produtividade por Responsável")
-    st.info("""
-    **O que é esta análise?**
-    Esta análise mostra o desempenho individual de cada responsável pelas movimentações de cards.
-    Permite identificar quem está movimentando mais cards, quais etapas cada pessoa mais trabalha, e padrões de especialização.
-    """)
+    # Adicionar estilo visual para a seção
+    st.markdown("""
+    <div style="background-color: #f5f5f5; padding: 15px; border-radius: 10px; border-left: 5px solid #E91E63; margin-bottom: 20px;">
+        <h3 style="margin-top: 0; color: #C2185B; font-size: 18px;">Evolução Diária de Produtividade</h3>
+        <p style="margin-bottom: 0; font-size: 14px; color: #333333;">
+            Análise da produtividade ao longo do tempo, com detalhamento por dia e etapa.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Definição dos grupos de usuários por cartório
-    GRUPO_TATUAPE = {
-        'Isabella Maielli': '330',
-        'Karolina Pantaleão': '332'
-    }
+    # Coletar dados para gráficos diários
+    dados_diarios = []
     
-    GRUPO_CASA_VERDE = {
-        'Vanessa Casa Verde': '210',
-        'Stael Casa Verde': '214',
-        'Alexandre Casa Verde': '266',
-        'Marcelo': '276',
-        'Ana Beatriz Pacheco': '278',
-        'Beatriz Costa': '526',
-        'João Vitor': '528',
-        'Luana Carolina Mangano': '604',
-        'Bianca Lima': '612'
-    }
+    for campo in campos_data:
+        # Pular campos sem dados
+        if df[campo].isna().all():
+            continue
+            
+        # Obter série temporal filtrada
+        serie_data = df[campo].dropna()
+        
+        # Nome amigável para o campo
+        nome_etapa = formatar_nome_etapa(campo)
+        
+        # Agrupar por dia
+        contagem_diaria = serie_data.dt.date.value_counts().sort_index()
+        
+        for data, qtd in contagem_diaria.items():
+            dados_diarios.append({
+                'Data': data,
+                'Quantidade': qtd,
+                'Etapa': nome_etapa
+            })
     
-    # Lista de usuários prioritários por cartório (incluindo nomes e IDs)
-    usuarios_tatuape = []
-    for nome, id_usuario in GRUPO_TATUAPE.items():
-        usuarios_tatuape.extend([nome, id_usuario])
-    usuarios_tatuape.append('Cartório Tatuapé')
-    
-    usuarios_casa_verde = []
-    for nome, id_usuario in GRUPO_CASA_VERDE.items():
-        usuarios_casa_verde.extend([nome, id_usuario])
-    
-    # Combinar todos os usuários prioritários
-    usuarios_prioritarios = usuarios_tatuape + usuarios_casa_verde
-    
-    # Criar mapeamento de IDs para nomes para unificar as contagens
-    mapeamento_id_nome = {**{v: k for k, v in GRUPO_TATUAPE.items()},
-                         **{v: k for k, v in GRUPO_CASA_VERDE.items()}}
-    
-    # Criar mapeamento de grupo para cada usuário
-    mapeamento_grupo = {}
-    for nome in GRUPO_TATUAPE:
-        mapeamento_grupo[nome] = 'Cartório Tatuapé'
-        mapeamento_grupo[GRUPO_TATUAPE[nome]] = 'Cartório Tatuapé'
-    
-    for nome in GRUPO_CASA_VERDE:
-        mapeamento_grupo[nome] = 'Cartório Casa Verde'
-        mapeamento_grupo[GRUPO_CASA_VERDE[nome]] = 'Cartório Casa Verde'
-    
-    # Verificar se temos as colunas necessárias
-    if 'MOVED_BY_NAME' not in df.columns or 'MOVED_TIME' not in df.columns:
-        st.error("Colunas 'MOVED_BY_NAME' ou 'MOVED_TIME' não encontradas para análise por responsável.")
+    # Se não houver dados, mostra mensagem e sai
+    if not dados_diarios:
+        st.warning("Não há dados disponíveis para análise diária no período selecionado.")
         return
     
-    # Verificar quais colunas usar
-    usar_nomes = 'STAGE_NAME' in df.columns
-    coluna_estagio = 'STAGE_NAME' if usar_nomes else 'STAGE_ID'
+    # Criar DataFrame para análise
+    df_dias = pd.DataFrame(dados_diarios)
     
-    # Converter para datetime se necessário
-    df['MOVED_TIME'] = pd.to_datetime(df['MOVED_TIME'], errors='coerce')
+    # Criar gráfico de produção diária total (todas as etapas)
+    st.subheader("Produtividade Total por Dia")
     
-    # Remover linhas sem responsável ou data
-    df_valido = df.dropna(subset=['MOVED_BY_NAME', 'MOVED_TIME']).copy()
+    # Agrupar por data para todas as etapas
+    total_por_dia = df_dias.groupby('Data')['Quantidade'].sum().reset_index()
     
-    if df_valido.empty:
-        st.warning("Não há dados válidos para análise por responsável.")
-        return
+    # Ordenar por data
+    total_por_dia = total_por_dia.sort_values('Data')
     
-    # Criar nova coluna com data formatada
-    df_valido['DATA'] = df_valido['MOVED_TIME'].dt.date
+    # Formatar datas para exibição
+    total_por_dia['Data_Formatada'] = total_por_dia['Data'].apply(lambda x: x.strftime('%d/%m'))
     
-    # Antes de fazer qualquer análise, unificar os IDs com os nomes e adicionar informação do grupo
-    df_valido['MOVED_BY_NAME'] = df_valido['MOVED_BY_NAME'].replace(mapeamento_id_nome)
-    df_valido['GRUPO'] = df_valido['MOVED_BY_NAME'].map(mapeamento_grupo)
+    # Calcular média móvel de 3 dias se tivermos dados suficientes
+    if len(total_por_dia) >= 3:
+        total_por_dia['Media_Movel'] = total_por_dia['Quantidade'].rolling(window=3, min_periods=1).mean()
     
-    # Criar tabela de produtividade diária por responsável
-    produtividade_diaria = df_valido.groupby(['MOVED_BY_NAME', 'DATA']).size().reset_index(name='QUANTIDADE')
+    # Criar gráfico combinado de barras e linha
+    fig_total = go.Figure()
     
-    # Pivot table para responsáveis nas linhas e datas nas colunas
-    pivot_responsavel = produtividade_diaria.pivot_table(
-        index='MOVED_BY_NAME',
-        columns='DATA',
-        values='QUANTIDADE',
-        fill_value=0
+    # Adicionar barras para quantidade diária
+    fig_total.add_trace(
+        go.Bar(
+            x=total_por_dia['Data_Formatada'],
+            y=total_por_dia['Quantidade'],
+            name='Atividades Diárias',
+            marker_color='#E91E63',
+            opacity=0.7,
+            text=total_por_dia['Quantidade'],
+            textposition='outside',
+            textfont=dict(size=10, color='black'),
+            hovertemplate='<b>%{x}</b><br>Atividades: %{y}<extra></extra>'
+        )
     )
     
-    # Adicionar coluna de total por responsável
-    pivot_responsavel['TOTAL'] = pivot_responsavel.sum(axis=1)
-    
-    # Ordenar primeiro os usuários prioritários, depois os demais por total
-    usuarios_ordenados = (
-        pd.concat([
-            pivot_responsavel[pivot_responsavel.index.isin(usuarios_prioritarios)],
-            pivot_responsavel[~pivot_responsavel.index.isin(usuarios_prioritarios)]
-        ])
-        .sort_values('TOTAL', ascending=False)
-    )
-    
-    # Resetar índice para exibição em streamlit
-    pivot_responsavel_display = usuarios_ordenados.reset_index()
-    
-    # Adicionar coluna de destaque
-    pivot_responsavel_display['DESTAQUE'] = pivot_responsavel_display['MOVED_BY_NAME'].isin(usuarios_prioritarios)
-    
-    # Exibir tabela com a produtividade diária
-    st.markdown("### Produtividade Diária por Responsável")
-    st.dataframe(
-        pivot_responsavel_display,
-        column_config={
-            "MOVED_BY_NAME": st.column_config.TextColumn(
-                "Responsável",
-                help="Nome do responsável pelas movimentações"
-            ),
-            "TOTAL": st.column_config.NumberColumn(
-                "Total",
-                help="Total de movimentações no período",
-                format="%d"
-            ),
-            "DESTAQUE": st.column_config.CheckboxColumn(
-                "Usuário Prioritário",
-                help="Indica se é um usuário prioritário"
+    # Adicionar linha para média móvel se disponível
+    if 'Media_Movel' in total_por_dia.columns:
+        fig_total.add_trace(
+            go.Scatter(
+                x=total_por_dia['Data_Formatada'],
+                y=total_por_dia['Media_Movel'],
+                name='Média Móvel (3 dias)',
+                line=dict(color='#2196F3', width=3),
+                hovertemplate='<b>%{x}</b><br>Média: %{y:.1f}<extra></extra>'
             )
-        },
-        use_container_width=True
-    )
+        )
     
-    # Adicionar explicação da tabela
-    st.info("""
-    **Como interpretar esta tabela:**
-    • Cada linha representa um responsável.
-    • As colunas mostram as datas do período analisado.
-    • Os valores nas células indicam quantas movimentações cada pessoa realizou em cada dia.
-    • A coluna "TOTAL" mostra o total de movimentações de cada responsável no período completo.
-    • Os usuários prioritários estão destacados e aparecem primeiro na listagem.
-    """)
-    
-    # Atualizar o gráfico de barras para mostrar os grupos
-    total_por_responsavel = usuarios_ordenados.reset_index()[['MOVED_BY_NAME', 'TOTAL']]
-    
-    # Criar coluna de cores para destacar grupos diferentes
-    total_por_responsavel['GRUPO'] = total_por_responsavel['MOVED_BY_NAME'].map(mapeamento_grupo)
-    total_por_responsavel['COR'] = total_por_responsavel['GRUPO'].fillna('Outros Usuários')
-    
-    fig = px.bar(
-        total_por_responsavel,
-        x='TOTAL',
-        y='MOVED_BY_NAME',
-        title="Total de Movimentações por Responsável",
-        labels={
-            'TOTAL': 'Quantidade de Movimentações',
-            'MOVED_BY_NAME': 'Responsável',
-            'COR': 'Grupo'
-        },
-        orientation='h',
-        color='COR',
-        color_discrete_map={
-            'Cartório Tatuapé': '#1f77b4',     # Azul escuro
-            'Cartório Casa Verde': '#2ca02c',   # Verde
-            'Outros Usuários': '#a6cee3'        # Azul claro
-        },
-        text='TOTAL'
-    )
-
-    fig.update_traces(
-        textposition='outside',  # Coloca os números fora das barras
-        textfont=dict(size=14),  # Aumenta o tamanho da fonte dos números
-        cliponaxis=False  # Permite que os números apareçam mesmo fora da área do gráfico
-    )
-
-    fig.update_layout(
-        height=800,  # Aumentar altura para melhor visualização
-        showlegend=True,
+    # Configurar layout
+    fig_total.update_layout(
+        title='Total de Atividades por Dia',
+        height=450,
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -1092,390 +617,404 @@ def analisar_produtividade_responsavel(df):
             xanchor="right",
             x=1
         ),
-        xaxis=dict(
-            range=[0, total_por_responsavel['TOTAL'].max() * 1.15]  # Aumenta o espaço para os números
+        margin=dict(l=20, r=20, t=50, b=50),
+        xaxis_title='Dia',
+        yaxis_title='Quantidade',
+        hovermode='x unified'
+    )
+    
+    st.plotly_chart(fig_total, use_container_width=True)
+    
+    # Informações sobre o dia com mais atividades
+    if not total_por_dia.empty:
+        max_dia = total_por_dia.loc[total_por_dia['Quantidade'].idxmax()]
+        st.info(f"**Dia com mais atividades:** {max_dia['Data'].strftime('%d/%m/%Y')} com {int(max_dia['Quantidade'])} registros")
+    
+    # Gráfico de produção por etapa ao longo do tempo
+    st.subheader("Produtividade por Etapa ao Longo do Tempo")
+    
+    # Permitir seleção de etapas para visualizar
+    etapas_disponiveis = sorted(df_dias['Etapa'].unique())
+    
+    # Cálculo de etapas com maior volume para seleção padrão
+    etapas_volume = df_dias.groupby('Etapa')['Quantidade'].sum().sort_values(ascending=False)
+    etapas_principais = etapas_volume.index.tolist()[:5] if len(etapas_volume) > 5 else etapas_volume.index.tolist()
+    
+    etapas_selecionadas = st.multiselect(
+        "Selecione as etapas para visualizar:",
+        options=etapas_disponiveis,
+        default=etapas_principais,
+        key="grafico_diario_etapas"
+    )
+    
+    if not etapas_selecionadas:
+        st.warning("Selecione pelo menos uma etapa para visualizar o gráfico.")
+    else:
+        # Filtrar dados para as etapas selecionadas
+        df_etapas_selecionadas = df_dias[df_dias['Etapa'].isin(etapas_selecionadas)]
+        
+        # Criar DataFrame pivot com datas nas linhas e etapas nas colunas
+        df_pivot = df_etapas_selecionadas.pivot_table(
+            index='Data',
+            columns='Etapa',
+            values='Quantidade',
+            aggfunc='sum',
+            fill_value=0
+        ).reset_index()
+        
+        # Formatar datas para exibição
+        df_pivot['Data_Formatada'] = df_pivot['Data'].apply(lambda x: x.strftime('%d/%m'))
+        
+        # Criar gráfico de linhas
+        fig_etapas = go.Figure()
+        
+        # Adicionar uma linha para cada etapa
+        for etapa in etapas_selecionadas:
+            if etapa in df_pivot.columns:
+                fig_etapas.add_trace(
+                    go.Scatter(
+                        x=df_pivot['Data_Formatada'],
+                        y=df_pivot[etapa],
+                        mode='lines+markers',
+                        name=etapa,
+                        hovertemplate='<b>%{x}</b><br>' + etapa + ': %{y}<extra></extra>'
+                    )
+                )
+        
+        # Configurar layout
+        fig_etapas.update_layout(
+            title='Evolução Diária por Etapa',
+            height=500,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.25,
+                xanchor="center",
+                x=0.5
+            ),
+            margin=dict(l=20, r=20, t=50, b=100),
+            xaxis_title='Dia',
+            yaxis_title='Quantidade',
+            hovermode='x unified'
         )
+        
+        st.plotly_chart(fig_etapas, use_container_width=True)
+        
+        # Tabela com os dados diários
+        st.subheader("Detalhamento por Dia")
+        
+        # Preparar tabela formatada
+        df_tabela = df_pivot.drop(columns=['Data_Formatada']).copy()
+        
+        # Adicionar coluna de total por dia
+        etapas_cols = [col for col in df_tabela.columns if col != 'Data']
+        df_tabela['Total'] = df_tabela[etapas_cols].sum(axis=1)
+        
+        # Formatar datas
+        df_tabela['Data'] = df_tabela['Data'].apply(lambda x: x.strftime('%d/%m/%Y'))
+        
+        # Ordenar por data (mais recente primeiro)
+        df_tabela = df_tabela.sort_values('Data', ascending=False)
+        
+        # Exibir tabela
+        st.dataframe(
+            df_tabela,
+            column_config={
+                "Data": st.column_config.TextColumn("Data"),
+                "Total": st.column_config.NumberColumn("Total do Dia", format="%d"),
+                **{etapa: st.column_config.NumberColumn(etapa, format="%d") for etapa in etapas_cols}
+            },
+            use_container_width=True,
+            hide_index=True
+        )
+
+def mostrar_visao_produtividade(df, campos_data, titulo_visao, freq):
+    """
+    Mostra a visão de produtividade agregada por período
+    
+    Args:
+        df (pandas.DataFrame): DataFrame com dados filtrados
+        campos_data (list): Lista de campos de data para análise
+        titulo_visao (str): Título da visão (Diária, Semanal, Mensal)
+        freq (str): Frequência para agrupamento (D, W, M)
+    """
+    st.markdown(f"### Visão {titulo_visao} de Produtividade")
+    
+    # Criar contagem para cada etapa por período
+    dados_grafico = []
+    
+    for campo in campos_data:
+        # Pular campos sem dados
+        if df[campo].isna().all():
+            continue
+        
+        # Formatar data de acordo com a frequência
+        serie_data = df[campo].dropna()
+        
+        # Agrupar por período
+        if freq == 'D':
+            contagem = serie_data.dt.date.value_counts().sort_index()
+            nome_periodo = 'Data'
+        elif freq == 'W':
+            # Agrupar por semana, usando a data de início da semana
+            contagem = serie_data.dt.to_period('W').dt.start_time.dt.date.value_counts().sort_index()
+            nome_periodo = 'Semana'
+        else:  # 'M'
+            # Agrupar por mês, usando o primeiro dia do mês
+            contagem = serie_data.dt.to_period('M').dt.start_time.dt.date.value_counts().sort_index()
+            nome_periodo = 'Mês'
+        
+        # Criar DataFrame temporário para este campo
+        df_temp = pd.DataFrame({
+            nome_periodo: contagem.index,
+            'Quantidade': contagem.values,
+            'Etapa': [formatar_nome_etapa(campo) for _ in range(len(contagem))]
+        })
+        
+        # Adicionar aos dados do gráfico
+        dados_grafico.append(df_temp)
+    
+    if not dados_grafico:
+        st.warning(f"Não há dados suficientes para criar a visão {titulo_visao.lower()}.")
+        return
+    
+    # Combinar todos os dados
+    df_grafico = pd.concat(dados_grafico, ignore_index=True)
+    
+    # Criar gráfico
+    fig = px.bar(
+        df_grafico,
+        x=nome_periodo,
+        y='Quantidade',
+        color='Etapa',
+        barmode='group',
+        title=f"Produtividade {titulo_visao} por Etapa",
+        labels={
+            nome_periodo: f"{nome_periodo}",
+            'Quantidade': 'Quantidade de Registros',
+            'Etapa': 'Etapa do Processo'
+        },
+        text='Quantidade'  # Adicionar rótulos de texto nas barras
+    )
+    
+    # Melhorar formatação do gráfico
+    fig.update_layout(
+        height=500,
+        xaxis={'categoryorder': 'category ascending'},
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.3,
+            xanchor="center",
+            x=0.5
+        ),
+        margin=dict(l=20, r=20, t=50, b=100)
+    )
+    
+    # Configurar a exibição do texto acima das barras
+    fig.update_traces(
+        textposition='outside',
+        textfont=dict(size=10, color='black'),
+        cliponaxis=False
     )
     
     st.plotly_chart(fig, use_container_width=True)
     
-    # Adicionar explicação do gráfico
-    st.info("""
-    **Como interpretar este gráfico:**
-    • Mostra o total de movimentações realizadas por cada responsável no período.
-    • As barras azuis escuras representam os usuários prioritários.
-    • As barras azuis claras representam os demais usuários.
-    • As barras mais longas indicam maior volume de trabalho.
-    """)
-    
-    # Adicionar nova seção para análise temporal dos usuários prioritários
-    st.markdown("### Movimentações dos Usuários Prioritários ao Longo do Tempo")
-    
-    # Criar DataFrame apenas com usuários prioritários
-    df_prioritarios = df_valido[df_valido['MOVED_BY_NAME'].isin(usuarios_prioritarios)].copy()
-    
-    # Permitir seleção do período de análise
-    col1, col2 = st.columns(2)
-    with col1:
-        periodo = st.selectbox(
-            "Selecione o período de análise:",
-            ["Diário", "Semanal", "Mensal"],
-            index=0
-        )
-    
-    with col2:
-        # Criar lista organizada de usuários por cartório
-        opcoes_tatuape = [f"[Tatuapé] {nome}" for nome in GRUPO_TATUAPE.keys()]
-        opcoes_casa_verde = [f"[Casa Verde] {nome}" for nome in GRUPO_CASA_VERDE.keys()]
-        
-        # Combinar as listas mantendo a organização por cartório
-        opcoes_selecao = sorted(opcoes_tatuape) + sorted(opcoes_casa_verde)
-        
-        usuarios_selecionados = st.multiselect(
-            "Selecione os usuários para visualizar:",
-            options=opcoes_selecao,
-            default=sorted(opcoes_casa_verde)[:5]  # Seleciona os 5 primeiros do Casa Verde por padrão
-        )
-    
-    # Criar lista de nomes selecionados para filtrar
-    nomes_e_ids_selecionados = set()
-    for selecao in usuarios_selecionados:
-        # Remover o prefixo do cartório para obter o nome
-        nome = selecao.split("] ")[1]
-        nomes_e_ids_selecionados.add(nome)
-        
-        # Adicionar o ID correspondente
-        if nome in GRUPO_TATUAPE:
-            nomes_e_ids_selecionados.add(GRUPO_TATUAPE[nome])
-        elif nome in GRUPO_CASA_VERDE:
-            nomes_e_ids_selecionados.add(GRUPO_CASA_VERDE[nome])
-    
-    # Filtrar pelos usuários selecionados (usando MOVED_BY_NAME original, antes do mapeamento)
-    df_plot = df_prioritarios[df_prioritarios['MOVED_BY_NAME'].isin(nomes_e_ids_selecionados)].copy()
-    
-    if not df_plot.empty:
-        # Adicionar colunas de período
-        df_plot['DATA'] = df_plot['MOVED_TIME'].dt.date
-        df_plot['SEMANA'] = df_plot['MOVED_TIME'].dt.strftime('%Y-%U')
-        df_plot['MES'] = df_plot['MOVED_TIME'].dt.strftime('%Y-%m')
-        
-        # Definir agrupamento baseado no período selecionado
-        if periodo == "Diário":
-            coluna_tempo = 'DATA'
-            formato_data = lambda x: x.strftime('%d/%m/%Y') if hasattr(x, 'strftime') else str(x)
-        elif periodo == "Semanal":
-            coluna_tempo = 'SEMANA'
-            formato_data = lambda x: f"Semana {x.split('-')[1]}/{x.split('-')[0]}"
-        else:  # Mensal
-            coluna_tempo = 'MES'
-            formato_data = lambda x: f"{pd.to_datetime(x + '-01').strftime('%B/%Y')}"
-        
-        # Agrupar dados
-        df_agrupado = df_plot.groupby([coluna_tempo, 'MOVED_BY_NAME']).size().reset_index(name='QUANTIDADE')
-        
-        # Formatar datas para exibição
-        df_agrupado['PERIODO_FORMATADO'] = df_agrupado[coluna_tempo].apply(formato_data)
-        
-        # Criar gráfico de linhas
-        fig = px.line(
-            df_agrupado,
-            x='PERIODO_FORMATADO',
-            y='QUANTIDADE',
-            color='MOVED_BY_NAME',
-            markers=True,
-            title=f"Movimentações {periodo}s por Usuário Prioritário",
-            labels={
-                'PERIODO_FORMATADO': 'Período',
-                'QUANTIDADE': 'Quantidade de Movimentações',
-                'MOVED_BY_NAME': 'Responsável'
-            }
-        )
-        
-        # Melhorar a formatação do gráfico
-        fig.update_layout(
-            height=500,
-            xaxis_tickangle=-45,
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1
-            ),
-            margin=dict(l=20, r=20, t=100, b=100),
-            yaxis_title="Quantidade de Movimentações",
-            xaxis_title="Período",
-            plot_bgcolor='white',
-            yaxis=dict(
-                gridcolor='lightgray',
-                gridwidth=1
-            ),
-            xaxis=dict(
-                gridcolor='lightgray',
-                gridwidth=1
-            )
-        )
-        
-        # Adicionar valores nos pontos
-        fig.update_traces(
-            textposition="top center",
-            texttemplate="%{y}",
-            textfont=dict(size=12)
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Adicionar tabela com os dados
-        st.markdown("#### Dados Detalhados")
-        
-        # Pivot table para mostrar os dados em formato tabular
-        pivot = df_agrupado.pivot(
-            index='PERIODO_FORMATADO',
-            columns='MOVED_BY_NAME',
-            values='QUANTIDADE'
-        ).fillna(0)
-        
-        # Adicionar total por período
-        pivot['TOTAL'] = pivot.sum(axis=1)
-        
-        # Resetar índice para exibição
-        pivot_display = pivot.reset_index()
-        
-        # Exibir tabela
-        st.dataframe(
-            pivot_display,
-            column_config={
-                "PERIODO_FORMATADO": st.column_config.TextColumn(
-                    "Período",
-                    help=f"Período {periodo.lower()}"
-                ),
-                "TOTAL": st.column_config.NumberColumn(
-                    "Total",
-                    help="Total de movimentações no período",
-                    format="%d"
-                )
-            },
-            use_container_width=True
-        )
-        
-        # Adicionar explicação
-        st.info(f"""
-        **Como interpretar esta visualização:**
-        • O gráfico mostra a evolução {periodo.lower()} das movimentações de cada usuário prioritário selecionado.
-        • Cada linha representa um usuário, com cores diferentes para fácil identificação.
-        • Os pontos mostram os valores exatos em cada período.
-        • A tabela abaixo fornece os valores detalhados para cada período.
-        • Use os filtros acima para:
-          - Alterar a granularidade temporal (Diário/Semanal/Mensal)
-          - Selecionar quais usuários deseja visualizar
-        """)
-    else:
-        st.warning("Não há dados para os usuários selecionados no período.")
-    
-    # Adicionar análise de produtividade por responsável e etapa
-    st.markdown("### Produtividade por Responsável e Etapa")
-    
-    # Agrupar por responsável e estágio
-    prod_por_estagio = df_valido.groupby(['MOVED_BY_NAME', coluna_estagio]).size().reset_index(name='QUANTIDADE')
-    
-    # Pivot table para ver quais etapas cada responsável mais trabalha
-    pivot_estagio_resp = prod_por_estagio.pivot_table(
-        index='MOVED_BY_NAME',
-        columns=coluna_estagio,
-        values='QUANTIDADE',
+    # Tabela de resumo
+    resumo = df_grafico.pivot_table(
+        index='Etapa',
+        columns=nome_periodo,
+        values='Quantidade',
+        aggfunc='sum',
         fill_value=0
-    )
+    ).reset_index()
     
-    # Adicionar coluna de total
-    pivot_estagio_resp['TOTAL'] = pivot_estagio_resp.sum(axis=1)
+    # Adicionar total por etapa
+    resumo['Total'] = resumo.iloc[:, 1:].sum(axis=1)
     
-    # Ordenar primeiro os usuários prioritários, depois os demais por total
-    pivot_estagio_resp = pd.concat([
-        pivot_estagio_resp[pivot_estagio_resp.index.isin(usuarios_prioritarios)],
-        pivot_estagio_resp[~pivot_estagio_resp.index.isin(usuarios_prioritarios)]
-    ]).sort_values('TOTAL', ascending=False)
+    # Ordenar pelo total (maior para menor)
+    resumo = resumo.sort_values('Total', ascending=False)
     
-    # Adicionar coluna de destaque
-    pivot_display = pivot_estagio_resp.reset_index()
-    pivot_display['DESTAQUE'] = pivot_display['MOVED_BY_NAME'].isin(usuarios_prioritarios)
+    # Adicionar linha de total geral
+    total_por_periodo = resumo.iloc[:, 1:].sum(axis=0)
+    total_por_periodo['Etapa'] = 'TOTAL GERAL'
+    resumo = pd.concat([resumo, pd.DataFrame([total_por_periodo])], ignore_index=True)
     
-    # Exibir tabela
-    st.dataframe(
-        pivot_display,
-        column_config={
-            "MOVED_BY_NAME": st.column_config.TextColumn(
-                "Responsável",
-                help="Nome do responsável pelas movimentações"
-            ),
-            "TOTAL": st.column_config.NumberColumn(
-                "Total",
-                help="Total de movimentações",
-                format="%d"
-            ),
-            "DESTAQUE": st.column_config.CheckboxColumn(
-                "Usuário Prioritário",
-                help="Indica se é um usuário prioritário"
-            )
+    st.dataframe(resumo, use_container_width=True)
+    
+    # Explicação da análise
+    with st.expander(f"Como interpretar a visão {titulo_visao.lower()}"):
+        st.markdown(f"""
+        **Análise {titulo_visao}:**
+        
+        * O gráfico mostra a quantidade de registros por etapa do processo em cada {nome_periodo.lower()}.
+        * A tabela apresenta os mesmos dados em formato numérico, com totais por etapa e por {nome_periodo.lower()}.
+        * Etapas com maiores valores indicam maior volume de trabalho naquele período.
+        * Compare diferentes períodos para identificar tendências e variações na carga de trabalho.
+        """)
+
+def analisar_produtividade_responsavel(df, campos_data):
+    """
+    Analisa a produtividade por responsável
+    
+    Args:
+        df (pandas.DataFrame): DataFrame com dados filtrados
+        campos_data (list): Lista de campos de data para análise
+    """
+    if 'ASSIGNED_BY_NAME' not in df.columns:
+        st.info("Dados de responsável não disponíveis para análise.")
+        return
+    
+    # Criar dados para análise por responsável
+    dados_resp = []
+    
+    for campo in campos_data:
+        # Pular campos sem dados
+        if df[campo].isna().all():
+            continue
+        
+        # Filtrar registros que têm data e responsável
+        df_valido = df.dropna(subset=[campo, 'ASSIGNED_BY_NAME'])
+        
+        # Agrupar por responsável e contar
+        contagem = df_valido.groupby('ASSIGNED_BY_NAME').size().reset_index()
+        contagem.columns = ['Responsável', 'Quantidade']
+        contagem['Etapa'] = formatar_nome_etapa(campo)
+        
+        # Adicionar aos dados
+        dados_resp.append(contagem)
+    
+    if not dados_resp:
+        st.warning("Não há dados suficientes para análise por responsável.")
+        return
+    
+    # Combinar todos os dados
+    df_resp = pd.concat(dados_resp, ignore_index=True)
+    
+    # Criar gráfico
+    fig = px.bar(
+        df_resp,
+        x='Responsável',
+        y='Quantidade',
+        color='Etapa',
+        barmode='group',
+        title="Produtividade por Responsável e Etapa",
+        labels={
+            'Responsável': "Responsável",
+            'Quantidade': 'Quantidade de Registros',
+            'Etapa': 'Etapa do Processo'
         },
-        use_container_width=True
+        text='Quantidade'  # Adicionar rótulos de texto nas barras
     )
     
-    # Adicionar explicação da tabela
-    st.info("""
-    **Como interpretar esta tabela:**
-    • Cada linha representa um responsável.
-    • As colunas mostram as diferentes etapas do fluxo de trabalho.
-    • Os valores nas células indicam quantas movimentações cada pessoa realizou em cada etapa.
-    • A coluna "TOTAL" mostra o total de movimentações de cada responsável.
-    • Os usuários prioritários estão destacados e aparecem primeiro na listagem.
-    """)
-    
-    # Gráfico de heatmap focado nos usuários prioritários
-    st.markdown("### Especialização dos Usuários Prioritários por Etapa")
-    
-    # Selecionar apenas usuários prioritários para o heatmap
-    pivot_prioritarios = pivot_estagio_resp[pivot_estagio_resp.index.isin(usuarios_prioritarios)].drop(columns=['TOTAL'])
-    
-    # Normalizar por linha para visualizar percentual por responsável
-    pivot_norm = pivot_prioritarios.div(pivot_prioritarios.sum(axis=1), axis=0)
-    
-    # Criar heatmap
-    fig_heat = px.imshow(
-        pivot_norm,
-        title="Especialização dos Usuários Prioritários por Etapa (% do total de movimentações)",
-        labels=dict(x="Etapa", y="Responsável", color="% do Total"),
-        color_continuous_scale="Viridis",
-        text_auto=".1%"
-    )
-    
-    fig_heat.update_layout(
-        height=500,
-        xaxis_tickangle=-45,
+    # Melhorar formatação do gráfico
+    fig.update_layout(
+        height=600,
+        xaxis={'categoryorder': 'total descending'},
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.3,
+            xanchor="center",
+            x=0.5
+        ),
         margin=dict(l=20, r=20, t=50, b=100)
     )
     
-    st.plotly_chart(fig_heat, use_container_width=True)
+    # Configurar a exibição do texto acima das barras
+    fig.update_traces(
+        textposition='outside', 
+        textfont=dict(size=10, color='black'),
+        cliponaxis=False
+    )
     
-    # Adicionar explicação do mapa de calor
-    st.info("""
-    **Como interpretar este mapa de calor:**
-    • Mostra apenas os usuários prioritários.
-    • As cores mais intensas indicam maior concentração de atividade naquela etapa.
-    • Os valores mostram o percentual do trabalho total de cada responsável dedicado a cada etapa.
-    • Permite identificar especialização: responsáveis que trabalham predominantemente em etapas específicas.
-    • Um valor de 80% significa que 80% das movimentações daquela pessoa foram naquela etapa específica.
-    """)
+    st.plotly_chart(fig, use_container_width=True)
     
-    # Análise por tipo de documento
-    if 'UF_CRM_12_1722534861891' in df_valido.columns:
-        st.markdown("### Produtividade por Tipo de Documento")
+    # Tabela de resumo
+    resumo_resp = df_resp.pivot_table(
+        index='Responsável',
+        columns='Etapa',
+        values='Quantidade',
+        aggfunc='sum',
+        fill_value=0
+    ).reset_index()
+    
+    # Adicionar total por responsável
+    resumo_resp['Total'] = resumo_resp.iloc[:, 1:].sum(axis=1)
+    
+    # Ordenar pelo total (maior para menor)
+    resumo_resp = resumo_resp.sort_values('Total', ascending=False)
+    
+    # Adicionar linha de total geral
+    total_por_etapa = resumo_resp.iloc[:, 1:].sum(axis=0)
+    total_por_etapa['Responsável'] = 'TOTAL GERAL'
+    resumo_resp = pd.concat([resumo_resp, pd.DataFrame([total_por_etapa])], ignore_index=True)
+    
+    st.dataframe(resumo_resp, use_container_width=True)
+    
+    # Explicação da análise
+    with st.expander("Como interpretar a análise por responsável"):
+        st.markdown("""
+        **Análise por Responsável:**
         
-        # Agrupar por responsável e tipo de documento
-        prod_tipo_doc = df_valido.groupby(['MOVED_BY_NAME', 'UF_CRM_12_1722534861891']).size().reset_index(name='QUANTIDADE')
-        
-        # Pivot table para responsáveis nas linhas e tipos de documento nas colunas
-        pivot_tipo_doc = prod_tipo_doc.pivot_table(
-            index='MOVED_BY_NAME',
-            columns='UF_CRM_12_1722534861891',
-            values='QUANTIDADE',
-            fill_value=0
-        )
-        
-        # Adicionar coluna de total por responsável
-        pivot_tipo_doc['TOTAL'] = pivot_tipo_doc.sum(axis=1)
-        
-        # Ordenar primeiro os usuários prioritários, depois os demais por total
-        pivot_tipo_doc = pd.concat([
-            pivot_tipo_doc[pivot_tipo_doc.index.isin(usuarios_prioritarios)],
-            pivot_tipo_doc[~pivot_tipo_doc.index.isin(usuarios_prioritarios)]
-        ]).sort_values('TOTAL', ascending=False)
-        
-        # Adicionar coluna de destaque
-        pivot_tipo_doc_display = pivot_tipo_doc.reset_index()
-        pivot_tipo_doc_display['DESTAQUE'] = pivot_tipo_doc_display['MOVED_BY_NAME'].isin(usuarios_prioritarios)
-        
-        # Exibir tabela
-        st.dataframe(
-            pivot_tipo_doc_display,
-            column_config={
-                "MOVED_BY_NAME": st.column_config.TextColumn(
-                    "Responsável",
-                    help="Nome do responsável pelas movimentações"
-                ),
-                "TOTAL": st.column_config.NumberColumn(
-                    "Total",
-                    help="Total de movimentações",
-                    format="%d"
-                ),
-                "DESTAQUE": st.column_config.CheckboxColumn(
-                    "Usuário Prioritário",
-                    help="Indica se é um usuário prioritário"
-                )
-            },
-            use_container_width=True
-        )
-        
-        # Adicionar explicação da tabela
-        st.info("""
-        **Como interpretar esta tabela:**
-        • Cada linha representa um responsável.
-        • As colunas mostram os diferentes tipos de documento (Nascimento, Casamento, Óbito, etc).
-        • Os valores nas células indicam quantas movimentações cada pessoa realizou para cada tipo de documento.
-        • A coluna "TOTAL" mostra o total geral de movimentações de cada responsável.
-        • Os usuários prioritários estão destacados e aparecem primeiro na listagem.
+        * O gráfico mostra a quantidade de registros por etapa do processo para cada responsável.
+        * A tabela apresenta os mesmos dados em formato numérico, com totais por responsável e por etapa.
+        * Responsáveis com maiores valores indicam maior volume de trabalho.
+        * Compare diferentes responsáveis para identificar distribuição da carga de trabalho.
         """)
+    
+    # Análise de eficiência por responsável (média de registros por dia)
+    st.markdown("### Eficiência por Responsável")
+    
+    # Calcular dias úteis no período analisado
+    dias_uteis = len(set([d.date() for d in df[campos_data].stack().dropna()]))
+    
+    if dias_uteis > 0:
+        # Adicionar coluna de média diária
+        resumo_resp['Média Diária'] = resumo_resp['Total'] / dias_uteis
         
-        # Criar gráfico de barras empilhadas apenas para usuários prioritários
-        st.markdown("### Distribuição de Tipos de Documento por Usuário Prioritário")
-        
-        # Transformar dados para formato adequado para plotly
-        pivot_melt = pd.melt(
-            pivot_tipo_doc[pivot_tipo_doc.index.isin(usuarios_prioritarios)].reset_index(),
-            id_vars=['MOVED_BY_NAME'],
-            value_vars=[col for col in pivot_tipo_doc.columns if col != 'TOTAL'],
-            var_name='TIPO_DOCUMENTO',
-            value_name='QUANTIDADE'
-        )
-        
-        fig_tipo_doc = px.bar(
-            pivot_melt,
-            x='MOVED_BY_NAME',
-            y='QUANTIDADE',
-            color='TIPO_DOCUMENTO',
-            title="Produtividade por Tipo de Documento - Usuários Prioritários",
+        # Criar gráfico de média diária
+        fig_media = px.bar(
+            resumo_resp[resumo_resp['Responsável'] != 'TOTAL GERAL'],
+            x='Responsável',
+            y='Média Diária',
+            title=f"Média Diária de Produtividade por Responsável (baseado em {dias_uteis} dias)",
+            color='Média Diária',
+            color_continuous_scale='Viridis',
             labels={
-                'MOVED_BY_NAME': 'Responsável',
-                'QUANTIDADE': 'Quantidade',
-                'TIPO_DOCUMENTO': 'Tipo de Documento'
+                'Responsável': "Responsável",
+                'Média Diária': 'Média de Registros por Dia'
             },
-            barmode='stack'
+            text=resumo_resp[resumo_resp['Responsável'] != 'TOTAL GERAL']['Média Diária'].round(1)  # Adicionar rótulos arredondados para 1 casa decimal
         )
         
-        fig_tipo_doc.update_layout(
-            xaxis_tickangle=-45,
-            height=600,
-            margin=dict(l=20, r=20, t=50, b=100),
-            showlegend=True,
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1
-            )
+        fig_media.update_layout(
+            height=500,
+            xaxis={'categoryorder': 'total descending'},
+            margin=dict(l=20, r=20, t=50, b=20)
         )
         
-        st.plotly_chart(fig_tipo_doc, use_container_width=True)
+        # Configurar a exibição do texto acima das barras
+        fig_media.update_traces(
+            textposition='outside',
+            textfont=dict(size=10, color='black'),
+            cliponaxis=False
+        )
         
-        # Adicionar explicação do gráfico
-        st.info("""
-        **Como interpretar este gráfico:**
-        • Mostra apenas os usuários prioritários.
-        • Cada barra representa um responsável.
-        • As cores indicam diferentes tipos de documento.
-        • A altura total da barra mostra o volume total de movimentações do responsável.
-        • A proporção de cada cor mostra a distribuição do trabalho por tipo de documento.
-        • Útil para identificar especialização por tipo de documento entre os usuários prioritários.
-        """)
+        st.plotly_chart(fig_media, use_container_width=True)
+        
+        # Exibir análise de eficiência em tabela
+        df_eficiencia = resumo_resp[['Responsável', 'Total', 'Média Diária']].copy()
+        df_eficiencia['Média Diária'] = df_eficiencia['Média Diária'].round(2)
+        
+        st.dataframe(
+            df_eficiencia, 
+            use_container_width=True,
+            column_config={
+                'Responsável': st.column_config.TextColumn("Responsável"),
+                'Total': st.column_config.NumberColumn("Total de Registros", format="%d"),
+                'Média Diária': st.column_config.NumberColumn("Média Diária", format="%.2f")
+            }
+        )
     else:
-        st.warning("Campo 'UF_CRM_12_1722534861891' (Tipo de documento) não encontrado para análise por tipo de documento.") 
+        st.info("Dados insuficientes para calcular a eficiência diária.") 
