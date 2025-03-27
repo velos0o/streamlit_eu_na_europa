@@ -15,6 +15,23 @@ def formatar_nome_etapa(campo):
     Returns:
         str: Nome formatado da etapa
     """
+    # Mapeamento das etapas para os novos nomes conforme solicitado
+    mapeamento_etapas = {
+        'UF_CRM_DATA_SOLICITAR_REQUERIMENTO': 'Deu ganho na Busca',
+        'UF_CRM_DEVOLUTIVA_BUSCA': 'Deu perca na Busca',
+        'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM': 'Requerimento Montado',
+        'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM_PRIORIDADE': 'Requerimento Montado',
+        'UF_CRM_DATA_AGUARDANDOCARTORIO_ORIGEM': 'Solicitado ao Cartório Origem',
+        'UF_CRM_DEVOLUCAO_ADM': 'DEVOLUÇÃO ADM',
+        'UF_CRM_DEVOLUCAO_ADM_VERIFICADO': 'DEVOLUÇÃO ADM VERIFICADO',
+        'UF_CRM_SOLICITACAO_DUPLICADO': 'SOLICITAÇÃO DUPLICADA'
+    }
+    
+    # Verificar se o campo está no mapeamento
+    if campo in mapeamento_etapas:
+        return mapeamento_etapas[campo]
+    
+    # Caso contrário, usar a formatação padrão
     nome = campo.replace('UF_CRM_DATA_', '').replace('UF_CRM_', '')
     # Garantir que todos os underlines são substituídos por espaços
     while '_' in nome:
@@ -36,7 +53,7 @@ def analisar_produtividade_etapas(df):
         'UF_CRM_DATA_CERTIDAO_FISICA_ENVIADA',
         'UF_CRM_DATA_MONTAR_REQUERIMENTO',
         'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM',
-        'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM_PRIORIDADE',
+        # Removemos UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM_PRIORIDADE da lista para processá-lo especialmente
         'UF_CRM_DATA_SOLICITAR_REQUERIMENTO',
         'UF_CRM_DEVOLUCAO_ADM',
         'UF_CRM_DEVOLUCAO_ADM_VERIFICADO',
@@ -50,7 +67,25 @@ def analisar_produtividade_etapas(df):
     if colunas_faltantes:
         st.warning(f"Algumas colunas de datas não foram encontradas: {', '.join(colunas_faltantes)}")
         campos_data = [col for col in campos_data if col in df.columns]
+    
+    # Colunas para consolidar em uma única métrica
+    campo_origem = 'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM'
+    campo_origem_prioridade = 'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM_PRIORIDADE'
+    
+    # Consolidar dados de UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM_PRIORIDADE em UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM
+    if campo_origem in df.columns and campo_origem_prioridade in df.columns:
+        # Criar cópia para não modificar o original
+        df = df.copy()
         
+        # Onde UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM é nulo mas UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM_PRIORIDADE não é,
+        # copie o valor de PRIORIDADE para o campo regular
+        mascara = df[campo_origem].isna() & ~df[campo_origem_prioridade].isna()
+        df.loc[mascara, campo_origem] = df.loc[mascara, campo_origem_prioridade]
+        
+        # Adicionar o campo_origem à lista de campos se ainda não estiver
+        if campo_origem not in campos_data:
+            campos_data.append(campo_origem)
+            
     if not campos_data:
         st.error("Nenhuma coluna de data necessária para análise foi encontrada.")
         return
@@ -68,29 +103,32 @@ def analisar_produtividade_etapas(df):
         df[campo] = pd.to_datetime(df[campo], errors='coerce')
     
     # Aplicar filtros para análise
-    st.sidebar.markdown("### Filtros de Produtividade")
+    st.markdown("### Filtros de Produtividade")
     
-    # Filtro de período
+    # Filtro de período no topo da página
     hoje = datetime.now()
-    data_inicio = st.sidebar.date_input(
-        "Data Inicial",
-        value=hoje - timedelta(days=30),
-        max_value=hoje,
-        key="prod_data_inicio"
-    )
-    data_fim = st.sidebar.date_input(
-        "Data Final",
-        value=hoje,
-        max_value=hoje,
-        min_value=data_inicio,
-        key="prod_data_fim"
-    )
+    col1, col2 = st.columns(2)
+    with col1:
+        data_inicio = st.date_input(
+            "Data Inicial",
+            value=hoje - timedelta(days=30),
+            max_value=hoje,
+            key="prod_data_inicio"
+        )
+    with col2:
+        data_fim = st.date_input(
+            "Data Final",
+            value=hoje,
+            max_value=hoje,
+            min_value=data_inicio,
+            key="prod_data_fim"
+        )
     
     # Filtro de responsável se existir a coluna
     responsavel_selecionado = None
     if 'ASSIGNED_BY_NAME' in df.columns:
         responsaveis = df['ASSIGNED_BY_NAME'].dropna().unique().tolist()
-        responsavel_selecionado = st.sidebar.multiselect(
+        responsavel_selecionado = st.multiselect(
             "Responsável",
             options=responsaveis,
             default=[],
@@ -98,7 +136,7 @@ def analisar_produtividade_etapas(df):
         )
     
     # Explicação sobre filtros
-    with st.sidebar.expander("Sobre os Filtros", expanded=False):
+    with st.expander("Sobre os Filtros", expanded=False):
         st.markdown("""
         **Como usar os filtros:**
         • **Data Inicial e Final**: Selecione o período que deseja analisar.
@@ -293,6 +331,52 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
         st.warning("Não há dados disponíveis para análise no período selecionado.")
         return
     
+    # Adicionar etapa "Busca Realizada" que é a soma de "Deu ganho na Busca" e "Deu perca na Busca"
+    if "Deu ganho na Busca" in dados_campos and "Deu perca na Busca" in dados_campos:
+        ganho_busca = dados_campos["Deu ganho na Busca"]["total"]
+        perca_busca = dados_campos["Deu perca na Busca"]["total"]
+        total_busca = ganho_busca + perca_busca
+        
+        # Calcular dia máximo e valor máximo combinados
+        # Para simplificar, usamos o maior valor entre os dois
+        dia_max_ganho = dados_campos["Deu ganho na Busca"]["dia_max"]
+        dia_max_perca = dados_campos["Deu perca na Busca"]["dia_max"]
+        valor_max_ganho = dados_campos["Deu ganho na Busca"]["valor_max"]
+        valor_max_perca = dados_campos["Deu perca na Busca"]["valor_max"]
+        
+        if valor_max_ganho >= valor_max_perca:
+            dia_max_busca = dia_max_ganho
+            valor_max_busca = valor_max_ganho
+        else:
+            dia_max_busca = dia_max_perca
+            valor_max_busca = valor_max_perca
+        
+        # Calcular número de dias combinados
+        dias_ganho = dados_campos["Deu ganho na Busca"]["num_dias"]
+        dias_perca = dados_campos["Deu perca na Busca"]["num_dias"]
+        dias_total = max(dias_ganho, dias_perca)  # Estimativa conservadora
+        
+        # Média diária combinada
+        media_diaria_busca = total_busca / dias_total if dias_total > 0 else 0
+        
+        # Adicionar aos dados
+        dados_campos["Busca Realizada"] = {
+            'total': total_busca,
+            'dia_max': dia_max_busca,
+            'valor_max': valor_max_busca,
+            'media_diaria': media_diaria_busca,
+            'num_dias': dias_total,
+            'campo_original': 'UF_CRM_BUSCA_REALIZADA'  # Campo virtual
+        }
+        
+        # Incluir no total geral
+        total_geral += total_busca
+        
+        # Incluir IDs
+        if "Deu ganho na Busca" in ids_por_etapa and "Deu perca na Busca" in ids_por_etapa:
+            ids_busca = ids_por_etapa["Deu ganho na Busca"].union(ids_por_etapa["Deu perca na Busca"])
+            ids_por_etapa["Busca Realizada"] = ids_busca
+    
     # Calcular métricas gerais
     num_dias_periodo = (periodo_fim.date() - periodo_inicio.date()).days + 1
     num_dias_com_atividade = len(dias_com_atividade)
@@ -356,6 +440,108 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
         </div>
         """, unsafe_allow_html=True)
     
+    # Seção de métricas para o grupo Pesquisa
+    st.markdown("""
+    <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 25px 0 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <h4 style="color: #1565C0; margin-top: 0; font-size: 18px; border-bottom: 2px solid #1976D2; padding-bottom: 8px; margin-bottom: 15px;">
+            🔍 Métricas de Pesquisa
+        </h4>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Dicionário com descrições explicativas para cada métrica
+    descricoes_metricas = {
+        'Deu ganho na Busca': 'Pesquisas realizadas com sucesso, onde o documento foi encontrado, permitindo avançar com o processo.',
+        'Deu perca na Busca': 'Pesquisas onde o documento não foi encontrado, interrompendo o fluxo normal do processo.',
+        'Busca Realizada': 'Total de pesquisas realizadas, incluindo as bem sucedidas e as que não tiveram sucesso.',
+        'Requerimento Montado': 'Documentação preparada e organizada após pesquisa bem sucedida, prontos para solicitação ao cartório.',
+        'Solicitado ao Cartório Origem': 'Requerimento já enviado formalmente ao cartório onde o documento está registrado, aguardando retorno.',
+        'DEVOLUÇÃO ADM': 'Processos que foram devolvidos por questões administrativas e precisam de revisão ou correção.',
+        'DEVOLUÇÃO ADM VERIFICADO': 'Processos devolvidos que já foram analisados pela administração e estão sendo processados.',
+        'SOLICITAÇÃO DUPLICADA': 'Solicitações identificadas como duplicadas de processos já existentes no sistema.',
+        'Certidão Emitida': 'Documento oficial foi emitido pelo cartório e recebido pela equipe.',
+        'Certidão Física Entregue': 'Documento físico já foi entregue ao solicitante final.',
+        'Certidão Física Enviada': 'Documento físico foi enviado mas ainda não foi confirmada a entrega ao destinatário.',
+    }
+    
+    # Criar cards para métricas de pesquisa
+    if "Deu ganho na Busca" in dados_campos and "Deu perca na Busca" in dados_campos and "Busca Realizada" in dados_campos:
+        ganho_busca = dados_campos["Deu ganho na Busca"]["total"]
+        perca_busca = dados_campos["Deu perca na Busca"]["total"]
+        total_busca = dados_campos["Busca Realizada"]["total"]
+        
+        # Taxa de sucesso
+        taxa_sucesso = (ganho_busca / total_busca * 100) if total_busca > 0 else 0
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #43A047 0%, #81C784 100%); border-radius: 10px; padding: 15px; color: white; text-align: center; height: 160px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h4 style="margin:0; font-size: 16px; opacity: 0.9; color: #FFFFFF !important;">💹 Ganhos de Pesquisa</h4>
+                <p style="font-size: 36px; font-weight: bold; margin: 10px 0; color: #FFFFFF !important;">{ganho_busca:,}</p>
+                <p style="font-size: 12px; margin: 0; opacity: 0.8; color: #FFFFFF !important;">{taxa_sucesso:.1f}% de sucesso</p>
+                <p style="font-size: 11px; margin-top: 5px; opacity: 0.9; color: #FFFFFF !important;">Pesquisas com resultados positivos</p>
+                <p style="font-size: 10px; margin-top: 5px; opacity: 0.8; color: #FFFFFF !important;">{descricoes_metricas["Deu ganho na Busca"]}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #E53935 0%, #EF5350 100%); border-radius: 10px; padding: 15px; color: white; text-align: center; height: 160px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h4 style="margin:0; font-size: 16px; opacity: 0.9; color: #FFFFFF !important;">📉 Percas de Pesquisa</h4>
+                <p style="font-size: 36px; font-weight: bold; margin: 10px 0; color: #FFFFFF !important;">{perca_busca:,}</p>
+                <p style="font-size: 12px; margin: 0; opacity: 0.8; color: #FFFFFF !important;">{100-taxa_sucesso:.1f}% de insucesso</p>
+                <p style="font-size: 11px; margin-top: 5px; opacity: 0.9; color: #FFFFFF !important;">Pesquisas sem resultados encontrados</p>
+                <p style="font-size: 10px; margin-top: 5px; opacity: 0.8; color: #FFFFFF !important;">{descricoes_metricas["Deu perca na Busca"]}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #1976D2 0%, #64B5F6 100%); border-radius: 10px; padding: 15px; color: white; text-align: center; height: 160px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <h4 style="margin:0; font-size: 16px; opacity: 0.9; color: #FFFFFF !important;">Busca Realizada</h4>
+                <p style="font-size: 36px; font-weight: bold; margin: 10px 0; color: #FFFFFF !important;">{total_busca:,}</p>
+                <p style="font-size: 12px; margin: 0; opacity: 0.8; color: #FFFFFF !important;">Total realizado</p>
+                <p style="font-size: 11px; margin-top: 5px; opacity: 0.9; color: #FFFFFF !important;">Soma de ganhos e percas ({ganho_busca:,} + {perca_busca:,})</p>
+                <p style="font-size: 10px; margin-top: 5px; opacity: 0.8; color: #FFFFFF !important;">{descricoes_metricas["Busca Realizada"]}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # Adicionar explicação sobre a lógica das métricas de busca
+        st.markdown("""
+        <div style="background-color: #f0f7ff; border-radius: 8px; padding: 15px; margin-top: 20px; border-left: 5px solid #1976D2;">
+            <h5 style="margin-top: 0; color: #1565C0; font-size: 16px;">📋 Explicação Detalhada das Métricas de Busca</h5>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Usar componentes nativos do Streamlit em vez de HTML complexo
+        st.subheader("Lógica de contagem das métricas de busca:")
+        
+        # Criar as explicações das métricas com markdown nativo
+        st.markdown(f"""
+        * **Deu ganho na Busca ({ganho_busca:,})**: Representa o número de pesquisas que foram realizadas com sucesso, ou seja, encontraram o que estava sendo buscado. Cada registro contabilizado nesta métrica indica uma busca que teve resultado positivo, gerando valor para o processo.
+        
+        * **Deu perca na Busca ({perca_busca:,})**: Representa o número de pesquisas que não tiveram sucesso, ou seja, não encontraram resultados satisfatórios. Estas são buscas válidas e completas, mas que não retornaram os dados esperados.
+        
+        * **Busca Realizada ({total_busca:,})**: Representa o total de buscas realizadas no período, incluindo tanto as bem-sucedidas quanto as mal-sucedidas. É calculada pela soma das buscas com ganho e com perca ({ganho_busca:,} + {perca_busca:,}).
+        """)
+        
+        st.markdown(f"""
+        A **Taxa de Sucesso** é calculada dividindo o número de ganhos pelo total de buscas realizadas: {ganho_busca:,} ÷ {total_busca:,} = {taxa_sucesso:.1f}%
+        """)
+        
+        st.subheader("Importância destas métricas:")
+        
+        st.markdown("""
+        * Uma **alta taxa de sucesso** indica eficiência no processo de busca e qualidade nas informações utilizadas para realizar as pesquisas.
+        
+        * Um **alto volume de buscas** com **baixa taxa de sucesso** pode indicar necessidade de aprimoramento nos critérios ou métodos de busca.
+        
+        * Estas métricas ajudam a identificar oportunidades de melhoria e a mensurar a efetividade do processo de pesquisa ao longo do tempo.
+        """)
+    else:
+        st.info("Dados de pesquisa não disponíveis para o período selecionado.")
+    
     # Seção de métricas por etapa com estilo aprimorado
     st.markdown("""
     <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 25px 0 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
@@ -375,66 +561,147 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
     # Organizar campos em ordem de maior volume
     campos_ordenados = sorted(dados_campos.keys(), key=lambda x: dados_campos[x]['total'], reverse=True)
     
+    # Etapas a excluir da visualização de Produtividade por Etapa
+    etapas_excluir = ["Busca Realizada", "Deu ganho na Busca", "Deu perca na Busca"]
+    
+    # Filtrar campos ordenados para excluir as etapas especificadas
+    campos_ordenados = [campo for campo in campos_ordenados if campo not in etapas_excluir]
+    
+    # Identificar etapas de perda para destacar em vermelho
+    etapas_perda = ["DEVOLUÇÃO ADM", "DEVOLUÇÃO ADM VERIFICADO", "SOLICITAÇÃO DUPLICADA"]
+    
+    # Separar etapas de perda das demais
+    campos_perda = [campo for campo in campos_ordenados if campo in etapas_perda]
+    campos_regulares = [campo for campo in campos_ordenados if campo not in etapas_perda]
+    
     # Definir número de colunas
     NUM_COLUNAS = 3
     
-    # Criar linhas de cards
-    for i in range(0, len(campos_ordenados), NUM_COLUNAS):
-        # Obter o grupo de etapas para esta linha
-        etapas_linha = campos_ordenados[i:i+NUM_COLUNAS]
+    # Seção para etapas regulares
+    if campos_regulares:
         
-        # Criar colunas
-        cols = st.columns(NUM_COLUNAS)
+        # Criar linhas de cards para etapas regulares
+        for i in range(0, len(campos_regulares), NUM_COLUNAS):
+            # Obter o grupo de etapas para esta linha
+            etapas_linha = campos_regulares[i:i+NUM_COLUNAS]
+            
+            # Criar colunas
+            cols = st.columns(NUM_COLUNAS)
+            
+            # Preencher cada coluna
+            for j, etapa in enumerate(etapas_linha):
+                if j < len(cols):  # Verificar se ainda há colunas disponíveis
+                    with cols[j]:
+                        dados = dados_campos[etapa]
+                        cor_index = i + j % len(cores_etapas)
+                        cor_etapa = cores_etapas[cor_index % len(cores_etapas)]
+                        
+                        # Usar componentes nativos do Streamlit em vez de HTML complexo
+                        with st.container():
+                            # Card principal com borda colorida
+                            st.markdown(f"""
+                            <div style="border: 2px solid {cor_etapa}; border-radius: 10px; overflow: hidden; margin-bottom: 20px;">
+                                <div style="background-color: {cor_etapa}; color: white; padding: 15px; text-align: center;">
+                                    <h4 style="margin: 0; font-size: 16px; font-weight: 700;">{etapa.replace('_', ' ')}</h4>
+                                    <p style="font-size: 38px; font-weight: 800; margin: 8px 0;">{dados['total']:,}</p>
+                                    <p style="font-size: 12px; margin: 0;">Total de registros</p>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Descrição como texto normal
+                            st.markdown(f"**Descrição:** {descricoes_metricas.get(etapa, '')}")
+                            
+                            # Estatísticas usando colunas nativas do Streamlit
+                            col_a, col_b = st.columns(2)
+                            with col_a:
+                                st.markdown(f"""
+                                <div style="background-color: #f0f7ff; padding: 10px; border-radius: 5px; text-align: center;">
+                                    <p style="margin: 0; font-size: 12px; color: #555; font-weight: 600;">Média por Dia Ativo</p>
+                                    <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: {cor_etapa};">{dados['media_diaria']:.1f}</p>
+                                    <p style="font-size: 11px; margin: 0; color: #555;">{dados['num_dias']} dias ativos</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            with col_b:
+                                st.markdown(f"""
+                                <div style="background-color: #f0f7ff; padding: 10px; border-radius: 5px; text-align: center;">
+                                    <p style="margin: 0; font-size: 12px; color: #555; font-weight: 600;">Dia mais Produtivo</p>
+                                    <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: {cor_etapa};">{dados['dia_max'].strftime('%d/%m')}</p>
+                                    <p style="font-size: 11px; margin: 0; color: #555;">{dados['valor_max']} registros</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            # Registros únicos como texto normal
+                            if 'ID' in df.columns and etapa in ids_por_etapa:
+                                num_ids = len(ids_por_etapa[etapa])
+                                st.markdown(f"**Registros únicos:** {num_ids}")
+    
+    # Seção para etapas de perda (em vermelho)
+    if campos_perda:
+        st.markdown("""
+        <div style="background: #ffebee; border-radius: 10px; padding: 15px; margin: 25px 0 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <h4 style="color: #c62828; margin-top: 0; font-size: 18px; border-bottom: 2px solid #e53935; padding-bottom: 8px; margin-bottom: 15px;">
+                ⚠️ Devoluções e Duplicações
+            </h4>
+        </div>
+        """, unsafe_allow_html=True)
         
-        # Preencher cada coluna
-        for j, etapa in enumerate(etapas_linha):
-            if j < len(cols):  # Verificar se ainda há colunas disponíveis
-                with cols[j]:
-                    dados = dados_campos[etapa]
-                    cor_index = i + j % len(cores_etapas)
-                    cor_etapa = cores_etapas[cor_index % len(cores_etapas)]
-                    cor_gradient = cores_etapas[(cor_index + 1) % len(cores_etapas)]
-                    
-                    # Criar um card estilizado para cada etapa
-                    st.markdown(f"""
-                    <div style="background-color: {cor_etapa}; border-radius: 10px; padding: 15px; margin-bottom: 15px; color: white; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-                        <h4 style="margin-top: 0; font-size: 16px; font-weight: 700; color: #FFFFFF !important;">{etapa.replace('_', ' ')}</h4>
-                        <p style="font-size: 38px; font-weight: 800; margin: 10px 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); color: #FFFFFF !important;">{dados['total']:,}</p>
-                        <p style="font-size: 12px; margin: 0; font-weight: 500; color: #FFFFFF !important;">Total de registros</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Dados adicionais para a etapa
-                    col_a, col_b = st.columns(2)
-                    
-                    with col_a:
-                        st.markdown(f"""
-                        <div style="background: white; border-radius: 8px; padding: 10px; margin-bottom: 10px; text-align: center; height: 80px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid {cor_etapa};">
-                            <p style="margin: 0; font-size: 12px; color: #333; font-weight: 600;">Média por Dia Ativo</p>
-                            <p style="font-size: 22px; font-weight: bold; margin: 5px 0; color: {cor_etapa};">{dados['media_diaria']:.1f}</p>
-                            <p style="font-size: 10px; margin: 0; color: #666;">{dados['num_dias']} dias ativos</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    with col_b:
-                        st.markdown(f"""
-                        <div style="background: white; border-radius: 8px; padding: 10px; margin-bottom: 10px; text-align: center; height: 80px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid {cor_etapa};">
-                            <p style="margin: 0; font-size: 12px; color: #333; font-weight: 600;">Dia mais Produtivo</p>
-                            <p style="font-size: 22px; font-weight: bold; margin: 5px 0; color: {cor_etapa};">{dados['dia_max'].strftime('%d/%m')}</p>
-                            <p style="font-size: 10px; margin: 0; color: #666;">{dados['valor_max']} registros</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    # Mostrar informação de registros únicos se disponível
-                    if 'ID' in df.columns and etapa in ids_por_etapa:
-                        num_ids = len(ids_por_etapa[etapa])
-                        st.markdown(f"""
-                        <div style="text-align: center; margin-top: 5px;">
-                            <span style="font-size: 12px; color: #666; background: #f0f0f0; padding: 3px 8px; border-radius: 10px;">
-                                Registros únicos: <b>{num_ids}</b>
-                            </span>
-                        </div>
-                        """, unsafe_allow_html=True)
+        # Criar linhas de cards para etapas de perda
+        for i in range(0, len(campos_perda), NUM_COLUNAS):
+            # Obter o grupo de etapas para esta linha
+            etapas_linha = campos_perda[i:i+NUM_COLUNAS]
+            
+            # Criar colunas
+            cols = st.columns(NUM_COLUNAS)
+            
+            # Preencher cada coluna
+            for j, etapa in enumerate(etapas_linha):
+                if j < len(cols):  # Verificar se ainda há colunas disponíveis
+                    with cols[j]:
+                        dados = dados_campos[etapa]
+                        cor_etapa = "#E53935"  # Vermelho para todas as etapas de perda
+                        
+                        # Usar componentes nativos do Streamlit em vez de HTML complexo
+                        with st.container():
+                            # Card principal com borda colorida
+                            st.markdown(f"""
+                            <div style="border: 2px solid {cor_etapa}; border-radius: 10px; overflow: hidden; margin-bottom: 20px;">
+                                <div style="background-color: {cor_etapa}; color: white; padding: 15px; text-align: center;">
+                                    <h4 style="margin: 0; font-size: 16px; font-weight: 700;">{etapa.replace('_', ' ')}</h4>
+                                    <p style="font-size: 38px; font-weight: 800; margin: 8px 0;">{dados['total']:,}</p>
+                                    <p style="font-size: 12px; margin: 0;">Total de registros</p>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Descrição como texto normal
+                            st.markdown(f"**Descrição:** {descricoes_metricas.get(etapa, '')}")
+                            
+                            # Estatísticas usando colunas nativas do Streamlit
+                            col_a, col_b = st.columns(2)
+                            with col_a:
+                                st.markdown(f"""
+                                <div style="background-color: #fff5f5; padding: 10px; border-radius: 5px; text-align: center;">
+                                    <p style="margin: 0; font-size: 12px; color: #555; font-weight: 600;">Média por Dia Ativo</p>
+                                    <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: {cor_etapa};">{dados['media_diaria']:.1f}</p>
+                                    <p style="font-size: 11px; margin: 0; color: #555;">{dados['num_dias']} dias ativos</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            with col_b:
+                                st.markdown(f"""
+                                <div style="background-color: #fff5f5; padding: 10px; border-radius: 5px; text-align: center;">
+                                    <p style="margin: 0; font-size: 12px; color: #555; font-weight: 600;">Dia mais Produtivo</p>
+                                    <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: {cor_etapa};">{dados['dia_max'].strftime('%d/%m')}</p>
+                                    <p style="font-size: 11px; margin: 0; color: #555;">{dados['valor_max']} registros</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            # Registros únicos como texto normal
+                            if 'ID' in df.columns and etapa in ids_por_etapa:
+                                num_ids = len(ids_por_etapa[etapa])
+                                st.markdown(f"**Registros únicos:** {num_ids}")
     
     # Criar tabela de resumo com estilo aprimorado
     st.markdown("""
@@ -531,6 +798,14 @@ def mostrar_grafico_diario(df, campos_data):
     # Coletar dados para gráficos diários
     dados_diarios = []
     
+    # Campos para calcular "Busca Realizada"
+    ganho_busca_campo = 'UF_CRM_DATA_SOLICITAR_REQUERIMENTO'
+    perca_busca_campo = 'UF_CRM_DEVOLUTIVA_BUSCA'
+    
+    # Dados de ganho e perca para cálculo de busca total
+    dados_ganho_busca = {}
+    dados_perca_busca = {}
+    
     for campo in campos_data:
         # Pular campos sem dados
         if df[campo].isna().all():
@@ -545,11 +820,30 @@ def mostrar_grafico_diario(df, campos_data):
         # Agrupar por dia
         contagem_diaria = serie_data.dt.date.value_counts().sort_index()
         
+        # Guardar dados especiais para cálculo de busca total
+        if campo == ganho_busca_campo:
+            dados_ganho_busca = {data: qtd for data, qtd in contagem_diaria.items()}
+        elif campo == perca_busca_campo:
+            dados_perca_busca = {data: qtd for data, qtd in contagem_diaria.items()}
+        
         for data, qtd in contagem_diaria.items():
             dados_diarios.append({
                 'Data': data,
                 'Quantidade': qtd,
                 'Etapa': nome_etapa
+            })
+    
+    # Adicionar dados de "Busca Realizada" - combinação de ganho e perca
+    todas_datas = set(list(dados_ganho_busca.keys()) + list(dados_perca_busca.keys()))
+    for data in todas_datas:
+        ganho = dados_ganho_busca.get(data, 0)
+        perca = dados_perca_busca.get(data, 0)
+        total_busca = ganho + perca
+        if total_busca > 0:
+            dados_diarios.append({
+                'Data': data,
+                'Quantidade': total_busca,
+                'Etapa': 'Busca Realizada'
             })
     
     # Se não houver dados, mostra mensagem e sai
@@ -629,6 +923,48 @@ def mostrar_grafico_diario(df, campos_data):
     if not total_por_dia.empty:
         max_dia = total_por_dia.loc[total_por_dia['Quantidade'].idxmax()]
         st.info(f"**Dia com mais atividades:** {max_dia['Data'].strftime('%d/%m/%Y')} com {int(max_dia['Quantidade'])} registros")
+    
+    # Seção de análise de pesquisas
+    st.subheader("Análise de Pesquisas")
+    
+    # Filtrar apenas as etapas de pesquisa
+    etapas_pesquisa = ['Deu ganho na Busca', 'Deu perca na Busca', 'Busca Realizada']
+    df_pesquisa = df_dias[df_dias['Etapa'].isin(etapas_pesquisa)]
+    
+    if not df_pesquisa.empty:
+        # Criar gráfico de evolução de pesquisas
+        fig_pesquisa = px.line(
+            df_pesquisa,
+            x='Data',
+            y='Quantidade',
+            color='Etapa',
+            title='Evolução de Pesquisas por Dia',
+            labels={
+                'Data': 'Data', 
+                'Quantidade': 'Quantidade', 
+                'Etapa': 'Tipo de Pesquisa'
+            },
+            markers=True
+        )
+        
+        fig_pesquisa.update_layout(
+            height=450,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            ),
+            margin=dict(l=20, r=20, t=50, b=50),
+            xaxis_title='Dia',
+            yaxis_title='Quantidade',
+            hovermode='x unified'
+        )
+        
+        st.plotly_chart(fig_pesquisa, use_container_width=True)
+    else:
+        st.info("Não há dados de pesquisa disponíveis para o período selecionado.")
     
     # Gráfico de produção por etapa ao longo do tempo
     st.subheader("Produtividade por Etapa ao Longo do Tempo")
@@ -743,6 +1079,14 @@ def mostrar_visao_produtividade(df, campos_data, titulo_visao, freq):
     # Criar contagem para cada etapa por período
     dados_grafico = []
     
+    # Campos para calcular "Busca Realizada"
+    ganho_busca_campo = 'UF_CRM_DATA_SOLICITAR_REQUERIMENTO'
+    perca_busca_campo = 'UF_CRM_DEVOLUTIVA_BUSCA'
+    
+    # Dados de ganho e perca para cálculo de busca total
+    dados_ganho_busca = {}
+    dados_perca_busca = {}
+    
     for campo in campos_data:
         # Pular campos sem dados
         if df[campo].isna().all():
@@ -751,28 +1095,69 @@ def mostrar_visao_produtividade(df, campos_data, titulo_visao, freq):
         # Formatar data de acordo com a frequência
         serie_data = df[campo].dropna()
         
+        # Nome amigável para o campo
+        nome_etapa = formatar_nome_etapa(campo)
+        
         # Agrupar por período
         if freq == 'D':
             contagem = serie_data.dt.date.value_counts().sort_index()
             nome_periodo = 'Data'
+            
+            # Guardar dados especiais para cálculo de busca total
+            if campo == ganho_busca_campo:
+                dados_ganho_busca = {data: qtd for data, qtd in contagem.items()}
+            elif campo == perca_busca_campo:
+                dados_perca_busca = {data: qtd for data, qtd in contagem.items()}
+                
         elif freq == 'W':
             # Agrupar por semana, usando a data de início da semana
             contagem = serie_data.dt.to_period('W').dt.start_time.dt.date.value_counts().sort_index()
             nome_periodo = 'Semana'
+            
+            # Guardar dados especiais para cálculo de busca total
+            if campo == ganho_busca_campo:
+                dados_ganho_busca = {data: qtd for data, qtd in contagem.items()}
+            elif campo == perca_busca_campo:
+                dados_perca_busca = {data: qtd for data, qtd in contagem.items()}
+                
         else:  # 'M'
             # Agrupar por mês, usando o primeiro dia do mês
             contagem = serie_data.dt.to_period('M').dt.start_time.dt.date.value_counts().sort_index()
             nome_periodo = 'Mês'
+            
+            # Guardar dados especiais para cálculo de busca total
+            if campo == ganho_busca_campo:
+                dados_ganho_busca = {data: qtd for data, qtd in contagem.items()}
+            elif campo == perca_busca_campo:
+                dados_perca_busca = {data: qtd for data, qtd in contagem.items()}
         
         # Criar DataFrame temporário para este campo
         df_temp = pd.DataFrame({
             nome_periodo: contagem.index,
             'Quantidade': contagem.values,
-            'Etapa': [formatar_nome_etapa(campo) for _ in range(len(contagem))]
+            'Etapa': [nome_etapa for _ in range(len(contagem))]
         })
         
         # Adicionar aos dados do gráfico
         dados_grafico.append(df_temp)
+    
+    # Adicionar dados de "Busca Realizada" - combinação de ganho e perca
+    todas_datas = set(list(dados_ganho_busca.keys()) + list(dados_perca_busca.keys()))
+    if todas_datas:
+        dados_busca_realizada = []
+        for data in todas_datas:
+            ganho = dados_ganho_busca.get(data, 0)
+            perca = dados_perca_busca.get(data, 0)
+            total_busca = ganho + perca
+            if total_busca > 0:
+                dados_busca_realizada.append({
+                    nome_periodo: data,
+                    'Quantidade': total_busca,
+                    'Etapa': 'Busca Realizada'
+                })
+        
+        if dados_busca_realizada:
+            dados_grafico.append(pd.DataFrame(dados_busca_realizada))
     
     if not dados_grafico:
         st.warning(f"Não há dados suficientes para criar a visão {titulo_visao.lower()}.")
@@ -819,6 +1204,51 @@ def mostrar_visao_produtividade(df, campos_data, titulo_visao, freq):
     )
     
     st.plotly_chart(fig, use_container_width=True)
+    
+    # Adicionar visualização específica para pesquisas
+    etapas_pesquisa = ['Deu ganho na Busca', 'Deu perca na Busca', 'Busca Realizada']
+    df_pesquisa = df_grafico[df_grafico['Etapa'].isin(etapas_pesquisa)]
+    
+    if not df_pesquisa.empty:
+        st.subheader(f"Análise de Pesquisas - Visão {titulo_visao}")
+        
+        fig_pesquisa = px.bar(
+            df_pesquisa,
+            x=nome_periodo,
+            y='Quantidade',
+            color='Etapa',
+            barmode='group',
+            title=f"Pesquisas {titulo_visao}",
+            labels={
+                nome_periodo: f"{nome_periodo}",
+                'Quantidade': 'Quantidade de Registros',
+                'Etapa': 'Tipo de Pesquisa'
+            },
+            text='Quantidade'
+        )
+        
+        # Configurar a exibição do gráfico
+        fig_pesquisa.update_layout(
+            height=450,
+            xaxis={'categoryorder': 'category ascending'},
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.3,
+                xanchor="center",
+                x=0.5
+            ),
+            margin=dict(l=20, r=20, t=50, b=100)
+        )
+        
+        # Configurar a exibição do texto acima das barras
+        fig_pesquisa.update_traces(
+            textposition='outside',
+            textfont=dict(size=10, color='black'),
+            cliponaxis=False
+        )
+        
+        st.plotly_chart(fig_pesquisa, use_container_width=True)
     
     # Tabela de resumo
     resumo = df_grafico.pivot_table(
@@ -868,6 +1298,14 @@ def analisar_produtividade_responsavel(df, campos_data):
     # Criar dados para análise por responsável
     dados_resp = []
     
+    # Campos para calcular "Busca Realizada"
+    ganho_busca_campo = 'UF_CRM_DATA_SOLICITAR_REQUERIMENTO'
+    perca_busca_campo = 'UF_CRM_DEVOLUTIVA_BUSCA'
+    
+    # Dados de ganho e perca por responsável
+    dados_ganho_resp = {}
+    dados_perca_resp = {}
+    
     for campo in campos_data:
         # Pular campos sem dados
         if df[campo].isna().all():
@@ -876,13 +1314,40 @@ def analisar_produtividade_responsavel(df, campos_data):
         # Filtrar registros que têm data e responsável
         df_valido = df.dropna(subset=[campo, 'ASSIGNED_BY_NAME'])
         
+        # Nome da etapa formatado
+        nome_etapa = formatar_nome_etapa(campo)
+        
         # Agrupar por responsável e contar
         contagem = df_valido.groupby('ASSIGNED_BY_NAME').size().reset_index()
         contagem.columns = ['Responsável', 'Quantidade']
-        contagem['Etapa'] = formatar_nome_etapa(campo)
+        contagem['Etapa'] = nome_etapa
+        
+        # Guardar dados especiais para cálculo de busca total
+        if campo == ganho_busca_campo:
+            dados_ganho_resp = {resp: qtd for resp, qtd in zip(contagem['Responsável'], contagem['Quantidade'])}
+        elif campo == perca_busca_campo:
+            dados_perca_resp = {resp: qtd for resp, qtd in zip(contagem['Responsável'], contagem['Quantidade'])}
         
         # Adicionar aos dados
         dados_resp.append(contagem)
+    
+    # Adicionar dados de "Busca Realizada" - combinação de ganho e perca
+    todos_resp = set(list(dados_ganho_resp.keys()) + list(dados_perca_resp.keys()))
+    if todos_resp:
+        dados_busca_realizada = []
+        for resp in todos_resp:
+            ganho = dados_ganho_resp.get(resp, 0)
+            perca = dados_perca_resp.get(resp, 0)
+            total_busca = ganho + perca
+            if total_busca > 0:
+                dados_busca_realizada.append({
+                    'Responsável': resp,
+                    'Quantidade': total_busca,
+                    'Etapa': 'Busca Realizada'
+                })
+        
+        if dados_busca_realizada:
+            dados_resp.append(pd.DataFrame(dados_busca_realizada))
     
     if not dados_resp:
         st.warning("Não há dados suficientes para análise por responsável.")
@@ -891,7 +1356,90 @@ def analisar_produtividade_responsavel(df, campos_data):
     # Combinar todos os dados
     df_resp = pd.concat(dados_resp, ignore_index=True)
     
-    # Criar gráfico
+    # Análise de pesquisas por responsável
+    etapas_pesquisa = ['Deu ganho na Busca', 'Deu perca na Busca', 'Busca Realizada']
+    df_pesquisa_resp = df_resp[df_resp['Etapa'].isin(etapas_pesquisa)]
+    
+    if not df_pesquisa_resp.empty:
+        st.subheader("Análise de Pesquisas por Responsável")
+        
+        # Criar gráfico de pesquisas por responsável
+        fig_pesquisa = px.bar(
+            df_pesquisa_resp,
+            x='Responsável',
+            y='Quantidade',
+            color='Etapa',
+            barmode='group',
+            title="Pesquisas por Responsável",
+            labels={
+                'Responsável': "Responsável",
+                'Quantidade': 'Quantidade de Registros',
+                'Etapa': 'Tipo de Pesquisa'
+            },
+            text='Quantidade'
+        )
+        
+        # Melhorar formatação do gráfico
+        fig_pesquisa.update_layout(
+            height=500,
+            xaxis={'categoryorder': 'total descending'},
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.3,
+                xanchor="center",
+                x=0.5
+            ),
+            margin=dict(l=20, r=20, t=50, b=100)
+        )
+        
+        # Configurar a exibição do texto acima das barras
+        fig_pesquisa.update_traces(
+            textposition='outside', 
+            textfont=dict(size=10, color='black'),
+            cliponaxis=False
+        )
+        
+        st.plotly_chart(fig_pesquisa, use_container_width=True)
+        
+        # Calcular taxa de sucesso por responsável
+        resumo_pesquisa = df_pesquisa_resp.pivot_table(
+            index='Responsável',
+            columns='Etapa',
+            values='Quantidade',
+            aggfunc='sum',
+            fill_value=0
+        ).reset_index()
+        
+        # Calcular taxa de sucesso
+        if 'Deu ganho na Busca' in resumo_pesquisa.columns and 'Busca Realizada' in resumo_pesquisa.columns:
+            resumo_pesquisa['Taxa de Sucesso (%)'] = resumo_pesquisa['Deu ganho na Busca'] / resumo_pesquisa['Busca Realizada'] * 100
+            
+            # Ordenar por taxa de sucesso
+            resumo_pesquisa = resumo_pesquisa.sort_values('Taxa de Sucesso (%)', ascending=False)
+            
+            # Formatar a tabela
+            st.dataframe(
+                resumo_pesquisa,
+                column_config={
+                    'Responsável': st.column_config.TextColumn("Responsável"),
+                    'Deu ganho na Busca': st.column_config.NumberColumn("Ganhos", format="%d"),
+                    'Deu perca na Busca': st.column_config.NumberColumn("Perdas", format="%d"),
+                    'Busca Realizada': st.column_config.NumberColumn("Total de Buscas", format="%d"),
+                    'Taxa de Sucesso (%)': st.column_config.ProgressColumn(
+                        "Taxa de Sucesso",
+                        format="%.1f%%",
+                        min_value=0,
+                        max_value=100
+                    )
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+    
+    # Criar gráfico geral
+    st.subheader("Produtividade Geral por Responsável")
+    
     fig = px.bar(
         df_resp,
         x='Responsável',
@@ -961,6 +1509,7 @@ def analisar_produtividade_responsavel(df, campos_data):
         * A tabela apresenta os mesmos dados em formato numérico, com totais por responsável e por etapa.
         * Responsáveis com maiores valores indicam maior volume de trabalho.
         * Compare diferentes responsáveis para identificar distribuição da carga de trabalho.
+        * Para pesquisas, observe a taxa de sucesso (proporção de ganhos sobre o total de buscas).
         """)
     
     # Análise de eficiência por responsável (média de registros por dia)
