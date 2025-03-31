@@ -32,11 +32,34 @@ def formatar_nome_etapa(campo):
         return mapeamento_etapas[campo]
     
     # Caso contrário, usar a formatação padrão
-    nome = campo.replace('UF_CRM_DATA_', '').replace('UF_CRM_', '')
+    nome = campo.replace('UF_CRM_DATA_', '').replace('UF_CRM_', '').replace('UF_CRM_RESPONSAVEL_', '')
     # Garantir que todos os underlines são substituídos por espaços
     while '_' in nome:
         nome = nome.replace('_', ' ')
     return nome.title()
+
+# Dicionário para mapear campos de data com seus respectivos campos de responsável
+def obter_mapeamento_campos():
+    """
+    Retorna um dicionário que mapeia campos de data com seus respectivos campos de responsável
+    
+    Returns:
+        dict: Dicionário de mapeamento entre campos de data e campos de responsável
+    """
+    return {
+        'UF_CRM_DATA_SOLICITAR_REQUERIMENTO': 'UF_CRM_RESPONSAVEL__BUSCA',
+        'UF_CRM_DEVOLUTIVA_BUSCA': 'UF_CRM_RESPONSAVEL_DEVOLUTIVA_BUSCA',
+        'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM': 'UF_CRM_RESPONSAVEL_SOLICITAR_CARTORIO_ORIGEM',
+        'UF_CRM_DATA_AGUARDANDOCARTORIO_ORIGEM': 'UF_CRM_RESPONSAVEL_AGUARDANDO_CARTORIO_DE_ORIGEM',
+        'UF_CRM_DATA_CERTIDAO_EMITIDA': 'UF_CRM_RESPONSAVEL_CERTIDAO_EMITIDA',
+        'UF_CRM_DATA_CERTIDAO_FISICA_ENTREGUE': 'UF_CRM_RESPONSAVEL_CERTIDO_FISICA_ENTREGUE',
+        'UF_CRM_DATA_CERTIDAO_FISICA_ENVIADA': 'UF_CRM_RESPONSAVEL_CERTIDO_FISICA_ENVIADA',
+        'UF_CRM_DEVOLUCAO_ADM': 'UF_CRM_RESPONSAVEL_DEVOLUCAO_ADM',
+        'UF_CRM_DEVOLUCAO_ADM_VERIFICADO': 'UF_CRM_RESPONSAVEL_DEVOLUCAO_ADM_VERIFICADO',
+        'UF_CRM_DEVOLUTIVA_REQUERIMENTO': 'UF_CRM_RESPONSAVEL_DEVOLVIDOREQUERIMENTO',
+        'UF_CRM_SOLICITACAO_DUPLICADO': 'UF_CRM_RESPONSAVEL_SOLICITACAO_DUPLICADA',
+        'UF_CRM_DATA_MONTAR_REQUERIMENTO': 'UF_CRM_MONTAGEM_PASTA_RESPONSAVEL'  # Adicionando o par que faltava
+    }
 
 def analisar_produtividade_etapas(df):
     """
@@ -62,11 +85,35 @@ def analisar_produtividade_etapas(df):
         'UF_CRM_SOLICITACAO_DUPLICADO'
     ]
     
+    # Lista de campos de responsáveis específicos
+    campos_responsavel = [
+        'UF_CRM_RESPONSAVEL__BUSCA',
+        'UF_CRM_RESPONSAVEL_AGUARDANDO_CARTORIO_DE_ORIGEM',
+        'UF_CRM_RESPONSAVEL_CERTIDAO_EMITIDA',
+        'UF_CRM_RESPONSAVEL_CERTIDO_FISICA_ENTREGUE',
+        'UF_CRM_RESPONSAVEL_CERTIDO_FISICA_ENVIADA',
+        'UF_CRM_RESPONSAVEL_DEVOLUCAO_ADM',
+        'UF_CRM_RESPONSAVEL_DEVOLUCAO_ADM_VERIFICADO',
+        'UF_CRM_RESPONSAVEL_DEVOLUTIVA_BUSCA',
+        'UF_CRM_RESPONSAVEL_DEVOLVIDOREQUERIMENTO',
+        'UF_CRM_RESPONSAVEL_SOLICITACAO_DUPLICADA',
+        'UF_CRM_RESPONSAVEL_SOLICITAR_CARTORIO_ORIGEM',
+        'UF_CRM_MONTAGEM_PASTA_RESPONSAVEL'
+    ]
+    
+    # Mapeamento entre campos de data e campos de responsável
+    mapeamento_campos = obter_mapeamento_campos()
+    
     # Verificar se temos as colunas necessárias para a análise
     colunas_faltantes = [col for col in campos_data if col not in df.columns]
     if colunas_faltantes:
         st.warning(f"Algumas colunas de datas não foram encontradas: {', '.join(colunas_faltantes)}")
         campos_data = [col for col in campos_data if col in df.columns]
+    
+    # Verificar se os campos de responsáveis existem
+    responsaveis_faltantes = [col for col in campos_responsavel if col not in df.columns]
+    if responsaveis_faltantes:
+        st.warning(f"Alguns campos de responsáveis não foram encontrados: {', '.join(responsaveis_faltantes)}")
     
     # Colunas para consolidar em uma única métrica
     campo_origem = 'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM'
@@ -90,17 +137,60 @@ def analisar_produtividade_etapas(df):
         st.error("Nenhuma coluna de data necessária para análise foi encontrada.")
         return
     
-    st.markdown("## Análise de Produtividade por Etapas")
+    # Header principal com estilo melhorado
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, #1565C0 0%, #64B5F6 100%); padding: 20px; border-radius: 10px; margin-bottom: 30px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+        <h2 style="color: white; text-align: center; margin: 0; font-size: 28px; font-weight: 700;">📊 Análise de Produtividade</h2>
+        <p style="color: white; text-align: center; margin: 10px 0 0 0; opacity: 0.9; font-size: 16px;">
+            Monitoramento completo da produtividade por etapas, períodos e responsáveis
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.info("""
-    **O que é a Análise de Produtividade por Etapas?**
+    **O que é a Análise de Produtividade?**
     • Esta análise mostra os registros de datas e horas para cada etapa do processo.
     • Permite identificar a velocidade de processamento, produtividade e distribuição do trabalho.
     • Os dados são exibidos por dia, semana e mês para facilitar diferentes níveis de análise.
+    • Agora também é possível analisar por responsável específico de cada etapa.
     """)
     
     # Converter todas as colunas de data para datetime
     for campo in campos_data:
         df[campo] = pd.to_datetime(df[campo], errors='coerce')
+    
+    # Pré-calcular os responsáveis mais produtivos para destaque na página principal
+    destaques_responsaveis = {}
+    for campo_data in campos_data:
+        if campo_data in df.columns and campo_data in mapeamento_campos:
+            campo_resp = mapeamento_campos.get(campo_data)
+            if campo_resp and campo_resp in df.columns:
+                # Filtrar dados válidos
+                df_etapa = df.dropna(subset=[campo_data, campo_resp])
+                if not df_etapa.empty:
+                    # Contar registros por responsável
+                    contagem = df_etapa[campo_resp].value_counts()
+                    if not contagem.empty:
+                        # Obter top 3 responsáveis para esta etapa
+                        top_resp = contagem.nlargest(3)
+                        nome_etapa = formatar_nome_etapa(campo_data)
+                        destaques_responsaveis[nome_etapa] = {
+                            'responsaveis': [(resp, qtd) for resp, qtd in zip(top_resp.index, top_resp.values)],
+                            'campo_data': campo_data,
+                            'campo_resp': campo_resp
+                        }
+    
+    # Botão para mostrar o mapeamento de campos como "jogo de ligar os pontos"
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📊 Ver Mapeamento de Etapas e Responsáveis", help="Visualize como os campos de data estão conectados aos campos de responsável correspondentes"):
+            visualizar_mapeamento_campos(mapeamento_campos, campos_data, campos_responsavel)
+            st.divider()
+    
+    with col2:
+        if st.button("🏆 Ver Destaques de Produtividade", help="Visualize os responsáveis com maior produtividade em cada etapa"):
+            mostrar_destaques_produtividade(destaques_responsaveis)
+            st.divider()
     
     # Aplicar filtros para análise
     st.markdown("### Filtros de Produtividade")
@@ -124,15 +214,63 @@ def analisar_produtividade_etapas(df):
             key="prod_data_fim"
         )
     
-    # Filtro de responsável se existir a coluna
-    responsavel_selecionado = None
+    # Filtro de responsável geral
+    responsavel_geral_selecionado = None
     if 'ASSIGNED_BY_NAME' in df.columns:
         responsaveis = df['ASSIGNED_BY_NAME'].dropna().unique().tolist()
-        responsavel_selecionado = st.multiselect(
-            "Responsável",
+        responsavel_geral_selecionado = st.multiselect(
+            "Responsável Geral",
             options=responsaveis,
             default=[],
-            key="prod_responsavel"
+            key="prod_responsavel_geral"
+        )
+    
+    # Filtro de responsável específico por etapa
+    st.markdown("#### Filtrar por Responsável de Etapa Específica")
+    
+    # Coletar todos os responsáveis únicos de todos os campos de responsável
+    todos_responsaveis = set()
+    for campo in campos_responsavel:
+        if campo in df.columns:
+            responsaveis_etapa = df[campo].dropna().unique().tolist()
+            todos_responsaveis.update(responsaveis_etapa)
+    
+    todos_responsaveis = sorted(list(todos_responsaveis))
+    
+    # Dropdown para selecionar campo de etapa
+    etapas_nomes = [formatar_nome_etapa(campo) for campo in campos_data if campo in df.columns]
+    etapa_selecionada = st.selectbox("Selecione a Etapa", options=["Todas as Etapas"] + etapas_nomes, key="filtro_etapa")
+    
+    responsavel_etapa_selecionado = None
+    if etapa_selecionada != "Todas as Etapas":
+        # Encontrar o campo de data correspondente à etapa selecionada
+        campo_data_selecionado = None
+        for campo in campos_data:
+            if formatar_nome_etapa(campo) == etapa_selecionada and campo in df.columns:
+                campo_data_selecionado = campo
+                break
+        
+        # Encontrar o campo de responsável correspondente
+        campo_resp_selecionado = None
+        if campo_data_selecionado in mapeamento_campos:
+            campo_resp_selecionado = mapeamento_campos[campo_data_selecionado]
+        
+        # Filtrar por responsável da etapa se o campo existir
+        if campo_resp_selecionado and campo_resp_selecionado in df.columns:
+            responsaveis_etapa = sorted(df[campo_resp_selecionado].dropna().unique().tolist())
+            responsavel_etapa_selecionado = st.multiselect(
+                f"Responsável pela Etapa: {etapa_selecionada}",
+                options=responsaveis_etapa,
+                default=[],
+                key="prod_responsavel_etapa"
+            )
+    else:
+        # Opção para filtrar por qualquer responsável em qualquer etapa
+        responsavel_etapa_selecionado = st.multiselect(
+            "Responsável por Qualquer Etapa",
+            options=todos_responsaveis,
+            default=[],
+            key="prod_responsavel_qualquer_etapa"
         )
     
     # Explicação sobre filtros
@@ -140,7 +278,8 @@ def analisar_produtividade_etapas(df):
         st.markdown("""
         **Como usar os filtros:**
         • **Data Inicial e Final**: Selecione o período que deseja analisar.
-        • **Responsável**: Filtre pelos colaboradores responsáveis (se disponível).
+        • **Responsável Geral**: Filtre pelo responsável geral do registro.
+        • **Etapa + Responsável pela Etapa**: Filtre por uma etapa específica e seu respectivo responsável.
         
         Todos os filtros são aplicados em conjunto (operação AND).
         """)
@@ -151,17 +290,48 @@ def analisar_produtividade_etapas(df):
     
     # Criar dataframe apenas com as colunas de data e informações relevantes
     colunas_selecionadas = campos_data.copy()
+    colunas_responsavel_presentes = [col for col in campos_responsavel if col in df.columns]
     colunas_info = ['ID', 'TITLE', 'ASSIGNED_BY_NAME', 'UF_CRM_12_1723552666'] if 'UF_CRM_12_1723552666' in df.columns else ['ID', 'TITLE']
     
+    # Adicionar colunas de informação
     for col in colunas_info:
         if col in df.columns:
             colunas_selecionadas.append(col)
     
+    # Adicionar colunas de responsável
+    for col in colunas_responsavel_presentes:
+        colunas_selecionadas.append(col)
+    
+    # Remover duplicatas
+    colunas_selecionadas = list(dict.fromkeys(colunas_selecionadas))
+    
     df_analise = df[colunas_selecionadas].copy()
     
-    # Filtra por responsável se selecionado
-    if responsavel_selecionado and 'ASSIGNED_BY_NAME' in df_analise.columns:
-        df_analise = df_analise[df_analise['ASSIGNED_BY_NAME'].isin(responsavel_selecionado)]
+    # Filtra por responsável geral se selecionado
+    if responsavel_geral_selecionado and 'ASSIGNED_BY_NAME' in df_analise.columns:
+        df_analise = df_analise[df_analise['ASSIGNED_BY_NAME'].isin(responsavel_geral_selecionado)]
+    
+    # Filtrar por responsável específico da etapa
+    if etapa_selecionada != "Todas as Etapas" and responsavel_etapa_selecionado:
+        # Encontrar campo de responsável correspondente
+        campo_data_selecionado = None
+        for campo in campos_data:
+            if formatar_nome_etapa(campo) == etapa_selecionada:
+                campo_data_selecionado = campo
+                break
+        
+        if campo_data_selecionado in mapeamento_campos:
+            campo_resp = mapeamento_campos[campo_data_selecionado]
+            if campo_resp in df_analise.columns:
+                df_analise = df_analise[df_analise[campo_resp].isin(responsavel_etapa_selecionado)]
+    elif responsavel_etapa_selecionado:  # Filtrar por responsável em qualquer etapa
+        # Criar máscaras para cada campo de responsável
+        mascara_final = pd.Series(False, index=df_analise.index)
+        for campo_resp in colunas_responsavel_presentes:
+            mascara = df_analise[campo_resp].isin(responsavel_etapa_selecionado)
+            mascara_final = mascara_final | mascara
+        
+        df_analise = df_analise[mascara_final]
     
     # Preparar para filtragem por data
     df_filtrado = df_analise.copy()
@@ -204,14 +374,37 @@ def analisar_produtividade_etapas(df):
         st.warning("Não há dados disponíveis para o período e filtros selecionados.")
         return
     
-    # Criar abas para diferentes visões
-    tab_metricas, tab_grafico_diario, tab_dia, tab_semana, tab_mes, tab_responsavel = st.tabs([
-        "Métricas por Etapa",
-        "Evolução Diária",
-        "Visão Diária", 
-        "Visão Semanal", 
-        "Visão Mensal",
-        "Por Responsável"
+    # Criar abas para diferentes visões com um estilo consistente
+    st.markdown("""
+    <style>
+    .stTabs [data-baseweb="tab"] {
+        background-color: #f1f5f9;
+        border-radius: 8px 8px 0 0;
+        padding: 10px 16px;
+        margin-right: 4px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #e2e8f0;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #dbeafe !important;
+        color: #1e40af !important;
+        border-bottom: 3px solid #3b82f6 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Criar abas mais descritivas para as visualizações
+    tab_metricas, tab_grafico_diario, tab_dia, tab_semana, tab_mes, tab_responsavel, tab_resp_etapa = st.tabs([
+        "📊 Métricas por Etapa",
+        "📈 Evolução Diária",
+        "📅 Visão Diária", 
+        "📆 Visão Semanal", 
+        "📝 Visão Mensal",
+        "👤 Por Responsável Geral",
+        "👥 Por Responsável Específico"
     ])
     
     # Aba de métricas por etapa
@@ -234,12 +427,603 @@ def analisar_produtividade_etapas(df):
     with tab_mes:
         mostrar_visao_produtividade(df_filtrado, campos_data, 'Mensal', 'M')
     
-    # Aba de análise por responsável
+    # Aba de análise por responsável geral
     with tab_responsavel:
         if 'ASSIGNED_BY_NAME' in df_filtrado.columns:
             analisar_produtividade_responsavel(df_filtrado, campos_data)
         else:
             st.info("Dados de responsável não disponíveis para análise.")
+    
+    # Nova aba: Análise por responsável específico de cada etapa
+    with tab_resp_etapa:
+        analisar_produtividade_responsavel_especifico(df_filtrado, campos_data, mapeamento_campos)
+
+def analisar_produtividade_responsavel_especifico(df, campos_data, mapeamento_campos):
+    """
+    Analisa a produtividade por responsável específico de cada etapa
+    
+    Args:
+        df (pandas.DataFrame): DataFrame com dados filtrados
+        campos_data (list): Lista de campos de data para análise
+        mapeamento_campos (dict): Dicionário que mapeia campos de data para campos de responsável
+    """
+    st.markdown("## Análise por Responsável Específico")
+    st.info("""
+    **O que mostra esta análise?**
+    • Detalhamento da produtividade por responsável específico de cada etapa
+    • Volume de atividades realizadas por cada responsável em cada etapa específica
+    • Comparativo entre responsáveis específicos em cada etapa do processo
+    • Evolução temporal (dia, semana, mês) da produtividade por responsável
+    """)
+    
+    # Verificar se temos campos de responsável específico no DataFrame
+    campos_responsavel_presentes = [campo for campo in mapeamento_campos.values() if campo in df.columns]
+    
+    if not campos_responsavel_presentes:
+        st.warning("Não foram encontrados campos de responsável específico nos dados.")
+        return
+    
+    # Adicionar depuração para verificar os campos de responsável
+    with st.expander("Diagnóstico: Campos de Responsável Disponíveis"):
+        for campo in campos_responsavel_presentes:
+            valores_unicos = df[campo].dropna().unique()
+            st.write(f"**Campo:** {campo}")
+            st.write(f"**Valores únicos:** {len(valores_unicos)}")
+            if len(valores_unicos) > 0:
+                amostra = valores_unicos[:min(5, len(valores_unicos))]
+                st.write(f"**Amostra de valores:** {', '.join([str(v) for v in amostra])}")
+            st.write("---")
+    
+    # Seletor de etapa para análise
+    etapas_disponiveis = []
+    for campo_data in campos_data:
+        if campo_data in df.columns and campo_data in mapeamento_campos:
+            campo_resp = mapeamento_campos[campo_data]
+            if campo_resp in df.columns:
+                # Verificar se realmente há dados para esta etapa
+                df_temp = df.dropna(subset=[campo_data])
+                if not df_temp.empty and campo_resp in df_temp.columns:
+                    # Verificar se há responsáveis preenchidos
+                    resp_preenchidos = df_temp[campo_resp].notna().sum()
+                    if resp_preenchidos > 0:
+                        etapas_disponiveis.append((
+                            campo_data, 
+                            formatar_nome_etapa(campo_data),
+                            resp_preenchidos
+                        ))
+    
+    # Se não houver etapas disponíveis, mostrar mensagem
+    if not etapas_disponiveis:
+        st.warning("Não há dados suficientes para análise por responsável específico.")
+        return
+    
+    # Ordenar etapas pelo nome formatado
+    etapas_disponiveis.sort(key=lambda x: x[1])
+    
+    # Seleção da etapa para análise
+    opcoes_etapas = [f"{nome} ({num_resp} responsáveis)" for _, nome, num_resp in etapas_disponiveis]
+    campo_data_por_nome = {opcoes_etapas[i]: campo for i, (campo, _, _) in enumerate(etapas_disponiveis)}
+    
+    etapa_selecionada_completa = st.selectbox(
+        "Selecione a Etapa para Análise",
+        options=opcoes_etapas,
+        key="resp_esp_etapa"
+    )
+    
+    # Extrair o nome da etapa sem a parte de contagem
+    nome_etapa_selecionada = etapa_selecionada_completa.split(" (")[0]
+    
+    # Encontrar o campo de data correspondente
+    campo_data = campo_data_por_nome[etapa_selecionada_completa]
+    campo_resp = mapeamento_campos[campo_data]
+    
+    # Filtrar dados que têm valores não nulos para o campo de data selecionado
+    df_filtrado = df.dropna(subset=[campo_data])
+    
+    if df_filtrado.empty:
+        st.warning(f"Não há dados para a etapa '{nome_etapa_selecionada}' no período selecionado.")
+        return
+    
+    # Verificar se o campo de responsável existe nos dados filtrados
+    if campo_resp not in df_filtrado.columns:
+        st.warning(f"Campo de responsável '{campo_resp}' não encontrado nos dados para esta etapa.")
+        return
+    
+    # Substituir valores nulos ou vazios por "Sem Responsável"
+    df_filtrado[campo_resp] = df_filtrado[campo_resp].fillna("Sem Responsável")
+    df_filtrado[campo_resp] = df_filtrado[campo_resp].replace("", "Sem Responsável")
+    
+    # Mostrar o total de registros e a proporção de responsáveis preenchidos
+    total_registros = len(df_filtrado)
+    resp_nao_preenchidos = (df_filtrado[campo_resp] == "Sem Responsável").sum()
+    perc_preenchido = ((total_registros - resp_nao_preenchidos) / total_registros * 100) if total_registros > 0 else 0
+    
+    # Exibir informações sobre preenchimento
+    st.markdown(f"""
+    <div style="background-color: #f0f7ff; border-radius: 8px; padding: 15px; margin-bottom: 20px; border-left: 5px solid #3182ce;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h4 style="margin-top: 0; color: #2c5282; font-size: 16px;">Dados da Etapa: {nome_etapa_selecionada}</h4>
+                <p style="margin-bottom: 0;">
+                    <strong>Total de registros:</strong> {total_registros}<br>
+                    <strong>Registros sem responsável:</strong> {resp_nao_preenchidos}<br>
+                    <strong>Completude dos dados:</strong> {perc_preenchido:.1f}%
+                </p>
+            </div>
+            <div style="width: 100px; height: 100px; background: conic-gradient(#3182ce {perc_preenchido}%, #e2e8f0 0); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 80px; height: 80px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-weight: bold; color: #2c5282;">{perc_preenchido:.1f}%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+        
+    # Contagem por responsável
+    contagem_resp = df_filtrado[campo_resp].value_counts().reset_index()
+    contagem_resp.columns = ['Responsável', 'Quantidade']
+    
+    # Adicionar coluna com percentual
+    total = contagem_resp['Quantidade'].sum()
+    contagem_resp['Percentual'] = contagem_resp['Quantidade'] / total * 100
+    
+    # Ordenar por quantidade (maior para menor)
+    contagem_resp = contagem_resp.sort_values('Quantidade', ascending=False)
+    
+    # Mostrar gráfico de barras
+    st.subheader(f"Produtividade por Responsável - {nome_etapa_selecionada}")
+    
+    # Limitar o número de responsáveis no gráfico para melhor visualização
+    max_responsaveis = 15
+    if len(contagem_resp) > max_responsaveis:
+        contagem_grafico = contagem_resp.head(max_responsaveis).copy()
+        contagem_grafico.loc[max_responsaveis] = ['Outros', contagem_resp.iloc[max_responsaveis:]['Quantidade'].sum(), 
+                                                  contagem_resp.iloc[max_responsaveis:]['Percentual'].sum()]
+    else:
+        contagem_grafico = contagem_resp
+    
+    # Usar cores diferentes para "Sem Responsável" e outros responsáveis
+    colors = ['#E53E3E' if resp == 'Sem Responsável' else '#3182CE' for resp in contagem_grafico['Responsável']]
+    
+    fig = px.bar(
+        contagem_grafico,
+        x='Responsável',
+        y='Quantidade',
+        text='Quantidade',
+        title=f"Volume de Atividades por Responsável - {nome_etapa_selecionada}",
+        color_discrete_sequence=colors,
+        hover_data=['Percentual']
+    )
+    
+    fig.update_layout(
+        height=500,
+        xaxis_title="Responsável",
+        yaxis_title="Quantidade de Registros",
+        xaxis={'categoryorder': 'total descending'},
+        showlegend=False
+    )
+    
+    fig.update_traces(
+        textposition='outside',
+        textfont=dict(size=10, color='black'),
+        cliponaxis=False,
+        hovertemplate='<b>%{x}</b><br>Quantidade: %{y}<br>Percentual: %{customdata[0]:.1f}%<extra></extra>'
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Mostrar dados em tabela
+    st.subheader("Detalhamento por Responsável")
+    
+    # Destacar "Sem Responsável" na tabela
+    def highlight_sem_resp(val):
+        if val == 'Sem Responsável':
+            return 'background-color: #FFEBEE; color: #C62828; font-weight: bold'
+        return ''
+    
+    # Estilizar a tabela
+    styled_df = contagem_resp.style.applymap(highlight_sem_resp, subset=['Responsável'])
+    
+    st.dataframe(
+        contagem_resp,
+        column_config={
+            "Responsável": st.column_config.TextColumn("Responsável"),
+            "Quantidade": st.column_config.NumberColumn("Quantidade", format="%d"),
+            "Percentual": st.column_config.ProgressColumn(
+                "% do Total",
+                format="%.1f%%",
+                min_value=0,
+                max_value=100
+            )
+        },
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # Adicionar opção para excluir "Sem Responsável" das análises
+    excluir_sem_resp = st.checkbox("Excluir 'Sem Responsável' das análises abaixo", 
+                                  value=True if resp_nao_preenchidos > 0 else False,
+                                  key="excluir_sem_resp")
+    
+    if excluir_sem_resp:
+        df_filtrado = df_filtrado[df_filtrado[campo_resp] != "Sem Responsável"]
+        if df_filtrado.empty:
+            st.warning("Não há dados com responsáveis preenchidos para esta etapa.")
+            return
+    
+    # Análise temporal por responsável
+    st.subheader("Evolução Temporal por Responsável")
+    
+    # Converter coluna de data para formato datetime se necessário
+    df_filtrado[campo_data] = pd.to_datetime(df_filtrado[campo_data])
+    
+    # Criar dataframe para análise temporal - com renomeação explícita de colunas
+    df_temporal = df_filtrado[[campo_data, campo_resp]].copy()
+    df_temporal['Data'] = df_temporal[campo_data].dt.date
+    df_temporal.rename(columns={campo_resp: 'Responsável'}, inplace=True)  # Renomear coluna explicitamente
+    
+    # Verificar se a renomeação funcionou
+    if 'Responsável' not in df_temporal.columns:
+        st.warning("Erro ao processar dados temporais. Usando método alternativo.")
+        # Método alternativo: criar DataFrame novo com as colunas desejadas
+        dados_temp = []
+        for idx, row in df_filtrado.iterrows():
+            if pd.notna(row[campo_data]) and pd.notna(row[campo_resp]):
+                dados_temp.append({
+                    'Data': row[campo_data].date(),
+                    'Responsável': row[campo_resp],
+                    'Registro': idx
+                })
+        
+        if not dados_temp:
+            st.warning("Não há dados suficientes para análise temporal.")
+            return
+            
+        df_temporal = pd.DataFrame(dados_temp)
+    
+    # Seleção de opção de visualização temporal
+    opcoes_temporais = ["Diária", "Semanal", "Mensal"]
+    granularidade = st.radio(
+        "Selecione a granularidade temporal:",
+        options=opcoes_temporais,
+        horizontal=True,
+        key="granularidade_temporal"
+    )
+    
+    # Preparar dados com base na granularidade selecionada
+    try:
+        # Preparar dados com a granularidade selecionada
+        if granularidade == "Semanal":
+            # Converter para data de início da semana
+            df_temporal['Período'] = df_temporal['Data'].apply(
+                lambda x: pd.to_datetime(x) - pd.Timedelta(days=pd.to_datetime(x).weekday())
+            )
+            # Formatar para exibição
+            df_temporal['Período_Exibição'] = df_temporal['Período'].apply(
+                lambda x: f"Semana {x.strftime('%d/%m/%Y')}"
+            )
+            agrupamento = 'Período'
+            nome_periodo = 'Semana'
+        elif granularidade == "Mensal":
+            # Converter para primeiro dia do mês
+            df_temporal['Período'] = df_temporal['Data'].apply(
+                lambda x: pd.to_datetime(x).replace(day=1)
+            )
+            # Formatar para exibição
+            df_temporal['Período_Exibição'] = df_temporal['Período'].apply(
+                lambda x: x.strftime('%b/%Y')
+            )
+            agrupamento = 'Período'
+            nome_periodo = 'Mês'
+        else:  # Diária
+            df_temporal['Período'] = df_temporal['Data']
+            df_temporal['Período_Exibição'] = df_temporal['Data'].apply(
+                lambda x: x.strftime('%d/%m/%Y')
+            )
+            agrupamento = 'Período'
+            nome_periodo = 'Dia'
+        
+        # Agrupar por período e responsável
+        contagem_temporal = df_temporal.groupby([agrupamento, 'Responsável']).size().reset_index()
+        contagem_temporal.columns = [agrupamento, 'Responsável', 'Quantidade']
+        
+        # Adicionar a coluna de exibição formatada
+        contagem_display = contagem_temporal.merge(
+            df_temporal[[agrupamento, 'Período_Exibição']].drop_duplicates(),
+            on=agrupamento,
+            how='left'
+        )
+    except Exception as e:
+        st.error(f"Erro ao processar dados temporais: {str(e)}")
+        st.write("Tentando método alternativo...")
+        
+        # Método alternativo simplificado
+        contagem_display = df_temporal.groupby(['Data', 'Responsável']).size().reset_index()
+        contagem_display.columns = ['Período', 'Responsável', 'Quantidade']
+        contagem_display['Período_Exibição'] = contagem_display['Período'].apply(
+            lambda x: x.strftime('%d/%m/%Y')
+        )
+        agrupamento = 'Período'
+        nome_periodo = 'Dia'
+    
+    # Permitir seleção de responsáveis para o gráfico
+    responsaveis = sorted(contagem_display['Responsável'].unique())
+    
+    if len(responsaveis) > 5:
+        # Se houver muitos responsáveis, permitir filtrar
+        top_responsaveis = contagem_display.groupby('Responsável')['Quantidade'].sum().nlargest(5).index.tolist()
+        
+        responsaveis_selecionados = st.multiselect(
+            "Selecione os Responsáveis para o Gráfico Temporal",
+            options=responsaveis,
+            default=top_responsaveis,
+            key="resp_esp_temporal"
+        )
+    else:
+        responsaveis_selecionados = responsaveis
+    
+    if not responsaveis_selecionados:
+        st.info("Selecione pelo menos um responsável para visualizar o gráfico temporal.")
+    else:
+        # Filtrar para os responsáveis selecionados
+        df_plot = contagem_display[contagem_display['Responsável'].isin(responsaveis_selecionados)]
+        
+        # Ordenar por período para garantir sequência temporal correta
+        df_plot = df_plot.sort_values(agrupamento)
+        
+        # 1. Gráfico de Linha - Evolução Temporal
+        st.subheader(f"Evolução {granularidade} por Responsável")
+        
+        fig_linha = px.line(
+            df_plot,
+            x='Período_Exibição',
+            y='Quantidade',
+            color='Responsável',
+            markers=True,
+            title=f"Evolução {granularidade} de {nome_etapa_selecionada} por Responsável"
+        )
+        
+        fig_linha.update_layout(
+            height=500,
+            xaxis_title=nome_periodo,
+            yaxis_title="Quantidade de Registros",
+            hovermode='x unified',
+            xaxis={'categoryorder': 'category ascending'}
+        )
+        
+        st.plotly_chart(fig_linha, use_container_width=True)
+        
+        # 2. Gráfico de Barras Empilhadas - Contribuição por Período
+        st.subheader(f"Contribuição {granularidade} por Responsável")
+        
+        fig_barras = px.bar(
+            df_plot,
+            x='Período_Exibição',
+            y='Quantidade',
+            color='Responsável',
+            title=f"Distribuição {granularidade} por Responsável - {nome_etapa_selecionada}",
+            text='Quantidade'
+        )
+        
+        fig_barras.update_layout(
+            height=500,
+            xaxis_title=nome_periodo,
+            yaxis_title="Quantidade de Registros",
+            xaxis={'categoryorder': 'category ascending'}
+        )
+        
+        fig_barras.update_traces(
+            textposition='auto',
+            textfont=dict(size=9)
+        )
+        
+        st.plotly_chart(fig_barras, use_container_width=True)
+        
+        # 3. Tabela detalhada por período
+        st.subheader(f"Detalhe {granularidade} por Responsável")
+        
+        # Criar tabela cruzada para visualização (pivot table)
+        tabela_periodo = pd.pivot_table(
+            df_plot,
+            values='Quantidade',
+            index='Período_Exibição',
+            columns='Responsável',
+            aggfunc='sum',
+            fill_value=0
+        ).reset_index()
+        
+        # Adicionar coluna de total por período
+        tabela_periodo['Total'] = tabela_periodo.iloc[:, 1:].sum(axis=1)
+        
+        # Gerar configuração de colunas dinâmica
+        colunas_config = {
+            "Período_Exibição": st.column_config.TextColumn(f"{nome_periodo}")
+        }
+        
+        # Adicionar configuração para cada responsável
+        for resp in responsaveis_selecionados:
+            colunas_config[resp] = st.column_config.NumberColumn(resp, format="%d")
+        
+        # Adicionar coluna de total
+        colunas_config["Total"] = st.column_config.NumberColumn("Total", format="%d")
+        
+        # Exibir tabela formatada
+        st.dataframe(
+            tabela_periodo,
+            column_config=colunas_config,
+            use_container_width=True,
+            hide_index=True
+        )
+    
+    # Análise de eficiência (média diária)
+    st.subheader("Eficiência por Responsável")
+    
+    try:
+        # Calcular dias com atividade para cada responsável
+        dias_por_resp = df_temporal.groupby('Responsável')['Data'].nunique().reset_index()
+        dias_por_resp.columns = ['Responsável', 'Dias com Atividade']
+        
+        # Calcular volume total por responsável
+        volume_por_resp = df_temporal.groupby('Responsável').size().reset_index()
+        volume_por_resp.columns = ['Responsável', 'Volume Total']
+        
+        # Juntar as informações
+        eficiencia = pd.merge(volume_por_resp, dias_por_resp, on='Responsável')
+        
+        # Calcular média diária
+        eficiencia['Média por Dia Ativo'] = eficiencia['Volume Total'] / eficiencia['Dias com Atividade']
+        
+        # Ordenar por média diária (maior para menor)
+        eficiencia = eficiencia.sort_values('Média por Dia Ativo', ascending=False)
+        
+        # Gráfico de eficiência
+        fig_eficiencia = px.bar(
+            eficiencia,
+            x='Responsável',
+            y='Média por Dia Ativo',
+            text=eficiencia['Média por Dia Ativo'].round(1),
+            color='Média por Dia Ativo',
+            color_continuous_scale='RdYlGn',
+            title=f"Média Diária por Responsável - {nome_etapa_selecionada}"
+        )
+        
+        fig_eficiencia.update_layout(
+            height=500,
+            xaxis_title="Responsável",
+            yaxis_title="Média por Dia Ativo",
+            xaxis={'categoryorder': 'total descending'}
+        )
+        
+        fig_eficiencia.update_traces(
+            textposition='outside',
+            textfont=dict(size=10, color='black'),
+            cliponaxis=False
+        )
+        
+        st.plotly_chart(fig_eficiencia, use_container_width=True)
+        
+        # Mostrar tabela de eficiência
+        st.dataframe(
+            eficiencia,
+            column_config={
+                "Responsável": st.column_config.TextColumn("Responsável"),
+                "Volume Total": st.column_config.NumberColumn("Volume Total", format="%d"),
+                "Dias com Atividade": st.column_config.NumberColumn("Dias Ativos", format="%d"),
+                "Média por Dia Ativo": st.column_config.NumberColumn("Média por Dia Ativo", format="%.2f")
+            },
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # Adicionar tabela com resumo de produtividade por dia da semana
+        st.subheader("Produtividade por Dia da Semana")
+        
+        # Adicionar coluna de dia da semana
+        df_temporal['Dia da Semana'] = df_temporal['Data'].apply(
+            lambda x: pd.to_datetime(x).strftime('%A')  # Nome do dia
+        )
+        
+        # Mapear para português
+        mapa_dias = {
+            'Monday': 'Segunda-feira',
+            'Tuesday': 'Terça-feira',
+            'Wednesday': 'Quarta-feira',
+            'Thursday': 'Quinta-feira',
+            'Friday': 'Sexta-feira',
+            'Saturday': 'Sábado',
+            'Sunday': 'Domingo'
+        }
+        
+        # Aplicar mapeamento e criar uma coluna para ordenação
+        df_temporal['Dia da Semana PT'] = df_temporal['Dia da Semana'].map(mapa_dias)
+        df_temporal['Ordem Dia'] = df_temporal['Dia da Semana'].map({
+            'Monday': 1,
+            'Tuesday': 2,
+            'Wednesday': 3,
+            'Thursday': 4,
+            'Friday': 5,
+            'Saturday': 6,
+            'Sunday': 7
+        })
+        
+        # Agrupar por dia da semana e responsável
+        tabela_dia_semana = df_temporal.groupby(['Ordem Dia', 'Dia da Semana PT', 'Responsável']).size().reset_index()
+        tabela_dia_semana.columns = ['Ordem Dia', 'Dia da Semana', 'Responsável', 'Quantidade']
+        
+        # Filtrar para os responsáveis selecionados
+        if responsaveis_selecionados:
+            tabela_dia_semana = tabela_dia_semana[tabela_dia_semana['Responsável'].isin(responsaveis_selecionados)]
+        
+        # Ordenar por dia da semana
+        tabela_dia_semana = tabela_dia_semana.sort_values(['Ordem Dia', 'Responsável'])
+        
+        # Criar gráfico de produtividade por dia da semana
+        fig_dia_semana = px.bar(
+            tabela_dia_semana,
+            x='Dia da Semana',
+            y='Quantidade',
+            color='Responsável',
+            title=f"Produtividade por Dia da Semana - {nome_etapa_selecionada}",
+            text='Quantidade'
+        )
+        
+        fig_dia_semana.update_layout(
+            height=500,
+            xaxis_title="Dia da Semana",
+            yaxis_title="Quantidade de Registros",
+            xaxis={'categoryorder': 'array', 'categoryarray': [v for k, v in sorted(mapa_dias.items(), key=lambda x: x[1])]}
+        )
+        
+        fig_dia_semana.update_traces(
+            textposition='auto',
+            textfont=dict(size=9)
+        )
+        
+        st.plotly_chart(fig_dia_semana, use_container_width=True)
+        
+        # Criar tabela pivot para visualização
+        pivot_dia_semana = pd.pivot_table(
+            tabela_dia_semana,
+            values='Quantidade',
+            index='Dia da Semana',
+            columns='Responsável',
+            aggfunc='sum',
+            fill_value=0
+        ).reset_index()
+        
+        # Adicionar coluna de total por dia
+        pivot_dia_semana['Total'] = pivot_dia_semana.iloc[:, 1:].sum(axis=1)
+        
+        # Reordenar dias da semana
+        ordem_dias = [v for k, v in sorted(mapa_dias.items(), key=lambda x: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].index(x[0]))]
+        pivot_dia_semana['Ordem'] = pivot_dia_semana['Dia da Semana'].map({dia: i for i, dia in enumerate(ordem_dias)})
+        pivot_dia_semana = pivot_dia_semana.sort_values('Ordem')
+        pivot_dia_semana = pivot_dia_semana.drop(columns=['Ordem'])
+        
+        # Gerar configuração de colunas dinâmica
+        colunas_config_dia = {
+            "Dia da Semana": st.column_config.TextColumn("Dia da Semana")
+        }
+        
+        # Adicionar configuração para cada responsável
+        for resp in responsaveis_selecionados:
+            if resp in pivot_dia_semana.columns:
+                colunas_config_dia[resp] = st.column_config.NumberColumn(resp, format="%d")
+        
+        # Adicionar coluna de total
+        colunas_config_dia["Total"] = st.column_config.NumberColumn("Total", format="%d")
+        
+        # Exibir tabela formatada
+        st.dataframe(
+            pivot_dia_semana,
+            column_config=colunas_config_dia,
+            use_container_width=True,
+            hide_index=True
+        )
+        
+    except Exception as e:
+        st.error(f"Erro ao calcular eficiência: {str(e)}")
+        st.info("Verifique se os dados dos responsáveis estão corretamente preenchidos no sistema.")
 
 def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
     """
@@ -1567,3 +2351,286 @@ def analisar_produtividade_responsavel(df, campos_data):
         )
     else:
         st.info("Dados insuficientes para calcular a eficiência diária.") 
+
+# Adicionar nova função para visualizar o mapeamento entre campos
+def visualizar_mapeamento_campos(mapeamento_campos, campos_data, campos_responsavel):
+    """
+    Visualiza o mapeamento entre campos de data e campos de responsável
+    
+    Args:
+        mapeamento_campos (dict): Dicionário com o mapeamento entre campos de data e responsável
+        campos_data (list): Lista de campos de data
+        campos_responsavel (list): Lista de campos de responsável
+    """
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #5B21B6 0%, #7C3AED 100%); padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+        <h3 style="margin-top: 0; color: white; font-size: 22px; font-weight: 700; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); color: #FFFFFF !important;">
+            🧩 MAPEAMENTO: ETAPAS E SEUS RESPONSÁVEIS
+        </h3>
+        <p style="margin-bottom: 0; font-size: 14px; color: rgba(255,255,255,0.9); text-align: center; color: #FFFFFF !important;">
+            Cada campo de data (quando a ação foi realizada) está conectado ao seu respectivo campo de responsável (quem realizou a ação).
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Adicionar explicação básica sobre o conceito de mapeamento
+    st.markdown("""
+    <div style="background-color: #f0f7ff; border-radius: 8px; padding: 15px; margin-bottom: 20px; border-left: 5px solid #3182ce;">
+        <h4 style="margin-top: 0; color: #2c5282; font-size: 16px;">O Conceito de Mapeamento Data → Responsável</h4>
+        <p style="margin-bottom: 10px;">
+            No sistema, cada ação importante do processo possui:
+        </p>
+        <ul style="margin-bottom: 0;">
+            <li><strong>Campo de Data</strong>: registra <em>quando</em> a ação foi realizada</li>
+            <li><strong>Campo de Responsável</strong>: registra <em>quem</em> realizou a ação</li>
+        </ul>
+        <p style="margin-top: 10px;">
+            Este mapeamento mostra como esses pares estão conectados para gerar as métricas de produtividade por responsável.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Preparar dados para visualização
+    mapeamento_formatado = []
+    for campo_data, campo_resp in mapeamento_campos.items():
+        if campo_data in campos_data:  # Verificar se o campo de data está na lista válida
+            nome_etapa = formatar_nome_etapa(campo_data)
+            nome_resp = "Resp. " + formatar_nome_etapa(campo_resp)
+            mapeamento_formatado.append({
+                "Campo Data": campo_data,
+                "Etapa": nome_etapa,
+                "Campo Responsável": campo_resp,
+                "Nome Responsável": nome_resp,
+                "Descrição": f"Quem realizou a etapa de {nome_etapa.lower()}"
+            })
+    
+    # Converter para DataFrame
+    df_mapeamento = pd.DataFrame(mapeamento_formatado)
+    
+    # Criar visualização interativa
+    st.markdown("""
+    <style>
+    .conexao-container {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+        position: relative;
+        padding: 5px;
+        background-color: #f8fafc;
+        border-radius: 10px;
+    }
+    .conexao-container:hover {
+        background-color: #f1f5f9;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    .etapa-box {
+        background: #2563EB;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        width: 40%;
+        text-align: center;
+        font-weight: 500;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        position: relative;
+        z-index: 2;
+    }
+    .resp-box {
+        background: #7C3AED;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        width: 40%;
+        text-align: center;
+        font-weight: 500;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        position: relative;
+        z-index: 2;
+    }
+    .conexao-linha {
+        position: absolute;
+        height: 3px;
+        background: linear-gradient(90deg, #2563EB, #7C3AED);
+        top: 50%;
+        left: 42%;
+        right: 42%;
+        z-index: 1;
+    }
+    .campo-tecnico {
+        font-size: 10px;
+        color: rgba(255,255,255,0.7);
+        margin-top: 4px;
+    }
+    .descricao-mapeamento {
+        font-size: 12px;
+        color: #64748b;
+        text-align: center;
+        margin-top: 8px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Exibir cada conexão como um "jogo de ligar os pontos"
+    for idx, row in df_mapeamento.iterrows():
+        st.markdown(f"""
+        <div class="conexao-container">
+            <div class="etapa-box">
+                <div>{row['Etapa']}</div>
+                <div class="campo-tecnico">{row['Campo Data']}</div>
+            </div>
+            <div class="conexao-linha"></div>
+            <div class="resp-box">
+                <div>{row['Nome Responsável']}</div>
+                <div class="campo-tecnico">{row['Campo Responsável']}</div>
+            </div>
+            <div class="descricao-mapeamento">{row['Descrição']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Explicação em expander
+    with st.expander("ℹ️ Como usar este mapeamento?"):
+        st.markdown("""
+        ### Entendendo o Mapeamento de Etapas e Responsáveis
+        
+        Este diagrama mostra como os campos de data (que representam as etapas do processo) estão conectados com seus respectivos campos de responsável no sistema.
+        
+        - **Lado Esquerdo (Azul):** Representa a etapa do processo e o campo de data correspondente no Bitrix24
+        - **Lado Direito (Roxo):** Representa o campo de responsável que registra quem executou aquela etapa
+        - **Linha de Conexão:** Mostra o relacionamento entre a etapa e seu responsável
+        
+        **Por que isso é útil?**
+        - Permite entender quais campos registram os responsáveis por cada etapa
+        - Ajuda a identificar as relações entre os dados no sistema
+        - Facilita a criação de relatórios e análises específicas por responsável
+        
+        **Como funciona na prática:**
+        1. Quando uma etapa é realizada, o sistema registra a data no campo correspondente
+        2. Ao mesmo tempo, o sistema registra quem realizou a ação no campo de responsável
+        3. Este mapeamento é usado para gerar as métricas de produtividade por responsável
+        """)
+    
+    # Oferecer tabela de dados brutos
+    with st.expander("📋 Ver Dados em Formato de Tabela"):
+        st.dataframe(df_mapeamento[["Etapa", "Nome Responsável", "Campo Data", "Campo Responsável", "Descrição"]], 
+                    hide_index=True, 
+                    use_container_width=True)
+
+# Função para mostrar os destaques de produtividade em um formato visual atraente
+def mostrar_destaques_produtividade(destaques):
+    """
+    Exibe os destaques de produtividade por etapa
+    
+    Args:
+        destaques (dict): Dicionário com informações de destaque por etapa
+    """
+    if not destaques:
+        st.warning("Não foram encontrados dados suficientes para exibir destaques de produtividade.")
+        return
+    
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #FF8C00 0%, #FFC107 100%); padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+        <h3 style="margin-top: 0; color: white; font-size: 22px; font-weight: 700; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);">
+            🏆 DESTAQUES DE PRODUTIVIDADE
+        </h3>
+        <p style="margin-bottom: 0; font-size: 14px; color: rgba(255,255,255,0.9); text-align: center;">
+            Responsáveis com maior produtividade em cada etapa do processo
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Definir um esquema de cores para as medalhas
+    medal_colors = ["#FFD700", "#C0C0C0", "#CD7F32"]  # Ouro, Prata, Bronze
+    medal_icons = ["🥇", "🥈", "🥉"]
+    
+    # Agrupar etapas em categorias para melhor organização
+    categorias = {
+        "Pesquisa": ["Deu ganho na Busca", "Deu perca na Busca", "Busca Realizada"],
+        "Documentação": ["Requerimento Montado", "Montar Requerimento"],
+        "Processamento": ["Solicitado ao Cartório Origem", "Aguardandocartorio Origem"],
+        "Finalização": ["Certidao Emitida", "Certidao Fisica Enviada", "Certidao Fisica Entregue"],
+        "Exceções": ["Devolucao Adm", "Devolucao Adm Verificado", "Devolutiva Requerimento", "Solicitacao Duplicado"]
+    }
+    
+    # Mapear etapas para suas categorias
+    etapa_para_categoria = {}
+    for categoria, etapas in categorias.items():
+        for etapa in etapas:
+            for destaque_etapa in destaques.keys():
+                if etapa.lower() in destaque_etapa.lower():
+                    etapa_para_categoria[destaque_etapa] = categoria
+    
+    # Usar as categorias não vazias
+    categorias_usadas = set(etapa_para_categoria.values())
+    
+    # Criar colunas para as categorias
+    num_categorias = len(categorias_usadas)
+    if num_categorias > 0:
+        cols = st.columns(min(num_categorias, 3))  # Máximo de 3 colunas
+        
+        # Distribuir as categorias nas colunas
+        categoria_para_coluna = {}
+        for i, categoria in enumerate(sorted(categorias_usadas)):
+            categoria_para_coluna[categoria] = cols[i % min(num_categorias, 3)]
+        
+        # Para cada categoria, mostrar os destaques
+        for categoria in sorted(categorias_usadas):
+            with categoria_para_coluna[categoria]:
+                st.markdown(f"""
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border-top: 4px solid #3b82f6;">
+                    <h4 style="margin: 0 0 10px 0; color: #1e3a8a; font-size: 16px;">{categoria}</h4>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Pegar etapas desta categoria
+                etapas_categoria = [etapa for etapa, cat in etapa_para_categoria.items() if cat == categoria]
+                
+                # Para cada etapa na categoria
+                for etapa in etapas_categoria:
+                    responsaveis = destaques[etapa]['responsaveis']
+                    campo_data = destaques[etapa]['campo_data']
+                    campo_resp = destaques[etapa]['campo_resp']
+                    
+                    # Exibir cartão de etapa
+                    st.markdown(f"""
+                    <div style="background-color: #ffffff; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <h5 style="margin: 0 0 10px 0; color: #2563eb; font-size: 15px; text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px;">{etapa}</h5>
+                    """, unsafe_allow_html=True)
+                    
+                    # Exibir os top responsáveis
+                    for i, (resp, qtd) in enumerate(responsaveis):
+                        if i < 3:  # Mostrar apenas os 3 primeiros
+                            color = medal_colors[i]
+                            icon = medal_icons[i]
+                            st.markdown(f"""
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; padding: 5px; background-color: #f8fafc; border-radius: 4px;">
+                                <div style="display: flex; align-items: center;">
+                                    <span style="font-size: 16px; margin-right: 5px;">{icon}</span>
+                                    <span style="font-weight: 500; color: #334155;">{resp}</span>
+                                </div>
+                                <span style="font-weight: 600; color: #1e40af;">{qtd}</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    
+                    # Adicionar link para visualização detalhada
+                    st.markdown(f"""
+                        <div style="text-align: center; margin-top: 10px;">
+                            <a href="#" onclick="return false;" style="text-decoration: none; font-size: 12px; color: #3b82f6;">
+                                Ver análise detalhada →
+                            </a>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+    else:
+        st.info("Não foram encontradas categorias de produtividade para exibir.")
+    
+    # Adicionar instrução sobre como usar os destaques
+    st.markdown("""
+    <div style="background-color: #f0f7ff; border-radius: 8px; padding: 15px; margin: 20px 0; border-left: 5px solid #3b82f6;">
+        <h4 style="margin-top: 0; color: #1e40af; font-size: 16px;">Como usar estes destaques</h4>
+        <p style="margin-bottom: 0;">
+            Estes destaques mostram os responsáveis mais produtivos em cada etapa do processo. 
+            Para ver uma análise completa por responsável, navegue até a aba <strong>👥 Por Responsável Específico</strong> 
+            e selecione a etapa desejada.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
