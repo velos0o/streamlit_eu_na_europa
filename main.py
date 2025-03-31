@@ -69,7 +69,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Adicionar logo no sidebar (método tradicional)
-st.sidebar.image("assets/LOGO-EU.NA.EUROPA-MAIO.24-COLORIDO-VERTICAL.svg", width=200)
+st.sidebar.image("assets/LOGO-EU.NA.EUROPA-MAIO.24-COLORIDO-VERTICAL.svg", width=500)
 
 # Menu de navegação simplificado
 st.sidebar.title("Dashboard CRM Bitrix24")
@@ -96,33 +96,33 @@ def ir_para_extracoes(): st.session_state['pagina_atual'] = 'Extrações de Dado
 def ir_para_apresentacao(): st.session_state['pagina_atual'] = 'Apresentação Conclusões'
 
 # Botões individuais para navegação (usando método tradicional)
-st.sidebar.button("📊 Macro Higienização", key="btn_inicio", 
+st.sidebar.button("Macro Higienização", key="btn_inicio", 
             on_click=ir_para_inicio,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Macro Higienização" else "secondary")
 
-st.sidebar.button("🛠️ Produção Higienização", key="btn_producao", 
+st.sidebar.button("Produção Higienização", key="btn_producao", 
             on_click=ir_para_producao,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Produção Higienização" else "secondary",
             help="Visualização de produção de processos")
 
-st.sidebar.button("✅ Conclusões Higienização", key="btn_conclusoes", 
+st.sidebar.button("Conclusões Higienização", key="btn_conclusoes", 
             on_click=ir_para_conclusoes,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Conclusões Higienização" else "secondary")
 
-st.sidebar.button("📋 Funil Emissões Bitrix", key="btn_cartorio", 
+st.sidebar.button("Funil Emissões Bitrix", key="btn_cartorio", 
             on_click=ir_para_cartorio,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Cartório" else "secondary")
 
-st.sidebar.button("👥 Comune Bitrix24", key="btn_comune", 
+st.sidebar.button("Comune Bitrix24", key="btn_comune", 
             on_click=ir_para_comune,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Comune" else "secondary")
 
-st.sidebar.button("📥 Extrações", key="btn_extracoes", 
+st.sidebar.button("Extrações", key="btn_extracoes", 
             on_click=ir_para_extracoes,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Extrações de Dados" else "secondary")
