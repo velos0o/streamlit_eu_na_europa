@@ -10,9 +10,14 @@ from .analysis import (
 from .visualization import visualizar_cartorio_dados
 from .movimentacoes import analisar_produtividade as analisar_movimentacoes
 from .produtividade import analisar_produtividade_etapas
+from .analise_tempo_crm import mostrar_dashboard_tempo_crm
 import pandas as pd
 import io
 from datetime import datetime
+import os
+import sys
+from pathlib import Path
+from components.report_guide import show_contextual_help
 
 def show_cartorio():
     """
@@ -26,6 +31,14 @@ def show_cartorio():
     Painel de Controle - Cartório</h1>
     """, unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 1rem; color: #555; font-family: Arial, Helvetica, sans-serif; margin-bottom: 1.5rem;'>Monitoramento do funil de emissões e qualidade dos dados.</p>", unsafe_allow_html=True)
+
+    # Adicionar seção de ajuda específica para certidões entregues
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.subheader("Análise de Documentos e Certidões")
+    with col2:
+        if st.button("🔍 Ajuda: Certidões Entregues", type="secondary", use_container_width=True):
+            show_contextual_help("certidoes")
 
     # Carregar os dados dos cartórios
     with st.spinner("Carregando dados dos cartórios..."):
@@ -107,10 +120,11 @@ def show_cartorio():
 
     # Mostrar informações relevantes com a nova estrutura de abas
     if not df_cartorio_filtrado.empty:
-        # Criar 6 abas reorganizadas
-        tab_visao_geral, tab_prod_etapas, tab_movimentacoes, tab_acomp_emissao, tab_qualidade, tab_visao_anterior = st.tabs([
+        # Criar 7 abas reorganizadas (adicionando a nova aba de Análise de Tempo)
+        tab_visao_geral, tab_prod_etapas, tab_tempo_crm, tab_movimentacoes, tab_acomp_emissao, tab_qualidade, tab_visao_anterior = st.tabs([
             "📊 Visão Geral",
             "⏱️ Produtividade por Etapas",
+            "⏳ Análise de Tempo",
             "🔄 Movimentações",
             "📈 Acompanhamento Emissão",
             "🔍 Qualidade dos Dados",
@@ -139,6 +153,21 @@ def show_cartorio():
             </div>
             """, unsafe_allow_html=True)
             analisar_produtividade_etapas(df_cartorio_filtrado) # Passando o df filtrado
+
+        # Nova Aba: Análise de Tempo do CRM
+        with tab_tempo_crm:
+            st.markdown("<h2 class='tab-title'>Análise de Tempo do Processo</h2>", unsafe_allow_html=True)
+            st.markdown("""
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                <p style="margin: 0;">Visualização do funil de processamento e análise detalhada do tempo entre etapas do processo.</p>
+                <p style="margin-top: 10px; font-size: 14px; color: #666;">
+                    <strong>Personalização:</strong> Utilize as configurações na barra lateral para ajustar os parâmetros de SLA.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Chamar o dashboard de tempo passando o dataframe filtrado
+            mostrar_dashboard_tempo_crm(df_cartorio_filtrado)
 
         # Aba 3: Movimentações
         with tab_movimentacoes:
@@ -557,3 +586,7 @@ def show_cartorio():
     # Rodapé
     st.divider()
     st.caption(f"Painel Cartório | Dados atualizados em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}") 
+
+# Para teste direto deste arquivo
+if __name__ == "__main__":
+    show_cartorio() 

@@ -139,68 +139,37 @@ def show_apresentacao(slide_inicial=0):
                     st.query_params["slide"] = 9
         else:
             # Título estilizado para modo apresentação
-            st.markdown("""
-            <div class="header-container">
-                <h1 class="presentation-title">DASHBOARD INTEGRADO</h1>
-                <p class="presentation-subtitle">Conclusões, Produção e Cartório</p>
-            </div>
-            """, unsafe_allow_html=True)
+            st.title("DASHBOARD INTEGRADO")
+            st.caption("Conclusões, Produção e Cartório")
             
             # Botões de navegação grandes e visíveis - Fixados no topo
-            st.markdown("""
-            <style>
-            .big-nav-buttons {
-                display: flex;
-                justify-content: space-between;
-                gap: 20px; 
-                margin-bottom: 15px;
-                background-color: #f0f2f6;
-                padding: 10px;
-                border-radius: 10px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            .nav-button {
-                flex: 1;
-                background-color: #1A237E;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 12px;
-                font-size: 16px;
-                font-weight: bold;
-                cursor: pointer;
-                text-align: center;
-                transition: all 0.3s;
-            }
-            .nav-button:hover {
-                background-color: #303F9F;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            }
-            .nav-button a {
-                color: white;
-                text-decoration: none;
-                display: block;
-                width: 100%;
-                height: 100%;
-            }
-            </style>
+            col1, col2, col3, col4 = st.columns(4)
             
-            <div class="big-nav-buttons">
-                <div class="nav-button">
-                    <a href="?slide=0" target="_self">CONCLUSÕES</a>
-                </div>
-                <div class="nav-button">
-                    <a href="?slide=6" target="_self">PRODUÇÃO</a>
-                </div>
-                <div class="nav-button">
-                    <a href="?slide=9" target="_self">CARTÓRIO</a>
-                </div>
-                <div class="nav-button" style="background-color: #9c27b0;">
-                    <a href="?config=1" target="_self">⚙️ CONFIG</a>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            with col1:
+                if st.button("CONCLUSÕES", use_container_width=True, type="primary"):
+                    st.query_params["slide"] = 0
+            
+            with col2:
+                if st.button("PRODUÇÃO", use_container_width=True, type="primary"):
+                    st.query_params["slide"] = 6
+            
+            with col3:
+                if st.button("CARTÓRIO", use_container_width=True, type="primary"):
+                    st.query_params["slide"] = 9
+            
+            with col4:
+                # Usar expander em vez de popover
+                with st.expander("⚙️ CONFIG", expanded=False):
+                    st.subheader("Configurações")
+                    st.session_state.tempo_slide = st.slider(
+                        "Tempo por slide (segundos)",
+                        min_value=5,
+                        max_value=60,
+                        value=st.session_state.tempo_slide,
+                        step=5
+                    )
+                    # Usar HTML em vez de badge
+                    st.markdown('<span style="background-color: #4caf50; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;">Configurações de Apresentação</span>', unsafe_allow_html=True)
 
     # Criar interface de configuração na barra lateral
     with st.sidebar:

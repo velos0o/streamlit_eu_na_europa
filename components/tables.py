@@ -15,22 +15,52 @@ from data_processor import format_status_text
 
 def render_styled_table(df, height=None):
     """
-    Renderiza tabela estilizada com CSS personalizado
+    Renderiza tabela usando recursos nativos do Streamlit com status coloridos
     
     Args:
         df (pandas.DataFrame): DataFrame a ser exibido
         height (str, optional): Altura máxima da tabela (ex: '400px')
     """
-    # Converter DataFrame para HTML com classes CSS
-    html = df.to_html(classes='styled-table', escape=False)
+    # Verifica se temos dados
+    if df.empty:
+        st.info("Não há dados disponíveis para exibir.")
+        return
     
-    # Adicionar estilo para controlar altura, se especificado
-    style_tag = f'<style>div.table-container {{ max-height: {height}; overflow-y: auto; }}</style>' if height else ''
+    # Cria uma cópia para não modificar o original
+    styled_df = df.copy()
     
-    # Renderizar HTML
-    st.markdown(
-        f'{style_tag}<div class="table-container">{html}</div>',
-        unsafe_allow_html=True
+    # Verificar se o campo de status existe
+    if 'UF_CRM_HIGILIZACAO_STATUS' in styled_df.columns:
+        # Transformar o campo de status em HTML colorido
+        def criar_status_formatado(status):
+            if pd.isna(status) or status == '':
+                return '<span style="background-color: #ef5350; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;">PENDÊNCIA</span>'
+            
+            status = str(status).upper()
+            if status == 'COMPLETO':
+                return '<span style="background-color: #4caf50; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;">COMPLETO</span>'
+            elif status == 'INCOMPLETO':
+                return '<span style="background-color: #ff9800; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;">INCOMPLETO</span>'
+            else:
+                return '<span style="background-color: #ef5350; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;">PENDÊNCIA</span>'
+        
+        # Aplicar a função para criar os status formatados
+        styled_df['UF_CRM_HIGILIZACAO_STATUS'] = styled_df['UF_CRM_HIGILIZACAO_STATUS'].apply(criar_status_formatado)
+    
+    # Usar dataframe nativo do Streamlit com configuração de altura
+    st.dataframe(
+        styled_df,
+        height=height,
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "UF_CRM_HIGILIZACAO_STATUS": st.column_config.Column(
+                "Status",
+                help="Status de higienização",
+                width="medium",
+                required=True
+            )
+        }
     )
 
 def create_responsible_status_table(df):

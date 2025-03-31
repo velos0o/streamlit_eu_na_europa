@@ -1,6 +1,6 @@
 import streamlit as st
 
-# Configuração geral da página
+# Configuração geral da página com temas avançados (novo na 1.44)
 st.set_page_config(
     page_title="Dashboard CRM Bitrix24",
     page_icon="assets/LOGO-EU.NA.EUROPA-MAIO.24-COLORIDO-VERTICAL.svg",
@@ -27,82 +27,14 @@ from views.apresentacao import show_apresentacao
 # Importar nova página de COMUNE
 from views.comune.comune_main import show_comune
 
-# Carregando CSS
+# Importar os novos componentes do guia de relatório
+from components.report_guide import show_guide_sidebar, show_page_guide, show_contextual_help
+from components.search_component import show_search_box
+from components.table_of_contents import render_toc
+
+# Carregando CSS ainda necessário
 with open('assets/styles.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-
-# Adicionando CSS da fonte Montserrat
-st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
-
-* {
-    font-family: 'Montserrat', sans-serif !important;
-}
-
-h1, h2, h3, h4, h5, h6 {
-    font-family: 'Montserrat', sans-serif !important;
-    font-weight: 600;
-}
-
-p, span, div {
-    font-family: 'Montserrat', sans-serif !important;
-    font-weight: 400;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Removendo todos os elementos padrão do Streamlit
-st.markdown("""
-<style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .stDeployButton {display:none;}
-    .css-ch5dnh {display: none;}
-    .css-1adrfps {padding-top: 1rem;}
-    .block-container {padding-top: 1rem;}
-    section[data-testid="stSidebar"] div.block-container {padding-top: 2rem;}
-    [data-testid="collapsedControl"] {display: none;}
-    div[data-testid="stToolbar"] {display: none !important;}
-    
-    /* Estilo específico para limpar qualquer navegação extra */
-    .main .block-container {padding-top: 20px !important;}
-    
-    /* Removida a regra que escondia as abas */
-    /* div.stTabs {display: none;} */
-    
-    /* Melhorar o estilo dos botões de navegação */
-    .menu-button {
-        margin-bottom: 8px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Variável de estado para controlar a navegação
-if 'pagina_atual' not in st.session_state:
-    st.session_state['pagina_atual'] = 'Macro Higienização'
-
-# Adicionar CSS especial para o modo de apresentação
-if 'pagina_atual' in st.session_state and st.session_state['pagina_atual'] == 'Apresentação Conclusões':
-    st.markdown("""
-    <style>
-        section[data-testid="stSidebar"] {
-            width: 15rem !important;
-        }
-        
-        /* Quando em modo apresentação automática, esconder completamente a barra lateral */
-        body.sidebar-collapsed section[data-testid="stSidebar"] {
-            display: none !important;
-            width: 0 !important;
-        }
-        
-        /* Configuração específica para o modo apresentação */
-        .modoapresentacao .stApp {
-            background-color: #f8f9fa !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
 
 # Adicionar CSS para centralizar imagens no sidebar
 st.markdown("""
@@ -114,18 +46,45 @@ st.markdown("""
         margin-right: auto;
         width: 80%;
     }
+    
+    /* Melhor centralização da logo */
+    [data-testid="stSidebar"] [data-testid="stImage"] > img {
+        margin: 0 auto;
+        display: block;
+        max-width: 100%;
+    }
+    
+    /* Container da imagem centralizado */
+    [data-testid="stSidebar"] [data-testid="stImage"] > div {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    /* Espaçamento extra acima e abaixo da logo */
+    [data-testid="stSidebar"] [data-testid="stImage"] {
+        padding: 10px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Adicionar logo no sidebar centralizado
-st.sidebar.image("assets/LOGO-EU.NA.EUROPA-MAIO.24-COLORIDO-VERTICAL.svg", width=250)
+# Adicionar logo no sidebar (método tradicional)
+st.sidebar.image("assets/LOGO-EU.NA.EUROPA-MAIO.24-COLORIDO-VERTICAL.svg", width=200)
 
 # Menu de navegação simplificado
 st.sidebar.title("Dashboard CRM Bitrix24")
 st.sidebar.markdown("---")
 
+# Adicionar barra de pesquisa no topo do sidebar
+show_search_box()
+st.sidebar.markdown("---")
+
 # Criar uma seção para os botões de navegação
-st.sidebar.markdown("### Navegação")
+st.sidebar.subheader("Navegação")
+
+# Variável de estado para controlar a navegação
+if 'pagina_atual' not in st.session_state:
+    st.session_state['pagina_atual'] = 'Macro Higienização'
 
 # Funções simples para alterar a página
 def ir_para_inicio(): st.session_state['pagina_atual'] = 'Macro Higienização'
@@ -136,63 +95,119 @@ def ir_para_comune(): st.session_state['pagina_atual'] = 'Comune'
 def ir_para_extracoes(): st.session_state['pagina_atual'] = 'Extrações de Dados'
 def ir_para_apresentacao(): st.session_state['pagina_atual'] = 'Apresentação Conclusões'
 
-# Botões individuais para navegação
-st.sidebar.button("Macro Higienização", key="btn_inicio", 
+# Botões individuais para navegação (usando método tradicional)
+st.sidebar.button("📊 Macro Higienização", key="btn_inicio", 
             on_click=ir_para_inicio,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Macro Higienização" else "secondary")
 
-st.sidebar.button("Produção Higienização", key="btn_producao", 
+st.sidebar.button("🛠️ Produção Higienização", key="btn_producao", 
             on_click=ir_para_producao,
             use_container_width=True,
-            type="primary" if st.session_state['pagina_atual'] == "Produção Higienização" else "secondary")
+            type="primary" if st.session_state['pagina_atual'] == "Produção Higienização" else "secondary",
+            help="Visualização de produção de processos")
 
-st.sidebar.button("Conclusões Higienização", key="btn_conclusoes", 
+st.sidebar.button("✅ Conclusões Higienização", key="btn_conclusoes", 
             on_click=ir_para_conclusoes,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Conclusões Higienização" else "secondary")
 
-st.sidebar.button("Funil Emissões Bitrix", key="btn_cartorio", 
+st.sidebar.button("📋 Funil Emissões Bitrix", key="btn_cartorio", 
             on_click=ir_para_cartorio,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Cartório" else "secondary")
 
-st.sidebar.button("Comune Bitrix24", key="btn_comune", 
+st.sidebar.button("👥 Comune Bitrix24", key="btn_comune", 
             on_click=ir_para_comune,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Comune" else "secondary")
 
-st.sidebar.button("Extrações", key="btn_extracoes", 
+st.sidebar.button("📥 Extrações", key="btn_extracoes", 
             on_click=ir_para_extracoes,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Extrações de Dados" else "secondary")
 
 # Adicionar separador para seção de apresentação
 st.sidebar.markdown("---")
-st.sidebar.markdown("### Modo Apresentação")
+st.sidebar.subheader("Modo Apresentação")
 
 # Botão destacado para o modo de apresentação
-st.sidebar.button("📊 Apresentação em TV (9:16)", key="btn_apresentacao", 
+st.sidebar.button("📺 Apresentação em TV (9:16)", key="btn_apresentacao", 
             on_click=ir_para_apresentacao,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Apresentação Conclusões" else "secondary")
+
+# Adicionar o guia de relatório na barra lateral
+show_guide_sidebar()
 
 # Exibição da página selecionada com base na variável de sessão
 pagina = st.session_state['pagina_atual']
 
 try:
+    # Adicionar guia de página contextual para cada página
+    if pagina != "Apresentação Conclusões":  # Não mostrar na apresentação
+        show_page_guide(pagina)
+    
     if pagina == "Macro Higienização":
+        # Definir as seções para o sumário da página
+        sections = [
+            {"label": "Métricas Gerais", "anchor": "metricas_gerais", "icon": "📊"},
+            {"label": "Últimas Conclusões", "anchor": "ultimas_conclusoes", "icon": "✅"}
+        ]
+        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_inicio()
+        
     elif pagina == "Produção Higienização":
+        # Definir as seções para o sumário da página
+        sections = [
+            {"label": "Métricas de Produção", "anchor": "metricas_producao", "icon": "📊"},
+            {"label": "Produção por Responsável", "anchor": "producao_responsavel", "icon": "👤"},
+            {"label": "Tendências Temporais", "anchor": "tendencias_temporais", "icon": "📈"},
+            {"label": "Pendências", "anchor": "pendencias", "icon": "⚠️"}
+        ]
+        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_producao()
+        
     elif pagina == "Conclusões Higienização":
+        # Definir as seções para o sumário da página
+        sections = [
+            {"label": "Métricas de Conclusão", "anchor": "metricas_conclusao", "icon": "📊"},
+            {"label": "Análise de Qualidade", "anchor": "analise_qualidade", "icon": "🔍"},
+            {"label": "Tendências de Conclusão", "anchor": "tendencias_conclusao", "icon": "📈"}
+        ]
+        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_conclusoes()
+        
     elif pagina == "Cartório":
+        # Definir as seções para o sumário da página
+        sections = [
+            {"label": "Visão do Funil", "anchor": "visao_funil", "icon": "📋"},
+            {"label": "Conversão Entre Etapas", "anchor": "conversao_etapas", "icon": "🔄"},
+            {"label": "Previsão de Conclusões", "anchor": "previsao_conclusoes", "icon": "🔮"}
+        ]
+        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_cartorio()
+        
     elif pagina == "Comune":
+        # Definir as seções para o sumário da página
+        sections = [
+            {"label": "Análise de Comunidades", "anchor": "analise_comunidades", "icon": "👥"},
+            {"label": "Interações", "anchor": "interacoes", "icon": "🔄"},
+            {"label": "Métricas de Engajamento", "anchor": "metricas_engajamento", "icon": "📊"}
+        ]
+        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_comune()
+        
     elif pagina == "Extrações de Dados":
+        # Definir as seções para o sumário da página
+        sections = [
+            {"label": "Extração Personalizada", "anchor": "extracao_personalizada", "icon": "🔍"},
+            {"label": "Relatórios Prontos", "anchor": "relatorios_prontos", "icon": "📋"},
+            {"label": "Exportação", "anchor": "exportacao", "icon": "📤"}
+        ]
+        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_extracoes()
+        
     elif pagina == "Apresentação Conclusões":
         # Verificar se há parâmetro 'slide' na URL
         slide_inicial = 0

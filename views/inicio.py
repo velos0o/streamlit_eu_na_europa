@@ -6,6 +6,7 @@ from pathlib import Path
 from api.bitrix_connector import load_merged_data
 from components.metrics import render_metrics_section, render_conclusion_item
 from components.tables import create_responsible_status_table, create_pendencias_table, create_production_table
+from components.table_of_contents import create_section_anchor, create_section_header
 
 # Obter o caminho absoluto para a pasta utils
 utils_path = os.path.join(Path(__file__).parents[1], 'utils')
@@ -83,13 +84,19 @@ def show_inicio():
     if 'home_data' in st.session_state and not st.session_state['home_data'].empty:
         df = st.session_state['home_data']
         
+        # Criar âncora e cabeçalho para a seção de métricas gerais
+        create_section_anchor("metricas_gerais")
+        st.subheader("Métricas Gerais")
+        
         # Exibir métricas
         counts = calculate_status_counts(df)
-        st.subheader("Resumo de Métricas")
         render_metrics_section(counts)
         
+        # Criar âncora e cabeçalho para a seção de últimas conclusões
+        create_section_anchor("ultimas_conclusoes")
+        st.subheader("Últimas Conclusões")
+        
         # Últimas conclusões
-        st.markdown("### Últimas Conclusões")
         if 'DATE_MODIFY' in df.columns:
             completed_df = df[df['UF_CRM_HIGILIZACAO_STATUS'] == 'COMPLETO']
             if not completed_df.empty:

@@ -106,4 +106,45 @@ def status_filter():
         return list(status_map.values())
     
     # Converter para valores internos
-    return [status_map[s] for s in selected if s in status_map] 
+    return [status_map[s] for s in selected if s in status_map]
+
+def create_filter_section(df, include_date=True, include_responsible=True, include_status=True, date_title="Filtro de Período"):
+    """
+    Cria uma seção completa de filtros combinando os diferentes tipos de filtro disponíveis.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame com os dados
+        include_date (bool): Se deve incluir filtro de data
+        include_responsible (bool): Se deve incluir filtro de responsável
+        include_status (bool): Se deve incluir filtro de status
+        date_title (str): Título personalizado para a seção de filtro de data
+    
+    Returns:
+        dict: Dicionário com os filtros aplicados
+        {
+            'date_range': (data_inicial, data_final),
+            'responsibles': [lista_de_responsaveis],
+            'status': [lista_de_status]
+        }
+    """
+    filters = {}
+    
+    with st.expander("📊 Filtros", expanded=True):
+        if include_date:
+            filters['date_range'] = date_filter_section(title=date_title)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if include_responsible and not df.empty:
+                filters['responsibles'] = responsible_filter(df)
+        
+        with col2:
+            if include_status:
+                filters['status'] = status_filter()
+                
+        # Botão para aplicar os filtros
+        if st.button("Aplicar Filtros", use_container_width=True):
+            st.experimental_rerun()
+    
+    return filters 
