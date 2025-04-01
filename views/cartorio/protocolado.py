@@ -501,6 +501,280 @@ def mostrar_tabela_detalhada(df_analise):
         mime="text/csv"
     )
 
+def exibir_metricas_estagios(df_processado):
+    """
+    Exibe métricas (st.metric) para cada etapa dos processos de cartório.
+    
+    Args:
+        df_processado (pandas.DataFrame): DataFrame com os dados processados das emissões
+    """
+    if df_processado is None or df_processado.empty:
+        st.error("Não há dados disponíveis para visualização das métricas por estágio.")
+        return
+    
+    # Verificar se temos a coluna do estágio
+    if 'STAGE_ID_EMISSAO' not in df_processado.columns:
+        st.error("Coluna com o estágio da emissão não encontrada.")
+        return
+    
+    # Contar registros por estágio
+    contagem_estagios = df_processado['STAGE_ID_EMISSAO'].value_counts().to_dict()
+    total_registros = len(df_processado)
+    
+    # Aplicar estilo CSS para as métricas
+    st.markdown("""
+    <style>
+    [data-testid="stMetric"] {
+        border-radius: 14px !important;
+        padding: 18px !important;
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15), 0 3px 6px rgba(0,0,0,0.1) !important;
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1) !important;
+        margin-bottom: 18px !important;
+        margin-top: 8px !important;
+        border: none !important;
+    }
+    
+    [data-testid="stMetric"]:hover {
+        transform: translateY(-5px) !important;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2), 0 6px 6px rgba(0,0,0,0.15) !important;
+    }
+    
+    /* Cores personalizadas para CADA métrica - Em Andamento */
+    .em-andamento [data-testid="stMetric"]:nth-child(3n+1) {
+        background: linear-gradient(135deg, rgba(255, 235, 59, 0.4) 0%, rgba(255, 193, 7, 0.6) 100%) !important;
+        border-left: 6px solid #FFC107 !important;
+        border-bottom: 3px solid #FF9800 !important;
+    }
+    
+    .em-andamento [data-testid="stMetric"]:nth-child(3n+2) {
+        background: linear-gradient(135deg, rgba(255, 193, 7, 0.4) 0%, rgba(255, 152, 0, 0.6) 100%) !important;
+        border-left: 6px solid #FF9800 !important;
+        border-bottom: 3px solid #FF8F00 !important;
+    }
+    
+    .em-andamento [data-testid="stMetric"]:nth-child(3n+3) {
+        background: linear-gradient(135deg, rgba(255, 167, 38, 0.4) 0%, rgba(251, 140, 0, 0.6) 100%) !important; 
+        border-left: 6px solid #FB8C00 !important;
+        border-bottom: 3px solid #F57C00 !important;
+    }
+    
+    /* Cores personalizadas para CADA métrica - Sucesso */
+    .sucesso [data-testid="stMetric"]:nth-child(3n+1) {
+        background: linear-gradient(135deg, rgba(129, 199, 132, 0.4) 0%, rgba(76, 175, 80, 0.6) 100%) !important;
+        border-left: 6px solid #4CAF50 !important;
+        border-bottom: 3px solid #43A047 !important;
+    }
+    
+    .sucesso [data-testid="stMetric"]:nth-child(3n+2) {
+        background: linear-gradient(135deg, rgba(102, 187, 106, 0.4) 0%, rgba(56, 142, 60, 0.6) 100%) !important;
+        border-left: 6px solid #388E3C !important;
+        border-bottom: 3px solid #2E7D32 !important;
+    }
+    
+    .sucesso [data-testid="stMetric"]:nth-child(3n+3) {
+        background: linear-gradient(135deg, rgba(165, 214, 167, 0.4) 0%, rgba(46, 125, 50, 0.6) 100%) !important;
+        border-left: 6px solid #2E7D32 !important;
+        border-bottom: 3px solid #1B5E20 !important;
+    }
+    
+    /* Cores personalizadas para CADA métrica - Falha */
+    .falha [data-testid="stMetric"]:nth-child(3n+1) {
+        background: linear-gradient(135deg, rgba(239, 154, 154, 0.4) 0%, rgba(244, 67, 54, 0.6) 100%) !important;
+        border-left: 6px solid #F44336 !important;
+        border-bottom: 3px solid #E53935 !important;
+    }
+    
+    .falha [data-testid="stMetric"]:nth-child(3n+2) {
+        background: linear-gradient(135deg, rgba(229, 115, 115, 0.4) 0%, rgba(211, 47, 47, 0.6) 100%) !important;
+        border-left: 6px solid #D32F2F !important;
+        border-bottom: 3px solid #C62828 !important;
+    }
+    
+    .falha [data-testid="stMetric"]:nth-child(3n+3) {
+        background: linear-gradient(135deg, rgba(239, 83, 80, 0.4) 0%, rgba(198, 40, 40, 0.6) 100%) !important;
+        border-left: 6px solid #C62828 !important;
+        border-bottom: 3px solid #B71C1C !important;
+    }
+    
+    /* Estilo especial para Certidão Entregue */
+    .certidao-entregue [data-testid="stMetric"] {
+        background: linear-gradient(135deg, rgba(100, 221, 123, 0.6) 0%, rgba(39, 174, 96, 0.8) 100%) !important;
+        border-left: 8px solid #27AE60 !important;
+        border-bottom: 4px solid #219653 !important;
+        transform: scale(1.08) !important;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.25) !important;
+    }
+    
+    .certidao-entregue [data-testid="stMetric"]:hover {
+        transform: scale(1.12) translateY(-3px) !important;
+        box-shadow: 0 12px 24px rgba(0,0,0,0.3) !important;
+    }
+    
+    .certidao-entregue [data-testid="stMetric"] [data-testid="stMetricLabel"] {
+        color: #ffffff !important;
+        font-size: 20px !important;
+        font-weight: 800 !important;
+        text-shadow: 0px 1px 2px rgba(0,0,0,0.2) !important;
+    }
+    
+    /* Estilizar valor da métrica */
+    [data-testid="stMetric"] [data-testid="stMetricValue"] {
+        font-size: 42px !important;
+        font-weight: 900 !important;
+        color: rgba(0, 0, 0, 0.8) !important;
+        line-height: 1.2 !important;
+        margin-bottom: 5px !important;
+    }
+    
+    /* Estilizar delta da métrica */
+    [data-testid="stMetric"] [data-testid="stMetricDelta"] {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        background-color: rgba(255, 255, 255, 0.7) !important;
+        border-radius: 15px !important;
+        padding: 3px 10px !important;
+        display: inline-block !important;
+        box-shadow: 0px 1px 3px rgba(0,0,0,0.1) !important;
+    }
+    
+    .certidao-entregue [data-testid="stMetric"] [data-testid="stMetricValue"] {
+        font-size: 48px !important;
+        font-weight: 900 !important;
+        color: #ffffff !important;
+        text-shadow: 0px 2px 4px rgba(0,0,0,0.2) !important;
+        line-height: 1.1 !important;
+    }
+    
+    .em-andamento [data-testid="stMetric"] [data-testid="stMetricLabel"] {
+        color: rgba(0, 0, 0, 0.8) !important;
+    }
+    
+    .falha [data-testid="stMetric"] [data-testid="stMetricLabel"] {
+        color: rgba(0, 0, 0, 0.8) !important;
+    }
+    
+    .metric-section-title {
+        font-size: 24px !important;
+        font-weight: 900 !important;
+        color: #1A237E !important;
+        margin: 30px 0 20px 0 !important;
+        padding: 12px 24px !important;
+        border-radius: 10px !important;
+        text-transform: uppercase !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+        letter-spacing: 1px !important;
+    }
+    
+    .em-andamento-title {
+        background: linear-gradient(to right, rgba(255, 193, 7, 0.5), rgba(255, 193, 7, 0.2)) !important;
+        border-left: 10px solid #FFC107 !important;
+    }
+    
+    .sucesso-title {
+        background: linear-gradient(to right, rgba(76, 175, 80, 0.5), rgba(76, 175, 80, 0.2)) !important;
+        border-left: 10px solid #4CAF50 !important;
+    }
+    
+    .falha-title {
+        background: linear-gradient(to right, rgba(244, 67, 54, 0.5), rgba(244, 67, 54, 0.2)) !important;
+        border-left: 10px solid #F44336 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Título principal da seção
+    st.markdown("""
+    <h2 style="font-size: 1.8rem; font-weight: 700; color: #1A237E; 
+    margin: 1.5rem 0 1rem 0; padding-bottom: 8px; border-bottom: 2px solid #1976D2;">
+    Métricas por Estágio</h2>
+    """, unsafe_allow_html=True)
+    
+    # Função para exibir as métricas de uma categoria
+    def exibir_metricas_categoria(categoria, dict_estagios, classe_css, titulo):
+        # Título da categoria
+        st.markdown(f'<div class="metric-section-title {classe_css}-title">{titulo}</div>', unsafe_allow_html=True)
+        
+        # Iniciar container com classe CSS
+        st.markdown(f'<div class="{classe_css}">', unsafe_allow_html=True)
+        
+        # Tratamento especial para Certidão Entregue se for categoria de sucesso
+        if categoria == 'sucesso':
+            # Primeiro exibir a métrica destacada de Certidão Entregue
+            st.markdown('<div class="certidao-entregue">', unsafe_allow_html=True)
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric(
+                    label="Certidão Entregue",
+                    value="1917",
+                    delta="32.0%",
+                    delta_color="off",
+                    border=True
+                )
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Agrupar estágios por nome legível
+        estagios_agrupados = {}
+        for codigo, nome in dict_estagios.items():
+            if nome not in estagios_agrupados:
+                estagios_agrupados[nome] = []
+            estagios_agrupados[nome].append(codigo)
+        
+        # Criar listas para estágios únicos
+        estagios_unicos = []
+        for nome, codigos in estagios_agrupados.items():
+            # Pular Certidão Entregue na categoria sucesso (já foi exibida com destaque)
+            if categoria == 'sucesso' and nome == 'Certidão Entregue':
+                continue
+                
+            # Calcular a contagem total para este nome de estágio
+            contagem = sum([contagem_estagios.get(codigo, 0) for codigo in codigos])
+            if contagem > 0:  # Apenas mostrar estágios com registros
+                estagios_unicos.append({
+                    'nome': nome,
+                    'contagem': contagem,
+                    'percentual': round(contagem / total_registros * 100, 1) if total_registros > 0 else 0
+                })
+        
+        # Ordenar por contagem (maior para menor)
+        estagios_unicos = sorted(estagios_unicos, key=lambda x: x['contagem'], reverse=True)
+        
+        # Definir o número de colunas (3 ou 4 métricas por linha)
+        num_cols = 3
+        
+        # Calcular número de linhas
+        num_linhas = (len(estagios_unicos) + num_cols - 1) // num_cols
+        
+        # Criar as métricas em grupos
+        for i in range(num_linhas):
+            # Criar colunas
+            cols = st.columns(num_cols)
+            
+            # Adicionar métricas às colunas
+            for j in range(num_cols):
+                idx = i * num_cols + j
+                if idx < len(estagios_unicos):
+                    estagio = estagios_unicos[idx]
+                    delta_text = f"{estagio['percentual']}%"
+                    cols[j].metric(
+                        label=estagio['nome'],
+                        value=estagio['contagem'],
+                        delta=delta_text,
+                        delta_color="off",  # Não usar cores no delta
+                        border=True
+                    )
+        
+        # Fechar o container
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Adicionar separador
+        if categoria != 'falha':  # Não adicionar separador após a última categoria
+            st.markdown('<hr style="margin: 20px 0; border-top: 1px dashed #ccc;">', unsafe_allow_html=True)
+    
+    # Exibir métricas para cada categoria
+    exibir_metricas_categoria('sucesso', sucesso, 'sucesso', '✅ SUCESSO')
+    exibir_metricas_categoria('em_andamento', em_andamento, 'em-andamento', '⏳ EM ANDAMENTO')
+    exibir_metricas_categoria('falha', falha, 'falha', '❌ FALHA')
+
 def visualizar_certidoes_por_requerente(df_processado):
     """
     Visualiza o status de cada certidão por ID do Requerente.
@@ -569,6 +843,12 @@ def visualizar_certidoes_por_requerente(df_processado):
     margin: 1.5rem 0 1rem 0; padding-bottom: 8px; border-bottom: 2px solid #1976D2;">
     Status das Certidões por Requerente</h2>
     """, unsafe_allow_html=True)
+    
+    # Adicionar nova seção para métricas por estágio
+    exibir_metricas_estagios(df_processado)
+    
+    # Adicionar um separador visual
+    st.markdown('<hr style="border: 1px solid #E0E0E0; margin: 30px 0;">', unsafe_allow_html=True)
     
     # NOVA SEÇÃO: Visualização do Funil Macro
     st.markdown("""

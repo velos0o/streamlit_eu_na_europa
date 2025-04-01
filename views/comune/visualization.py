@@ -1080,6 +1080,287 @@ def visualizar_metricas_tempo_dias(metricas_tempo):
         # Exibir o gráfico
         st.plotly_chart(fig, use_container_width=True)
 
+def visualizar_analise_evidencia(df_comune):
+    """
+    Exibe a análise de evidências e comprovantes para certidões italianas.
+    Verifica se o comprovante foi validado e se a evidência foi anexada,
+    e calcula o tempo desde a data de solicitação original.
+    """
+    st.markdown("""
+    <h3 style="font-size: 26px; font-weight: 800; color: #1A237E; margin: 30px 0 15px 0; 
+    padding-bottom: 8px; border-bottom: 2px solid #E0E0E0; font-family: Arial, Helvetica, sans-serif;">
+    ANÁLISE DE EVIDÊNCIAS E COMPROVANTES</h3>
+    """, unsafe_allow_html=True)
+    
+    if df_comune.empty:
+        st.warning("Nenhum dado de COMUNE disponível para análise.")
+        return
+
+    # Colunas necessárias (verifique os IDs corretos no seu Bitrix)
+    cols_necessarias = {
+        'id_processo': 'ID', 
+        'titulo': 'TITLE',
+        'comprovante_validado_id': 'UF_CRM_12_1743013093', # Comprovante Validado (Sim/Não)
+        'evidencia_anexo_id': 'UF_CRM_12_1743013064',      # Evidência Anexo (Arquivo)
+        'provincia_id': 'UF_CRM_12_1743018869',        # Provincia (Usado na tabela detalhada)
+        'comune_paroquia_id': 'UF_CRM_12_1722881735827', # Comune/Paróquia (Usado na tabela detalhada)
+        'data_solicitacao_original': 'DATA_SOLICITACAO_ORIGINAL' # Data vinda do CSV
+    }
+
+    # Verificar colunas existentes
+    cols_presentes_map = {k: v for k, v in cols_necessarias.items() if v in df_comune.columns}
+    cols_faltantes = set(cols_necessarias.values()) - set(df_comune.columns)
+    
+    if cols_faltantes:
+        st.warning(f"Colunas necessárias ausentes nos dados carregados: {', '.join(cols_faltantes)}. A análise pode estar incompleta.")
+        # Verificar se colunas cruciais para métricas estão faltando
+        metric_cols_needed = ['id_processo', 'comprovante_validado_id', 'evidencia_anexo_id']
+        if not all(k in cols_presentes_map for k in metric_cols_needed):
+            st.error("Faltam colunas essenciais (ID, Comprovante, Evidência) para calcular as métricas macro. Verifique os mapeamentos de campos.")
+            # Ainda tentar mostrar a tabela se possível
+        # Verificar se colunas cruciais para a tabela estão faltando
+        table_cols_needed = ['id_processo', 'data_solicitacao_original']
+        if not all(k in cols_presentes_map for k in table_cols_needed):
+             st.error("Faltam colunas essenciais (ID, Data Solicitação) para a tabela detalhada. Verifique os mapeamentos de campos e o carregamento de dados.")
+             return # Não podemos continuar sem ID e data
+
+    # Selecionar e renomear colunas presentes
+    df_analise = df_comune[[v for v in cols_presentes_map.values()]].copy()
+    df_analise = df_analise.rename(columns={v: k for k, v in cols_presentes_map.items()})
+
+    # --- Processamento das Colunas de Status (Comprovante e Evidência) --- 
+
+    # 1. Comprovante Validado 
+    if 'comprovante_validado_id' in df_analise.columns:
+        df_analise['COMPROVANTE_VALIDADO'] = df_analise['comprovante_validado_id'].fillna('').astype(str).str.strip().str.lower().isin(['sim', 'y', '1']) # Ajuste '1' se for o ID da opção 'Sim'
+        df_analise['Comprovante Validado?'] = np.where(df_analise['COMPROVANTE_VALIDADO'], 'Sim', 'Não')
+    else:
+        df_analise['Comprovante Validado?'] = 'N/A'
+        df_analise['COMPROVANTE_VALIDADO'] = False # Default para cálculo
+
+    # 2. Evidência Anexada (Arquivo)
+    if 'evidencia_anexo_id' in df_analise.columns:
+        df_analise['EVIDENCIA_ANEXADA'] = df_analise['evidencia_anexo_id'].fillna('').astype(str).str.strip().apply(lambda x: x not in ['', '[]', '{}', 'null', 'None', '0'])
+        df_analise['Evidência Anexada?'] = np.where(df_analise['EVIDENCIA_ANEXADA'], 'Sim', 'Não')
+    else:
+        df_analise['Evidência Anexada?'] = 'N/A'
+        df_analise['EVIDENCIA_ANEXADA'] = False # Default para cálculo
+
+    # --- Cálculo e Exibição das Métricas Macro ---
+    st.markdown("#### Resumo Geral")
+    total_processos = len(df_analise)
+    
+    # Verificar se as colunas existem antes de calcular
+    comprovante_sim = df_analise[df_analise['Comprovante Validado?'] == 'Sim'].shape[0] if 'Comprovante Validado?' in df_analise.columns else 0
+    comprovante_nao = df_analise[df_analise['Comprovante Validado?'] == 'Não'].shape[0] if 'Comprovante Validado?' in df_analise.columns else 0
+    
+    evidencia_sim = df_analise[df_analise['Evidência Anexada?'] == 'Sim'].shape[0] if 'Evidência Anexada?' in df_analise.columns else 0
+    evidencia_nao = df_analise[df_analise['Evidência Anexada?'] == 'Não'].shape[0] if 'Evidência Anexada?' in df_analise.columns else 0
+    
+    # Caso específico: Comprovante Sim E Evidência Não
+    comp_sim_evid_nao = 0
+    if 'COMPROVANTE_VALIDADO' in df_analise.columns and 'EVIDENCIA_ANEXADA' in df_analise.columns:
+         comp_sim_evid_nao = df_analise[(df_analise['COMPROVANTE_VALIDADO'] == True) & (df_analise['EVIDENCIA_ANEXADA'] == False)].shape[0]
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total de Processos", total_processos)
+        st.metric("Comprovante Validado (Sim)", comprovante_sim)
+        st.metric("Comprovante Validado (Não)", comprovante_nao)
+        
+    with col2:
+        st.metric("Evidência Anexada (Sim)", evidencia_sim)
+        st.metric("Evidência Anexada (Não)", evidencia_nao)
+        
+    with col3:
+         st.metric("⚠️ Comprovante 'Sim' SEM Evidência Anexada", comp_sim_evid_nao)
+
+
+    st.markdown("---") # Divisor
+
+    # --- Processamento da Tabela Detalhada (continua como antes) ---
+
+    # 3. Tempo desde Solicitação
+    if 'data_solicitacao_original' in df_analise.columns:
+        # Garantir que a coluna é datetime, tratando erros
+        df_analise['data_solicitacao_original'] = pd.to_datetime(df_analise['data_solicitacao_original'], errors='coerce')
+        
+        # Calcular diferença em dias
+        # Usar pd.Timestamp('now') para consistência com pandas
+        hoje = pd.Timestamp('now')
+        df_analise['TEMPO_SOLICITACAO_DIAS'] = (hoje - df_analise['data_solicitacao_original']).dt.days
+        
+        # Formatar para exibição (tratar NaT e valores negativos se a data for futura)
+        def formatar_dias(dias):
+            if pd.isna(dias):
+                return "Data Inválida/Ausente"
+            elif dias < 0:
+                return "Data Futura?"
+            else:
+                return f"{int(dias)} dias"
+                
+        df_analise['Tempo Desde Solicitação'] = df_analise['TEMPO_SOLICITACAO_DIAS'].apply(formatar_dias)
+    else:
+        df_analise['Tempo Desde Solicitação'] = 'Data Ausente'
+        df_analise['TEMPO_SOLICITACAO_DIAS'] = np.nan # Adicionar para possível ordenação futura
+
+    # 4. Renomear colunas finais e selecionar ordem
+    rename_final = {
+        'id_processo': 'ID Processo',
+        'titulo': 'Título Processo',
+        'provincia_id': 'Província',
+        'comune_paroquia_id': 'Comune/Paróquia',
+        # As colunas 'Comprovante Validado?', 'Evidência Anexada?', 'Tempo Desde Solicitação' já foram criadas com os nomes desejados
+    }
+    # Renomear apenas as colunas que existem no df_analise
+    df_display = df_analise.rename(columns={k: v for k, v in rename_final.items() if k in df_analise.columns})
+
+
+    # Definir a ordem final das colunas para exibição
+    cols_finais_ordem = [
+        'ID Processo', 'Título Processo', 'Província', 'Comune/Paróquia',
+        'Comprovante Validado?', 'Evidência Anexada?', 'Tempo Desde Solicitação'
+    ]
+    
+    # Filtrar pelas colunas que realmente existem no df_display
+    cols_exibicao_final = [col for col in cols_finais_ordem if col in df_display.columns]
+
+    st.markdown("#### Detalhamento por Processo")
+    st.info("Tabela abaixo mostra cada processo individualmente com o status das evidências e o tempo desde a solicitação original (baseado no arquivo CSV). Use os filtros das colunas para explorar.")
+    
+    # Exibir a tabela
+    st.dataframe(df_display[cols_exibicao_final], use_container_width=True)
+
+    # Adicionar opção de download
+    csv = df_display[cols_exibicao_final].to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Baixar dados da análise em CSV",
+        data=csv,
+        file_name=f'analise_evidencia_comprovante_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+        mime='text/csv',
+        key='download-evidencia-csv' # Adicionar chave única
+    )
+    
+    # --- Futuras Melhorias --- 
+    # st.subheader("Visão Agregada por Província/Comune (Exemplo)")
+    # if all(c in df_display.columns for c in ['Província', 'Comune/Paróquia', 'Comprovante Validado?', 'Evidência Anexada?']):
+    #     df_agregado = df_display.groupby(['Província', 'Comune/Paróquia']).agg(
+    #         Total_Processos = ('ID Processo', 'count'),
+    #         Comprovante_Sim = ('Comprovante Validado?', lambda x: (x == 'Sim').sum()),
+    #         Evidencia_Sim = ('Evidência Anexada?', lambda x: (x == 'Sim').sum()),
+    #         Tempo_Medio_Dias = ('TEMPO_SOLICITACAO_DIAS', 'mean')
+    #     ).reset_index()
+    #     df_agregado['Tempo_Medio_Dias'] = df_agregado['Tempo_Medio_Dias'].round(1)
+    #     st.dataframe(df_agregado, use_container_width=True)
+    # else:
+    #     st.warning("Não foi possível gerar visão agregada por falta de colunas.")
+        
+    # Adicionar Mapa aqui se necessário no futuro
+
+def visualizar_providencias(df_comune):
+    """
+    Exibe tabelas separadas agrupadas por Província e por Comune/Paróquia.
+    """
+    st.markdown("""
+    <h3 style="font-size: 26px; font-weight: 800; color: #1A237E; margin: 30px 0 15px 0; 
+    padding-bottom: 8px; border-bottom: 2px solid #E0E0E0; font-family: Arial, Helvetica, sans-serif;">
+    PROCESSOS POR LOCALIZAÇÃO</h3>
+    """, unsafe_allow_html=True)
+
+    if df_comune.empty:
+        st.warning("Nenhum dado de COMUNE disponível para análise.")
+        return
+
+    # IDs das colunas
+    col_provincia = 'UF_CRM_12_1743015702671' # ID da Província
+    col_comune = 'UF_CRM_12_1722881735827'    # ID do Comune/Paróquia
+    col_id = 'ID'
+
+    # --- Tabela por Província --- 
+    st.markdown("#### Contagem por Província")
+    st.info(
+        "Nota: Processos em estágios como 'Entregue PDF', 'Pendente', "
+        "'Pesquisa Não Finalizada' ou 'Devolutiva Emissor' podem não ter "
+        "o campo Província preenchido. Estes casos, juntamente com outros sem preenchimento, "
+        "são agrupados em 'não especificada'."
+    )
+    if col_provincia in df_comune.columns and col_id in df_comune.columns:
+        # Preencher NaN e agrupar
+        df_prov = df_comune[[col_provincia, col_id]].copy()
+        # Normalizar: Title Case, sem espaços extras, tratar NaNs e vazios
+        df_prov[col_provincia] = df_prov[col_provincia].astype(str).str.title().str.strip()
+        # Substituir representações comuns de nulo/vazio pelo termo padrão (após title case)
+        df_prov[col_provincia] = df_prov[col_provincia].replace(['', 'Nan', 'None', 'Null'], 'Não Especificada', regex=False)
+        # Garantir que NaNs originais também sejam tratados
+        df_prov[col_provincia] = df_prov[col_provincia].fillna('Não Especificada') 
+
+        df_prov_agrupado = df_prov.groupby(col_provincia).agg(
+            Quantidade_Processos=(col_id, 'count')
+        ).reset_index()
+        
+        # Renomear e ordenar
+        df_prov_agrupado = df_prov_agrupado.rename(columns={
+            col_provincia: 'Província',
+            'Quantidade_Processos': 'Nº de Processos'
+        })
+        df_prov_agrupado = df_prov_agrupado.sort_values(by='Nº de Processos', ascending=False)
+        
+        # Exibir tabela
+        st.dataframe(df_prov_agrupado, use_container_width=True, hide_index=True)
+        
+        # Download
+        csv_prov = df_prov_agrupado.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Baixar Contagem por Província (CSV)",
+            data=csv_prov,
+            file_name=f'contagem_por_provincia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+            mime='text/csv',
+            key='download-provincia-count-csv'
+        )
+    else:
+        st.warning(f"Não foi possível gerar a tabela por província. Colunas necessárias: {col_provincia}, {col_id}")
+
+    st.markdown("---") # Divisor
+
+    # --- Tabela por Comune/Paróquia --- 
+    st.markdown("#### Contagem por Comune/Paróquia")
+    if col_comune in df_comune.columns and col_id in df_comune.columns:
+        # Preencher NaN e agrupar
+        df_com = df_comune[[col_comune, col_id]].copy()
+        # Normalizar: Title Case, sem espaços extras, tratar NaNs e vazios
+        df_com[col_comune] = df_com[col_comune].astype(str).str.title().str.strip()
+        # Substituir representações comuns de nulo/vazio pelo termo padrão (após title case)
+        df_com[col_comune] = df_com[col_comune].replace(['', 'Nan', 'None', 'Null'], 'Não Especificado(a)', regex=False)
+        # Garantir que NaNs originais também sejam tratados
+        df_com[col_comune] = df_com[col_comune].fillna('Não Especificado(a)')
+        
+        df_com_agrupado = df_com.groupby(col_comune).agg(
+            Quantidade_Processos=(col_id, 'count')
+        ).reset_index()
+        
+        # Renomear e ordenar
+        df_com_agrupado = df_com_agrupado.rename(columns={
+            col_comune: 'Comune/Paróquia',
+            'Quantidade_Processos': 'Nº de Processos'
+        })
+        df_com_agrupado = df_com_agrupado.sort_values(by='Nº de Processos', ascending=False)
+        
+        # Exibir tabela
+        st.dataframe(df_com_agrupado, use_container_width=True, hide_index=True)
+        
+        # Download
+        csv_com = df_com_agrupado.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Baixar Contagem por Comune/Paróquia (CSV)",
+            data=csv_com,
+            file_name=f'contagem_por_comune_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+            mime='text/csv',
+            key='download-comune-count-csv'
+        )
+    else:
+        st.warning(f"Não foi possível gerar a tabela por comune/paróquia. Colunas necessárias: {col_comune}, {col_id}")
+
+
 # Funções auxiliares para formatação de tempo
 def formatar_tempo_meses(meses):
     return f"{int(meses)} {'mês' if int(meses) == 1 else 'meses'}"

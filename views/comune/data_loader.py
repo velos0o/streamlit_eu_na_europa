@@ -3,13 +3,41 @@ import pandas as pd
 from api.bitrix_connector import load_bitrix_data, get_credentials
 from datetime import datetime
 from dotenv import load_dotenv
+import os # Adicionado para construir caminho do arquivo
 
 # Carregar variáveis de ambiente
 load_dotenv()
 
+def carregar_datas_solicitacao():
+    """
+    Carrega as datas de solicitação originais do arquivo CSV.
+    """
+    # Construir o caminho relativo para o arquivo CSV
+    script_dir = os.path.dirname(__file__) # Diretório atual do script
+    csv_path = os.path.join(script_dir, 'Planilhas', 'Emissões Italiana, Antes de movimentação geral - comune.csv')
+
+    try:
+        df_datas = pd.read_csv(csv_path, usecols=['ID', 'Movido em'], dtype={'ID': str})
+        # Renomear colunas
+        df_datas = df_datas.rename(columns={'Movido em': 'DATA_SOLICITACAO_ORIGINAL'})
+        # Converter para datetime, tratando erros
+        df_datas['DATA_SOLICITACAO_ORIGINAL'] = pd.to_datetime(df_datas['DATA_SOLICITACAO_ORIGINAL'], errors='coerce')
+        # Remover linhas onde a data não pôde ser convertida ou o ID é nulo
+        df_datas.dropna(subset=['ID', 'DATA_SOLICITACAO_ORIGINAL'], inplace=True)
+        # Remover IDs duplicados, mantendo o primeiro (ou último, dependendo da lógica desejada)
+        df_datas.drop_duplicates(subset=['ID'], keep='first', inplace=True)
+        return df_datas
+    except FileNotFoundError:
+        st.error(f"Arquivo CSV não encontrado em: {csv_path}")
+        return pd.DataFrame({'ID': [], 'DATA_SOLICITACAO_ORIGINAL': []})
+    except Exception as e:
+        st.error(f"Erro ao ler o arquivo CSV: {e}")
+        return pd.DataFrame({'ID': [], 'DATA_SOLICITACAO_ORIGINAL': []})
+
 def carregar_dados_comune():
     """
     Carrega dados da entidade CRM_DYNAMIC_1052 com CATEGORY_ID = 22
+    e junta com as datas de solicitação do CSV.
     """
     # Obter token do Bitrix24
     BITRIX_TOKEN, BITRIX_URL = get_credentials()
@@ -26,14 +54,38 @@ def carregar_dados_comune():
         "operator": "EQUALS"
     })
     
-    # Carregar os dados
+    # Carregar os dados do Bitrix
     df_items = load_bitrix_data(url_items, filters=category_filter)
     
     # Se o DataFrame estiver vazio, retornar DataFrame vazio
     if df_items is None or df_items.empty:
-        st.error("Não foi possível carregar os dados de COMUNE. Verifique a conexão com o Bitrix24.")
+        st.error("Não foi possível carregar os dados de COMUNE do Bitrix24. Verifique a conexão.")
         return pd.DataFrame()
-    
+
+    # Garantir que a coluna ID do Bitrix seja string para o merge
+    if 'ID' in df_items.columns:
+        df_items['ID'] = df_items['ID'].astype(str)
+    else:
+        st.error("Coluna 'ID' não encontrada nos dados do Bitrix. Não é possível juntar as datas de solicitação.")
+        # Adicionar o nome mesmo sem o merge
+        df_items.loc[:, 'NOME_SEGMENTO'] = "COMUNE BITRIX24"
+        return df_items
+
+    # Carregar as datas de solicitação do CSV
+    df_datas_solicitacao = carregar_datas_solicitacao()
+
+    # Juntar (merge) os dados do Bitrix com as datas do CSV
+    if not df_datas_solicitacao.empty:
+        df_items = pd.merge(df_items, df_datas_solicitacao, on='ID', how='left')
+        print(f"Merge realizado. Colunas após merge: {df_items.columns.tolist()}")
+        # Verificar quantas linhas tiveram correspondência
+        matched_rows = df_items['DATA_SOLICITACAO_ORIGINAL'].notna().sum()
+        print(f"{matched_rows} de {len(df_items)} registros tiveram data de solicitação encontrada no CSV.")
+    else:
+        print("Não foi possível carregar ou processar as datas de solicitação do CSV. A coluna DATA_SOLICITACAO_ORIGINAL não será adicionada.")
+        # Adicionar coluna vazia para consistência, se necessário
+        df_items['DATA_SOLICITACAO_ORIGINAL'] = pd.NaT
+
     # Adicionar o nome para melhor visualização
     df_items.loc[:, 'NOME_SEGMENTO'] = "COMUNE BITRIX24"
     
