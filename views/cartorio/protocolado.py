@@ -501,6 +501,273 @@ def mostrar_tabela_detalhada(df_analise):
         mime="text/csv"
     )
 
+def visualizar_certidoes_por_requerente(df_processado):
+    """
+    Visualiza o status de cada certidão por ID do Requerente.
+    
+    Args:
+        df_processado (pandas.DataFrame): DataFrame com os dados processados das emissões
+    """
+    if df_processado is None or df_processado.empty:
+        st.error("Não há dados disponíveis para visualização por requerente.")
+        return
+    
+    # Verificar se temos a coluna de ID do Requerente
+    id_requerente_cols = [col for col in df_processado.columns if 'ID_REQUERENTE' in col]
+    
+    if not id_requerente_cols:
+        # Tentar identificar outras possíveis colunas com ID do requerente
+        possible_cols = [col for col in df_processado.columns if '1723552729' in col or 'REQUERENTE' in col.upper()]
+        
+        if not possible_cols:
+            st.error("Não foi possível identificar a coluna com o ID do Requerente nos dados.")
+            st.write("Colunas disponíveis:", df_processado.columns.tolist())
+            return
+        
+        id_requerente_col = possible_cols[0]
+        st.info(f"Usando a coluna '{id_requerente_col}' como ID do Requerente.")
+    else:
+        id_requerente_col = id_requerente_cols[0]
+    
+    # Verificar se temos campos para o nome do requerente
+    nome_requerente_col = None
+    possible_name_cols = [col for col in df_processado.columns if 'NOME_REQUERENTE' in col or 'NAME' in col.upper()]
+    
+    if possible_name_cols:
+        nome_requerente_col = possible_name_cols[0]
+    
+    # Verificar se temos as colunas necessárias
+    if 'STAGE_ID_EMISSAO' not in df_processado.columns:
+        st.error("Coluna com o estágio da emissão não encontrada.")
+        return
+    
+    # Criar cópia do DataFrame para trabalhar
+    df_requerentes = df_processado.copy()
+    
+    # Mapear o estágio para um nome legível
+    df_requerentes['NOME_ESTAGIO'] = df_requerentes['STAGE_ID_EMISSAO'].apply(
+        lambda x: sucesso.get(x, falha.get(x, em_andamento.get(x, "Desconhecido")))
+    )
+    
+    # Definir cores para os status
+    cores_status = {
+        'Sucesso': '#4CAF50',      # Verde
+        'Em Andamento': '#FFC107', # Amarelo
+        'Falha': '#F44336',        # Vermelho
+        'Desconhecido': '#9E9E9E'  # Cinza
+    }
+    
+    df_requerentes['STATUS_CATEGORIA'] = df_requerentes['STAGE_ID_EMISSAO'].apply(
+        lambda x: 'Sucesso' if x in sucesso else ('Falha' if x in falha else ('Em Andamento' if x in em_andamento else 'Desconhecido'))
+    )
+    
+    df_requerentes['COR_STATUS'] = df_requerentes['STATUS_CATEGORIA'].map(cores_status)
+    
+    # Título da seção
+    st.markdown("""
+    <h2 style="font-size: 1.8rem; font-weight: 700; color: #1A237E; 
+    margin: 1.5rem 0 1rem 0; padding-bottom: 8px; border-bottom: 2px solid #1976D2;">
+    Status das Certidões por Requerente</h2>
+    """, unsafe_allow_html=True)
+    
+    # NOVA SEÇÃO: Visualização do Funil Macro
+    st.markdown("""
+    <h3 style="font-size: 1.5rem; font-weight: 700; color: #303F9F; 
+    margin: 1rem 0 0.5rem 0; padding-bottom: 5px; border-bottom: 1px solid #7986CB;">
+    Visão Detalhada do Funil de Emissões</h3>
+    """, unsafe_allow_html=True)
+    
+    # Vamos usar diretamente os estágios sem agrupamento
+    # Criar lista de todos os estágios possíveis para garantir que todos apareçam
+    todos_estagios = {**em_andamento, **sucesso, **falha}
+    
+    # Contar certidões por estágio (STAGE_ID_EMISSAO)
+    contagem_estagios = df_requerentes['STAGE_ID_EMISSAO'].value_counts().reset_index()
+    contagem_estagios.columns = ['STAGE_ID', 'QUANTIDADE']
+    
+    # Adicionar o nome legível do estágio
+    contagem_estagios['NOME_ESTAGIO'] = contagem_estagios['STAGE_ID'].apply(
+        lambda x: sucesso.get(x, falha.get(x, em_andamento.get(x, "Desconhecido")))
+    )
+    
+    # Adicionar estágios que não têm registros para completar o funil
+    for stage_id, nome in todos_estagios.items():
+        if stage_id not in contagem_estagios['STAGE_ID'].values:
+            contagem_estagios = pd.concat([
+                contagem_estagios, 
+                pd.DataFrame({'STAGE_ID': [stage_id], 'QUANTIDADE': [0], 'NOME_ESTAGIO': [nome]})
+            ], ignore_index=True)
+    
+    # Categorizar os estágios
+    contagem_estagios['CATEGORIA'] = contagem_estagios['STAGE_ID'].apply(
+        lambda x: 'Sucesso' if x in sucesso else ('Falha' if x in falha else 'Em Andamento')
+    )
+    
+    # Definir cores por categoria
+    cor_categoria = {
+        'Sucesso': '#4CAF50',      # Verde
+        'Em Andamento': '#FFC107', # Amarelo
+        'Falha': '#F44336'         # Vermelho
+    }
+    
+    contagem_estagios['COR'] = contagem_estagios['CATEGORIA'].map(cor_categoria)
+    
+    # Calcular o percentual em relação ao total de certidões
+    total_certidoes = len(df_requerentes)
+    contagem_estagios['PERCENTUAL'] = contagem_estagios['QUANTIDADE'].apply(
+        lambda x: round(x / total_certidoes * 100, 1) if total_certidoes > 0 else 0
+    )
+    
+    # Ordenar os estágios pela quantidade (decrescente) dentro de cada categoria
+    # Primeiro definimos a ordem das categorias
+    ordem_categoria = {'Sucesso': 0, 'Em Andamento': 1, 'Falha': 2}
+    contagem_estagios['ORDEM_CATEGORIA'] = contagem_estagios['CATEGORIA'].map(ordem_categoria)
+    
+    # Ordenar primeiro por categoria e depois por quantidade
+    contagem_estagios = contagem_estagios.sort_values(
+        ['ORDEM_CATEGORIA', 'QUANTIDADE'], 
+        ascending=[True, False]
+    ).reset_index(drop=True)
+    
+    # Criar visualização do funil
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Criar gráfico de barras horizontais (para visualização de estágios detalhados)
+        fig_barras = go.Figure()
+        
+        # Adicionar as barras para cada categoria
+        for categoria in ['Sucesso', 'Em Andamento', 'Falha']:
+            df_cat = contagem_estagios[contagem_estagios['CATEGORIA'] == categoria]
+            
+            if not df_cat.empty:
+                fig_barras.add_trace(go.Bar(
+                    y=df_cat['NOME_ESTAGIO'],
+                    x=df_cat['QUANTIDADE'],
+                    name=categoria,
+                    orientation='h',
+                    marker=dict(
+                        color=df_cat['COR'],
+                        line=dict(color='white', width=1)
+                    ),
+                    hoverinfo='text',
+                    hovertext=df_cat.apply(
+                        lambda row: f"<b>{row['STAGE_ID']}</b><br>{row['NOME_ESTAGIO']}<br>Quantidade: {row['QUANTIDADE']}<br>Percentual: {row['PERCENTUAL']}%", 
+                        axis=1
+                    ),
+                    textposition="auto",
+                    text=df_cat['QUANTIDADE'],
+                    textfont=dict(size=14)
+                ))
+        
+        # Atualizar layout
+        fig_barras.update_layout(
+            title='Distribuição por Estágio do Funil',
+            font=dict(family="Arial, Helvetica, sans-serif", size=14),
+            height=max(450, len(contagem_estagios) * 25),  # altura dinâmica com base no número de estágios
+            margin=dict(t=50, b=30, l=50, r=50),
+            barmode='stack',
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            ),
+            xaxis=dict(
+                title="Quantidade de Certidões"
+            ),
+            yaxis=dict(
+                title="",
+                autorange="reversed"  # Para mostrar na ordem do funil
+            )
+        )
+        
+        st.plotly_chart(fig_barras, use_container_width=True)
+    
+    with col2:
+        # Mostrar resumo por categoria
+        st.markdown("""
+        <h4 style="font-size: 1.2rem; font-weight: 700; color: #303F9F; margin-top: 10px;">
+        Resumo por Categoria</h4>
+        """, unsafe_allow_html=True)
+        
+        # Calcular totais por categoria
+        resumo_categorias = contagem_estagios.groupby('CATEGORIA')['QUANTIDADE'].sum().reset_index()
+        resumo_categorias['PERCENTUAL'] = resumo_categorias['QUANTIDADE'].apply(
+            lambda x: round(x / total_certidoes * 100, 1) if total_certidoes > 0 else 0
+        )
+        
+        # Ordenar o resumo
+        ordem_cat = {'Sucesso': 0, 'Em Andamento': 1, 'Falha': 2}
+        resumo_categorias['ORDEM'] = resumo_categorias['CATEGORIA'].map(ordem_cat)
+        resumo_categorias = resumo_categorias.sort_values('ORDEM').reset_index(drop=True)
+        
+        # Mostrar cards com as métricas
+        for _, row in resumo_categorias.iterrows():
+            cor_bg = "#E8F5E9" if row['CATEGORIA'] == 'Sucesso' else "#FFF8E1" if row['CATEGORIA'] == 'Em Andamento' else "#FFEBEE"
+            cor_txt = "#2E7D32" if row['CATEGORIA'] == 'Sucesso' else "#F57F17" if row['CATEGORIA'] == 'Em Andamento' else "#C62828"
+            
+            st.markdown(f"""
+            <div style="background-color: {cor_bg}; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
+                <h5 style="margin: 0 0 5px 0; font-size: 0.95rem; color: {cor_txt};">{row['CATEGORIA']}</h5>
+                <p style="font-size: 1.8rem; font-weight: 900; margin: 0; color: {cor_txt};">{row['QUANTIDADE']}</p>
+                <p style="font-size: 0.8rem; margin: 0; color: #546E7A;">{row['PERCENTUAL']}% do total</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Adicionar top 3 estágios mais frequentes
+        st.markdown("""
+        <h4 style="font-size: 1.2rem; font-weight: 700; color: #303F9F; margin-top: 20px;">
+        Top Estágios</h4>
+        """, unsafe_allow_html=True)
+        
+        top_estagios = contagem_estagios.sort_values('QUANTIDADE', ascending=False).head(3)
+        
+        for _, row in top_estagios.iterrows():
+            if row['QUANTIDADE'] > 0:
+                st.markdown(f"""
+                <div style="background-color: #F5F5F5; border-radius: 10px; padding: 12px; margin-bottom: 10px; border-left: 5px solid {row['COR']};">
+                    <p style="font-size: 0.85rem; margin: 0 0 3px 0; color: #555;"><b>{row['STAGE_ID']}</b></p>
+                    <p style="font-size: 1.0rem; font-weight: 700; margin: 0; color: #333;">{row['NOME_ESTAGIO']}</p>
+                    <p style="font-size: 0.8rem; margin: 0; color: #757575;">{row['QUANTIDADE']} certidões ({row['PERCENTUAL']}%)</p>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # Mostrar detalhamento por estágio
+    with st.expander("Ver detalhamento completo dos estágios", expanded=False):
+        # Criar tabela com o detalhamento
+        st.dataframe(
+            contagem_estagios[['STAGE_ID', 'NOME_ESTAGIO', 'CATEGORIA', 'QUANTIDADE', 'PERCENTUAL']],
+            column_config={
+                "STAGE_ID": st.column_config.TextColumn("ID do Estágio"),
+                "NOME_ESTAGIO": st.column_config.TextColumn("Nome do Estágio"),
+                "CATEGORIA": st.column_config.TextColumn("Categoria"),
+                "QUANTIDADE": st.column_config.NumberColumn("Quantidade", format="%d"),
+                "PERCENTUAL": st.column_config.ProgressColumn(
+                    "Percentual do Total",
+                    format="%.1f%%",
+                    min_value=0,
+                    max_value=100
+                )
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+        
+        # Opção para download
+        csv = contagem_estagios.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Exportar dados para CSV",
+            data=csv,
+            file_name=f"detalhamento_estagios_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv"
+        )
+    
+    # Adicionar um separador visual
+    st.markdown('<hr style="border: 1px solid #E0E0E0; margin: 30px 0;">', unsafe_allow_html=True)
+
 def exibir_dashboard_protocolado():
     """
     Função principal para exibir o dashboard de Status Protocolado
@@ -607,10 +874,11 @@ def exibir_dashboard_protocolado():
     # Filtro simulado por unidade (como não temos essa informação nos dados, é apenas ilustrativo)
     st.info(f"Exibindo dados para: {unidade_filter}")
     
-    # Criar duas abas principais
-    tab_visao_geral, tab_detalhamento = st.tabs([
+    # Criar abas principais
+    tab_visao_geral, tab_detalhamento, tab_requerentes = st.tabs([
         "📊 Visão Geral", 
-        "📋 Detalhamento"
+        "📋 Detalhamento",
+        "👤 Certidões por Requerente"
     ])
     
     # Aba de Visão Geral
@@ -620,6 +888,10 @@ def exibir_dashboard_protocolado():
     # Aba de Detalhamento
     with tab_detalhamento:
         mostrar_tabela_detalhada(df_analise)
+    
+    # Nova aba de Certidões por Requerente
+    with tab_requerentes:
+        visualizar_certidoes_por_requerente(df_processado)
 
 if __name__ == "__main__":
     exibir_dashboard_protocolado() 
