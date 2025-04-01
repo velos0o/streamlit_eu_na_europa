@@ -11,6 +11,7 @@ from .visualization import visualizar_cartorio_dados
 from .movimentacoes import analisar_produtividade as analisar_movimentacoes
 from .produtividade import analisar_produtividade_etapas
 from .analise_tempo_crm import mostrar_dashboard_tempo_crm
+from .protocolado import exibir_dashboard_protocolado
 import pandas as pd
 import io
 from datetime import datetime
@@ -121,13 +122,14 @@ def show_cartorio():
     # Mostrar informações relevantes com a nova estrutura de abas
     if not df_cartorio_filtrado.empty:
         # Criar 7 abas reorganizadas (adicionando a nova aba de Análise de Tempo)
-        tab_visao_geral, tab_prod_etapas, tab_tempo_crm, tab_movimentacoes, tab_acomp_emissao, tab_qualidade, tab_visao_anterior = st.tabs([
+        tab_visao_geral, tab_prod_etapas, tab_tempo_crm, tab_movimentacoes, tab_acomp_emissao, tab_qualidade, tab_protocolado, tab_visao_anterior = st.tabs([
             "📊 Visão Geral",
             "⏱️ Produtividade por Etapas",
             "⏳ Análise de Tempo",
             "🔄 Movimentações",
             "📈 Acompanhamento Emissão",
             "🔍 Qualidade dos Dados",
+            "📋 Status Protocolado",
             "📑 Visão Anterior"
         ])
 
@@ -565,6 +567,21 @@ def show_cartorio():
                 else:
                     st.info("Clique no botão acima para executar a análise de confronto.")
 
+        # Nova Aba: Status Protocolado Emissões Brasileiras
+        with tab_protocolado:
+            st.markdown("<h2 class='tab-title'>Status Protocolado Emissões Brasileiras</h2>", unsafe_allow_html=True)
+            st.markdown("""
+            <div style="background-color: #E8EAF6; padding: 18px; border-radius: 8px; margin-bottom: 20px;
+            border-left: 5px solid #3F51B5; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <p style="margin: 0; font-size: 1rem; color: #283593;">Análise das famílias protocoladas e status das emissões, com foco nas unidades Carrão e Alphaville.</p>
+                <p style="margin-top: 12px; font-size: 0.9rem; color: #455A64;">
+                    <strong>Nota:</strong> Esta visualização exibe o progresso das emissões para cada família protocolada.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Chamar a função que exibe o dashboard de protocolado
+            exibir_dashboard_protocolado()
 
         # Aba 6: Visão Anterior
         with tab_visao_anterior:
