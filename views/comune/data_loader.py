@@ -3,10 +3,55 @@ import pandas as pd
 from api.bitrix_connector import load_bitrix_data, get_credentials
 from datetime import datetime
 from dotenv import load_dotenv
-import os # Adicionado para construir caminho do arquivo
+import os
+import json
+import re # Para remoção de pontuação e prefixos
+from unidecode import unidecode # Para remover acentos
+
+# Try importing thefuzz, provide guidance if not found
+try:
+    from thefuzz import process, fuzz
+except ImportError:
+    st.error("Biblioteca 'thefuzz' não encontrada. Por favor, instale com: pip install thefuzz python-Levenshtein")
+    # You might want to stop execution or return an empty DataFrame here
+    # For now, let functions proceed but fuzzy matching will fail if called.
+    process = None
+    fuzz = None
 
 # Carregar variáveis de ambiente
 load_dotenv()
+
+def _normalizar_localizacao(series):
+    """Normalização agressiva para campos de localização."""
+    if not isinstance(series, pd.Series):
+        series = pd.Series(series) # Garantir que é uma Series
+        
+    # 1. Converter para string e minúsculas
+    normalized = series.fillna('').astype(str).str.lower()
+    
+    # 2. Remover acentos
+    try:
+        normalized = normalized.apply(lambda x: unidecode(x) if isinstance(x, str) else x)
+    except Exception:
+         normalized = pd.Series([unidecode(str(x)) for x in series.fillna('')], index=series.index)
+         normalized = normalized.str.lower()
+
+    # 3. Remover prefixos comuns
+    prefixos = ['comune di ', 'provincia di ', 'parrocchia di ', 'parrocchia ', 'citta di ']
+    for prefix in prefixos:
+        normalized = normalized.str.replace(f'^{re.escape(prefix)}', '', regex=True)
+        
+    # 4. Remover pontuação básica
+    normalized = normalized.str.replace(r'[\'\"\.,;!?()\[\]{}]|’', '', regex=True)
+
+    # 5. Remover espaços extras
+    normalized = normalized.str.strip()
+    normalized = normalized.str.replace(r'\s+', ' ', regex=True)
+    
+    # 6. Tratar valores que se tornaram vazios após limpeza ou eram nulos originalmente
+    normalized = normalized.replace(['', 'nan', 'none', 'null'], 'nao especificado', regex=False)
+    
+    return normalized
 
 def carregar_datas_solicitacao():
     """
@@ -34,61 +79,236 @@ def carregar_datas_solicitacao():
         st.error(f"Erro ao ler o arquivo CSV: {e}")
         return pd.DataFrame({'ID': [], 'DATA_SOLICITACAO_ORIGINAL': []})
 
+def carregar_coordenadas_mapa():
+    """
+    Carrega as coordenadas do arquivo JSON mapa_italia.json e normaliza.
+    """
+    script_dir = os.path.dirname(__file__)
+    json_path = os.path.join(script_dir, 'Mapa', 'mapa_italia.json')
+    
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data_json = json.load(f)
+        df_coords = pd.DataFrame(data_json)
+        
+        cols_necessarias = ['city', 'admin_name', 'lat', 'lng']
+        if not all(col in df_coords.columns for col in cols_necessarias):
+            cols_faltantes = [col for col in cols_necessarias if col not in df_coords.columns]
+            st.error(f"JSON {json_path} sem colunas: {cols_faltantes}. Necessário: {cols_necessarias}")
+            return pd.DataFrame()
+        
+        df_coords = df_coords[cols_necessarias].copy()
+        df_coords = df_coords.rename(columns={
+            'city': 'COMUNE_MAPA_ORIG', 
+            'admin_name': 'PROVINCIA_MAPA_ORIG',
+            'lat': 'latitude',
+            'lng': 'longitude'
+        })
+        
+        # Aplicar Normalização Agressiva
+        df_coords['COMUNE_MAPA_NORM'] = _normalizar_localizacao(df_coords['COMUNE_MAPA_ORIG'])
+        df_coords['PROVINCIA_MAPA_NORM'] = _normalizar_localizacao(df_coords['PROVINCIA_MAPA_ORIG'])
+        
+        # Remover duplicatas baseadas nas colunas normalizadas
+        # Mantém a primeira ocorrência de uma combinação (Comune, Provincia)
+        df_coords.drop_duplicates(subset=['COMUNE_MAPA_NORM', 'PROVINCIA_MAPA_NORM'], keep='first', inplace=True)
+        # Opcional: Remover duplicatas baseadas APENAS no comune (se quiser apenas uma coord por comune)
+        # df_coords.drop_duplicates(subset=['COMUNE_MAPA_NORM'], keep='first', inplace=True)
+        
+        df_coords_final = df_coords[['COMUNE_MAPA_NORM', 'PROVINCIA_MAPA_NORM', 'latitude', 'longitude']].copy()
+
+        df_coords_final['latitude'] = pd.to_numeric(df_coords_final['latitude'], errors='coerce')
+        df_coords_final['longitude'] = pd.to_numeric(df_coords_final['longitude'], errors='coerce')
+        df_coords_final.dropna(subset=['latitude', 'longitude'], inplace=True)
+
+        print(f"Carregadas {len(df_coords_final)} coordenadas únicas (Comune+Prov) e válidas do JSON.")
+        return df_coords_final
+        
+    except FileNotFoundError:
+        st.error(f"Arquivo JSON de coordenadas não encontrado em: {json_path}")
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erro ao ler ou processar o arquivo JSON de coordenadas: {e}")
+        return pd.DataFrame()
+
 def carregar_dados_comune():
     """
-    Carrega dados da entidade CRM_DYNAMIC_1052 com CATEGORY_ID = 22
-    e junta com as datas de solicitação do CSV.
+    Carrega dados do Bitrix, normaliza locais, junta datas e coordenadas (merge exato + fuzzy matching).
     """
     # Obter token do Bitrix24
     BITRIX_TOKEN, BITRIX_URL = get_credentials()
     
-    # URL para acessar a tabela crm_dynamic_items_1052
+    # --- Carregar Dados Base do Bitrix --- 
     url_items = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_dynamic_items_1052"
-    
-    # Preparar filtro para a categoria 22
-    category_filter = {"dimensionsFilters": [[]]}
-    category_filter["dimensionsFilters"][0].append({
+    category_filter = {"dimensionsFilters": [[{
         "fieldName": "CATEGORY_ID", 
         "values": ["22"], 
         "type": "INCLUDE", 
         "operator": "EQUALS"
-    })
-    
-    # Carregar os dados do Bitrix
+    }]]}
     df_items = load_bitrix_data(url_items, filters=category_filter)
     
-    # Se o DataFrame estiver vazio, retornar DataFrame vazio
     if df_items is None or df_items.empty:
-        st.error("Não foi possível carregar os dados de COMUNE do Bitrix24. Verifique a conexão.")
+        st.error("Não foi possível carregar os dados de COMUNE do Bitrix24.")
         return pd.DataFrame()
 
-    # Garantir que a coluna ID do Bitrix seja string para o merge
+    # Garantir que a coluna ID do Bitrix seja string
     if 'ID' in df_items.columns:
         df_items['ID'] = df_items['ID'].astype(str)
     else:
-        st.error("Coluna 'ID' não encontrada nos dados do Bitrix. Não é possível juntar as datas de solicitação.")
-        # Adicionar o nome mesmo sem o merge
-        df_items.loc[:, 'NOME_SEGMENTO'] = "COMUNE BITRIX24"
-        return df_items
+        st.error("Coluna 'ID' não encontrada nos dados do Bitrix. Algumas junções podem falhar.")
+        # Continuar mesmo assim, se possível
 
-    # Carregar as datas de solicitação do CSV
-    df_datas_solicitacao = carregar_datas_solicitacao()
+    # --- Normalizar Campos de Localização do Bitrix --- 
+    col_provincia_bitrix = 'UF_CRM_12_1743015702671' # ID da Província
+    col_comune_bitrix = 'UF_CRM_12_1722881735827'    # ID do Comune/Paróquia
 
-    # Juntar (merge) os dados do Bitrix com as datas do CSV
-    if not df_datas_solicitacao.empty:
-        df_items = pd.merge(df_items, df_datas_solicitacao, on='ID', how='left')
-        print(f"Merge realizado. Colunas após merge: {df_items.columns.tolist()}")
-        # Verificar quantas linhas tiveram correspondência
-        matched_rows = df_items['DATA_SOLICITACAO_ORIGINAL'].notna().sum()
-        print(f"{matched_rows} de {len(df_items)} registros tiveram data de solicitação encontrada no CSV.")
+    if col_provincia_bitrix in df_items.columns:
+        df_items['PROVINCIA_ORIG'] = df_items[col_provincia_bitrix] # Guardar original
+        df_items['PROVINCIA_NORM'] = _normalizar_localizacao(df_items[col_provincia_bitrix])
     else:
-        print("Não foi possível carregar ou processar as datas de solicitação do CSV. A coluna DATA_SOLICITACAO_ORIGINAL não será adicionada.")
-        # Adicionar coluna vazia para consistência, se necessário
-        df_items['DATA_SOLICITACAO_ORIGINAL'] = pd.NaT
+        st.warning(f"Coluna de Província ({col_provincia_bitrix}) não encontrada nos dados do Bitrix.")
+        df_items['PROVINCIA_ORIG'] = 'Não Especificado'
+        df_items['PROVINCIA_NORM'] = 'nao especificado'
 
-    # Adicionar o nome para melhor visualização
-    df_items.loc[:, 'NOME_SEGMENTO'] = "COMUNE BITRIX24"
+    if col_comune_bitrix in df_items.columns:
+        df_items['COMUNE_ORIG'] = df_items[col_comune_bitrix] # Guardar original
+        df_items['COMUNE_NORM'] = _normalizar_localizacao(df_items[col_comune_bitrix])
+    else:
+        st.warning(f"Coluna de Comune/Paróquia ({col_comune_bitrix}) não encontrada nos dados do Bitrix.")
+        df_items['COMUNE_ORIG'] = 'Não Especificado'
+        df_items['COMUNE_NORM'] = 'nao especificado'
+        
+    # --- Carregar e Juntar Datas de Solicitação (CSV) --- 
+    df_datas_solicitacao = carregar_datas_solicitacao()
+    if not df_datas_solicitacao.empty and 'ID' in df_items.columns:
+        df_items = pd.merge(df_items, df_datas_solicitacao, on='ID', how='left')
+        matched_rows = df_items['DATA_SOLICITACAO_ORIGINAL'].notna().sum()
+        print(f"{matched_rows} de {len(df_items)} registros tiveram data de solicitação encontrada.")
+    elif 'ID' not in df_items.columns:
+         print("Merge de datas não realizado por falta da coluna 'ID' no Bitrix.")
+    else:
+        print("Não foi possível carregar datas de solicitação do CSV.")
+        df_items['DATA_SOLICITACAO_ORIGINAL'] = pd.NaT # Coluna vazia
+
+    # --- Juntar Coordenadas (JSON) - Merge Exato + Fuzzy --- 
+    df_coordenadas = carregar_coordenadas_mapa()
     
+    # Inicializar colunas de coordenadas no df_items
+    df_items['latitude'] = pd.NA
+    df_items['longitude'] = pd.NA
+    df_items['COORD_SOURCE'] = pd.NA # Para rastrear a origem do match
+
+    if not df_coordenadas.empty:
+        # 1. Merge Exato (Comune + Provincia)
+        coords_cp = df_coordenadas[['COMUNE_MAPA_NORM', 'PROVINCIA_MAPA_NORM', 'latitude', 'longitude']].copy()
+        df_merged_exact = pd.merge(
+            df_items, 
+            coords_cp, 
+            left_on=['COMUNE_NORM', 'PROVINCIA_NORM'], 
+            right_on=['COMUNE_MAPA_NORM', 'PROVINCIA_MAPA_NORM'], 
+            how='left',
+            suffixes=('', '_exact') # Sufixo para colunas de coordenadas do merge exato
+        )
+        
+        mask_exact = df_merged_exact['latitude_exact'].notna()
+        df_items.loc[mask_exact, 'latitude'] = df_merged_exact.loc[mask_exact, 'latitude_exact']
+        df_items.loc[mask_exact, 'longitude'] = df_merged_exact.loc[mask_exact, 'longitude_exact']
+        df_items.loc[mask_exact, 'COORD_SOURCE'] = 'ExactMatch_ComuneProv'
+        count_exact = mask_exact.sum()
+        print(f"{count_exact} correspondências encontradas (Exact Comune+Provincia).")
+        
+        # 2. Fuzzy Match (Comune Only Fallback) - Somente para os não encontrados
+        remaining_mask = df_items['latitude'].isna()
+        count_remaining = remaining_mask.sum()
+        print(f"{count_remaining} registros restantes sem coordenadas.")
+
+        if count_remaining > 0 and process is not None and fuzz is not None:
+            # Lista de nomes de comunes únicos do JSON para comparar
+            json_comunes_norm_list = df_coordenadas['COMUNE_MAPA_NORM'].unique().tolist()
+            # Remover 'nao especificado' da lista de alvos, se presente
+            if 'nao especificado' in json_comunes_norm_list: 
+                json_comunes_norm_list.remove('nao especificado')
+
+            if json_comunes_norm_list: # Prosseguir somente se houver nomes válidos no JSON
+                # Nomes únicos de comunes do Bitrix que ainda precisam de coordenadas
+                bitrix_comunes_to_match = df_items.loc[remaining_mask, 'COMUNE_NORM'].unique().tolist()
+                
+                fuzzy_matches_map = {}
+                match_threshold = 90 # Limite de similaridade (0-100)
+                
+                print(f"Iniciando fuzzy matching para {len(bitrix_comunes_to_match)} comunes únicos restantes...")
+                matched_count_fuzzy = 0
+                for bitrix_comune in bitrix_comunes_to_match:
+                    if bitrix_comune == 'nao especificado': continue # Pular nulos/vazios normalizados
+                    
+                    # Encontrar a melhor correspondência na lista JSON
+                    # Usamos token_sort_ratio que é bom para ordem diferente de palavras
+                    best_match = process.extractOne(
+                        query=bitrix_comune,
+                        choices=json_comunes_norm_list,
+                        scorer=fuzz.token_sort_ratio, 
+                        score_cutoff=match_threshold
+                    )
+                    
+                    if best_match:
+                        # Mapeia: Nome Comune Bitrix -> Nome Comune JSON (melhor correspondência)
+                        fuzzy_matches_map[bitrix_comune] = best_match[0] 
+                        matched_count_fuzzy += 1
+                        # Opcional: Imprimir matches encontrados para debug
+                        # if matched_count_fuzzy < 10: print(f"  Fuzzy Match: '{bitrix_comune}' -> '{best_match[0]}' (Score: {best_match[1]}) ")
+
+                print(f"Fuzzy matching concluído. Encontrados {matched_count_fuzzy} mapeamentos potenciais acima de {match_threshold}%.")
+
+                if fuzzy_matches_map:
+                    # Aplicar o mapeamento para obter o nome do comune JSON correspondente
+                    df_items['JSON_COMUNE_FUZZY_MATCH'] = df_items['COMUNE_NORM'].map(fuzzy_matches_map)
+
+                    # Preparar coordenadas únicas por comune JSON para o merge fuzzy
+                    coords_c_fuzzy = df_coordenadas[['COMUNE_MAPA_NORM', 'latitude', 'longitude']]
+                    coords_c_fuzzy = coords_c_fuzzy.drop_duplicates(subset=['COMUNE_MAPA_NORM'], keep='first')
+                    coords_c_fuzzy = coords_c_fuzzy.rename(columns={'latitude':'lat_fuzzy', 'longitude':'lon_fuzzy'})
+                    
+                    # Fazer merge com base no nome do comune JSON mapeado via fuzzy match
+                    # Fazemos o merge no df_items inteiro, mas só atualizaremos onde remaining_mask é True
+                    df_items = pd.merge(
+                        df_items, 
+                        coords_c_fuzzy, 
+                        left_on='JSON_COMUNE_FUZZY_MATCH', 
+                        right_on='COMUNE_MAPA_NORM', 
+                        how='left',
+                        suffixes=('', '_fuzzy') # Evitar conflito se colunas já existissem
+                    )
+
+                    # Atualizar coordenadas APENAS para linhas que não tinham match exato E tiveram um match fuzzy
+                    mask_fuzzy_update = remaining_mask & df_items['lat_fuzzy'].notna()
+                    df_items.loc[mask_fuzzy_update, 'latitude'] = df_items.loc[mask_fuzzy_update, 'lat_fuzzy']
+                    df_items.loc[mask_fuzzy_update, 'longitude'] = df_items.loc[mask_fuzzy_update, 'lon_fuzzy']
+                    df_items.loc[mask_fuzzy_update, 'COORD_SOURCE'] = 'FuzzyMatch_Comune'
+                    count_fuzzy_applied = mask_fuzzy_update.sum()
+                    print(f"{count_fuzzy_applied} correspondências adicionais aplicadas (Fuzzy Comune Only).")
+                    
+                    # Limpar colunas temporárias do merge fuzzy
+                    df_items.drop(columns=['JSON_COMUNE_FUZZY_MATCH', 'COMUNE_MAPA_NORM', 'lat_fuzzy', 'lon_fuzzy'], inplace=True, errors='ignore')
+            else:
+                print("Não há nomes de comunes válidos no arquivo JSON para realizar o fuzzy matching.")
+        elif count_remaining > 0:
+             print("Fuzzy matching não executado pois a biblioteca 'thefuzz' não foi importada corretamente.")
+             st.warning("Instale 'thefuzz' e 'python-Levenshtein' para habilitar o fuzzy matching e melhorar a correspondência de coordenadas.")
+
+        # Verificar total final
+        total_matched_coords = df_items['latitude'].notna().sum()
+        print(f"Total final: {total_matched_coords}/{len(df_items)} registros com coordenadas.")
+        
+        # Limpar colunas temporárias do merge exato
+        df_items.drop(columns=['COMUNE_MAPA_NORM_exact', 'PROVINCIA_MAPA_NORM_exact', 'latitude_exact', 'longitude_exact'], inplace=True, errors='ignore')
+
+    else:
+        print("Arquivo de coordenadas vazio ou não carregado. Nenhuma coordenada adicionada.")
+        
+    # --- Finalização --- 
+    df_items.loc[:, 'NOME_SEGMENTO'] = "COMUNE BITRIX24"
+    print(f"Colunas finais: {df_items.columns.tolist()}")
     return df_items
 
 def carregar_dados_negocios():

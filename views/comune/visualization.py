@@ -1259,7 +1259,8 @@ def visualizar_analise_evidencia(df_comune):
 
 def visualizar_providencias(df_comune):
     """
-    Exibe tabelas separadas agrupadas por Província e por Comune/Paróquia.
+    Exibe um mapa, métricas de correspondência e tabelas separadas agrupadas 
+    por Província e por Comune/Paróquia.
     """
     st.markdown("""
     <h3 style="font-size: 26px; font-weight: 800; color: #1A237E; margin: 30px 0 15px 0; 
@@ -1272,9 +1273,85 @@ def visualizar_providencias(df_comune):
         return
 
     # IDs das colunas
-    col_provincia = 'UF_CRM_12_1743015702671' # ID da Província
-    col_comune = 'UF_CRM_12_1722881735827'    # ID do Comune/Paróquia
+    col_provincia_orig = 'PROVINCIA_ORIG' # Nome original guardado no data_loader
+    col_comune_orig = 'COMUNE_ORIG'       # Nome original guardado no data_loader
+    col_provincia_norm = 'PROVINCIA_NORM' # Normalizado no data_loader
+    col_comune_norm = 'COMUNE_NORM'       # Normalizado no data_loader
     col_id = 'ID'
+    col_lat = 'latitude' 
+    col_lon = 'longitude' 
+    col_coord_source = 'COORD_SOURCE' # Coluna que indica a fonte do match
+
+    # --- Mapa e Métricas de Coordenadas --- 
+    st.markdown("#### Mapa e Correspondência de Coordenadas")
+    
+    # Verificar se as colunas de coordenadas existem
+    if col_lat in df_comune.columns and col_lon in df_comune.columns:
+        # Filtrar dados que possuem coordenadas válidas
+        df_mapa = df_comune[[col_lat, col_lon]].dropna()
+        pontos_no_mapa = len(df_mapa)
+        total_processos = len(df_comune)
+        percentual_mapeado = (pontos_no_mapa / total_processos * 100) if total_processos > 0 else 0
+        
+        # Calcular contagens por tipo de match
+        count_exact = 0
+        count_fuzzy = 0
+        if col_coord_source in df_comune.columns:
+            counts = df_comune[col_coord_source].value_counts()
+            count_exact = counts.get('ExactMatch_ComuneProv', 0)
+            count_fuzzy = counts.get('FuzzyMatch_Comune', 0)
+        count_no_match = total_processos - count_exact - count_fuzzy
+
+        # Exibir Métricas
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total de Processos", total_processos)
+        with col2:
+            st.metric("Processos Mapeados", pontos_no_mapa, f"{percentual_mapeado:.1f}%", delta_color="off")
+        with col3:
+            st.metric("Sem Coordenadas", count_no_match)
+
+        st.markdown(f"*   **Match Exato (Comune+Província):** {count_exact}")
+        st.markdown(f"*   **Match Fuzzy (Apenas Comune):** {count_fuzzy}")
+
+        # Exibir Mapa
+        if not df_mapa.empty:
+            st.map(df_mapa, latitude=col_lat, longitude=col_lon, size=10)
+        else:
+            st.warning("Nenhum processo com coordenadas válidas encontrado para exibir no mapa.")
+            
+        # Tabela de Diagnóstico Expansível
+        with st.expander("Ver Detalhes da Correspondência de Coordenadas"):
+            cols_diagnostico = [
+                col_id, 
+                col_provincia_orig, 
+                col_comune_orig, 
+                col_provincia_norm, 
+                col_comune_norm, 
+                col_coord_source, 
+                col_lat, 
+                col_lon
+            ]
+            # Filtrar colunas que realmente existem
+            cols_diagnostico_presentes = [c for c in cols_diagnostico if c in df_comune.columns]
+            df_diag = df_comune[cols_diagnostico_presentes].copy()
+            df_diag[col_coord_source] = df_diag[col_coord_source].fillna('No Match') # Preencher nulos na fonte
+            st.dataframe(df_diag, use_container_width=True)
+            
+            # Download da tabela de diagnóstico
+            csv_diag = df_diag.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Baixar Detalhes da Correspondência (CSV)",
+                data=csv_diag,
+                file_name=f'diagnostico_coordenadas_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                mime='text/csv',
+                key='download-diag-coord-csv'
+            )
+
+    else:
+        st.error(f"Colunas de coordenadas ('{col_lat}', '{col_lon}') não encontradas nos dados carregados.")
+
+    st.markdown("---") # Divisor
 
     # --- Tabela por Província --- 
     st.markdown("#### Contagem por Província")
@@ -1282,25 +1359,17 @@ def visualizar_providencias(df_comune):
         "Nota: Processos em estágios como 'Entregue PDF', 'Pendente', "
         "'Pesquisa Não Finalizada' ou 'Devolutiva Emissor' podem não ter "
         "o campo Província preenchido. Estes casos, juntamente com outros sem preenchimento, "
-        "são agrupados em 'não especificada'."
+        "são agrupados em 'nao especificado'."
     )
-    if col_provincia in df_comune.columns and col_id in df_comune.columns:
-        # Preencher NaN e agrupar
-        df_prov = df_comune[[col_provincia, col_id]].copy()
-        # Normalizar: Title Case, sem espaços extras, tratar NaNs e vazios
-        df_prov[col_provincia] = df_prov[col_provincia].astype(str).str.title().str.strip()
-        # Substituir representações comuns de nulo/vazio pelo termo padrão (após title case)
-        df_prov[col_provincia] = df_prov[col_provincia].replace(['', 'Nan', 'None', 'Null'], 'Não Especificada', regex=False)
-        # Garantir que NaNs originais também sejam tratados
-        df_prov[col_provincia] = df_prov[col_provincia].fillna('Não Especificada') 
-
-        df_prov_agrupado = df_prov.groupby(col_provincia).agg(
+    if col_provincia_norm in df_comune.columns and col_id in df_comune.columns:
+        # Agrupar usando a coluna normalizada
+        df_prov_agrupado = df_comune.groupby(col_provincia_norm).agg(
             Quantidade_Processos=(col_id, 'count')
         ).reset_index()
         
         # Renomear e ordenar
         df_prov_agrupado = df_prov_agrupado.rename(columns={
-            col_provincia: 'Província',
+            col_provincia_norm: 'Província (Normalizada)', # Ajustar nome da coluna
             'Quantidade_Processos': 'Nº de Processos'
         })
         df_prov_agrupado = df_prov_agrupado.sort_values(by='Nº de Processos', ascending=False)
@@ -1318,29 +1387,21 @@ def visualizar_providencias(df_comune):
             key='download-provincia-count-csv'
         )
     else:
-        st.warning(f"Não foi possível gerar a tabela por província. Colunas necessárias: {col_provincia}, {col_id}")
+        st.warning(f"Não foi possível gerar a tabela por província. Colunas necessárias: {col_provincia_norm}, {col_id}")
 
     st.markdown("---") # Divisor
 
     # --- Tabela por Comune/Paróquia --- 
     st.markdown("#### Contagem por Comune/Paróquia")
-    if col_comune in df_comune.columns and col_id in df_comune.columns:
-        # Preencher NaN e agrupar
-        df_com = df_comune[[col_comune, col_id]].copy()
-        # Normalizar: Title Case, sem espaços extras, tratar NaNs e vazios
-        df_com[col_comune] = df_com[col_comune].astype(str).str.title().str.strip()
-        # Substituir representações comuns de nulo/vazio pelo termo padrão (após title case)
-        df_com[col_comune] = df_com[col_comune].replace(['', 'Nan', 'None', 'Null'], 'Não Especificado(a)', regex=False)
-        # Garantir que NaNs originais também sejam tratados
-        df_com[col_comune] = df_com[col_comune].fillna('Não Especificado(a)')
-        
-        df_com_agrupado = df_com.groupby(col_comune).agg(
+    if col_comune_norm in df_comune.columns and col_id in df_comune.columns:
+        # Agrupar usando a coluna normalizada
+        df_com_agrupado = df_comune.groupby(col_comune_norm).agg(
             Quantidade_Processos=(col_id, 'count')
         ).reset_index()
         
         # Renomear e ordenar
         df_com_agrupado = df_com_agrupado.rename(columns={
-            col_comune: 'Comune/Paróquia',
+            col_comune_norm: 'Comune/Paróquia (Normalizada)', # Ajustar nome da coluna
             'Quantidade_Processos': 'Nº de Processos'
         })
         df_com_agrupado = df_com_agrupado.sort_values(by='Nº de Processos', ascending=False)
@@ -1358,7 +1419,7 @@ def visualizar_providencias(df_comune):
             key='download-comune-count-csv'
         )
     else:
-        st.warning(f"Não foi possível gerar a tabela por comune/paróquia. Colunas necessárias: {col_comune}, {col_id}")
+        st.warning(f"Não foi possível gerar a tabela por comune/paróquia. Colunas necessárias: {col_comune_norm}, {col_id}")
 
 
 # Funções auxiliares para formatação de tempo
