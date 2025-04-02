@@ -64,8 +64,27 @@ def show_inicio():
     # Verificar se está no modo de demonstração
     demo_mode = st.session_state.get('demo_mode', False)
     
-    # Verificar se foi acionado atualização via botão flutuante
-    if st.session_state.get('reload_trigger', False):
+    # Verificar se foi acionado atualização completa via botão flutuante
+    if st.session_state.get('full_refresh', False):
+        # Exibir indicador de atualização completa
+        st.info("⏳ Realizando atualização completa dos dados...")
+        
+        # Limpar todos os dados em cache para forçar recarregamento
+        for key in ['df_inicio', 'macro_counts', 'conclusoes_recentes']:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        # Ativar flag para forçar recarregamento ignorando cache
+        st.session_state['force_reload'] = True
+        
+        # Limpar flag de atualização completa
+        st.session_state['full_refresh'] = False
+        
+        # Recarregar imediatamente para iniciar o processo
+        st.rerun()
+    
+    # Verificar se foi acionado atualização normal via botão flutuante
+    elif st.session_state.get('reload_trigger', False):
         # Limpar dados em cache para forçar recarregamento
         for key in ['df_inicio', 'macro_counts', 'conclusoes_recentes']:
             if key in st.session_state:
@@ -77,6 +96,26 @@ def show_inicio():
     
     st.title("Dashboard CRM Bitrix24")
     st.markdown("---")
+    
+    # Nas seções subsequentes, onde os dados são carregados, vamos adicionar o parâmetro force_reload
+    force_reload = st.session_state.get('force_reload', False)
+    
+    # Se estiver forçando recarregamento, exibir indicador
+    if force_reload:
+        st.info("⏳ Atualizando dados diretamente da API (ignorando cache)...")
+    
+    try:
+        # Carregar dados com o novo parâmetro force_reload onde os dados são carregados
+        # ...
+        
+        # Desativar flag de força de recarregamento após uso
+        if 'force_reload' in st.session_state:
+            del st.session_state['force_reload']
+            
+    except Exception as e:
+        st.error(f"Erro ao carregar dados: {str(e)}")
+        if st.button("Tentar novamente"):
+            st.experimental_rerun()
     
     # Resumo do projeto
     st.markdown("""

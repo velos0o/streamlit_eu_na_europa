@@ -86,12 +86,48 @@ def render_sidebar_refresh_button():
     
     # Botão grande nativo do Streamlit
     if st.sidebar.button("🔄 ATUALIZAR DADOS", key="btn_sidebar_refresh_all", type="primary", use_container_width=True):
-        # Definir estados para forçar o recarregamento em todas as páginas
-        st.session_state['reload_trigger'] = True
-        st.session_state['loading_state'] = 'loading'
+        # Limpar TODOS os dados em cache para forçar nova chamada à API
+        chaves_para_limpar = [
+            # Estados de carregamento
+            'loading_state',
+            'reload_trigger',
+            
+            # Dados da página inicial
+            'df_inicio', 
+            'macro_counts', 
+            'conclusoes_recentes',
+            
+            # Dados da página de produção
+            'filtered_df',
+            'filtered_df_cat34',
+            
+            # Outros dados de cache que possam existir
+            'df_conclusoes',
+            'df_cartorio',
+            'df_comune',
+            'df_extracoes',
+            
+            # Filtros e configurações para reiniciar
+            'start_date',
+            'end_date',
+            'selected_status',
+            'selected_responsibles'
+        ]
+        
+        # Limpar cada chave se existir no estado da sessão
+        for chave in chaves_para_limpar:
+            if chave in st.session_state:
+                del st.session_state[chave]
+        
+        # Definir explicitamente o estado de carregamento como 'not_started' 
+        # para forçar recarregamento completo
+        st.session_state['loading_state'] = 'not_started'
+        
+        # Flag para indicar que estamos fazendo uma atualização completa
+        st.session_state['full_refresh'] = True
         
         # Registrar no log
-        print("Botão de atualização acionado na sidebar - recarregando dados")
+        print("Atualizando todos os dados - limpeza completa do cache")
         
         # Recarregar a página
         st.rerun()

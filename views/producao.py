@@ -278,8 +278,29 @@ def show_producao():
         st.session_state['loading_state'] = 'loading'
         st.rerun()
     
-    # Verificar se foi acionado atualização via botão flutuante
-    if st.session_state.get('reload_trigger', False):
+    # Verificar se foi acionado atualização completa via botão flutuante
+    if st.session_state.get('full_refresh', False):
+        # Exibir indicador de atualização completa
+        st.info("⏳ Realizando atualização completa dos dados...")
+        
+        # Forçar estado de carregamento
+        st.session_state['loading_state'] = 'loading'
+        
+        # Ativar flag para forçar recarregamento ignorando cache
+        st.session_state['force_reload'] = True
+        
+        # Limpar flag de atualização completa
+        st.session_state['full_refresh'] = False
+        
+        # Registrar no log para depuração
+        if st.session_state.get('debug_mode', False):
+            st.write("Atualização completa iniciada via botão de atualização")
+        
+        # Recarregar imediatamente para iniciar o processo
+        st.rerun()
+    
+    # Verificar se foi acionado atualização normal via botão flutuante
+    elif st.session_state.get('reload_trigger', False):
         st.session_state['loading_state'] = 'loading'
         st.session_state['reload_trigger'] = False
         if st.session_state.get('debug_mode', False):
@@ -291,6 +312,7 @@ def show_producao():
     debug_mode = st.session_state.get('debug_mode', False)
     use_id_filter = st.session_state.get('use_id_filter', False)
     id_list = st.session_state.get('id_list', None)
+    force_reload = st.session_state.get('force_reload', False)
     
     # Se estiver carregando, mostrar apenas a animação
     if loading_state == 'loading':
@@ -322,6 +344,10 @@ def show_producao():
                     
                     update_progress(progress_bar, 0.2, message_container, "Conectando à API do Bitrix24...")
                     
+                    # Se estiver forçando recarregamento, mostrar mensagem
+                    if force_reload:
+                        update_progress(progress_bar, 0.25, message_container, "Ignorando cache e recarregando todos os dados...")
+                    
                     # Carregar dados com filtro de IDs se necessário
                     filtered_df = load_merged_data(
                         category_id=32,
@@ -330,7 +356,8 @@ def show_producao():
                         deal_ids=id_list if use_id_filter else None,
                         debug=debug_mode,
                         progress_bar=progress_bar,
-                        message_container=message_container
+                        message_container=message_container,
+                        force_reload=force_reload  # Passar o parâmetro para forçar recarregamento
                     )
                     
                     # Carregar dados da categoria 34 se não estiver em modo de demo
@@ -349,6 +376,10 @@ def show_producao():
                 
                 # Armazenar dados filtrados na sessão
                 st.session_state['filtered_df'] = filtered_df
+                
+                # Desativar flag de força de recarregamento após uso
+                if 'force_reload' in st.session_state:
+                    del st.session_state['force_reload']
                 
                 # Atualizar estado de carregamento
                 update_progress(progress_bar, 1.0, message_container, "Dados carregados com sucesso!")

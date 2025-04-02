@@ -60,7 +60,7 @@ SHOW_DEBUG_INFO = False
 
 # Função para carregar os dados do Bitrix com cache do Streamlit
 @st.cache_data(ttl=3600)  # Cache válido por 1 hora
-def load_bitrix_data(url, filters=None, show_logs=False):
+def load_bitrix_data(url, filters=None, show_logs=False, force_reload=False):
     """
     Carrega dados do Bitrix24 via API.
     
@@ -68,10 +68,17 @@ def load_bitrix_data(url, filters=None, show_logs=False):
         url (str): URL da API Bitrix24
         filters (dict, optional): Filtros para a consulta
         show_logs (bool): Se deve exibir logs de depuração
+        force_reload (bool): Se deve ignorar o cache e forçar recarregamento
         
     Returns:
         pandas.DataFrame: DataFrame com os dados obtidos
     """
+    # Se estiver forçando recarregamento, invalidar o cache para esta chamada
+    if force_reload:
+        load_bitrix_data.clear()
+        if show_logs:
+            st.info("Cache invalidado para forçar recarregamento")
+    
     try:
         if show_logs:
             st.info(f"Tentando acessar: {url}")
@@ -186,7 +193,7 @@ def load_bitrix_data(url, filters=None, show_logs=False):
             st.error(f"Erro ao carregar dados do Bitrix24: {str(e)}")
         return pd.DataFrame()
 
-def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=None, debug=False, progress_bar=None, message_container=None):
+def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=None, debug=False, progress_bar=None, message_container=None, force_reload=False):
     """
     Carrega e mescla dados das tabelas crm_deal e crm_deal_uf.
     
@@ -198,6 +205,7 @@ def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=No
         debug (bool): Se deve mostrar informações de depuração
         progress_bar: Placeholder da barra de progresso (opcional)
         message_container: Placeholder da mensagem (opcional)
+        force_reload (bool): Se deve ignorar o cache e forçar recarregamento completo
         
     Returns:
         pandas.DataFrame: DataFrame com os dados mesclados
@@ -214,6 +222,8 @@ def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=No
         st.write(f"Categoria: {category_id}, Período: {date_from} a {date_to}")
         if deal_ids:
             st.write(f"IDs específicos: {deal_ids}")
+        if force_reload:
+            st.info("Modo de recarregamento forçado ativado - ignorando cache")
     
     try:
         # Preparar os filtros
@@ -251,7 +261,7 @@ def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=No
         # Carregar dados principais
         if debug:
             st.subheader("Carregando tabela crm_deal")
-        df_deal = load_bitrix_data(BITRIX_CRM_DEAL_URL, filters if filters["dimensionsFilters"][0] else None, show_logs=debug)
+        df_deal = load_bitrix_data(BITRIX_CRM_DEAL_URL, filters if filters["dimensionsFilters"][0] else None, show_logs=debug, force_reload=force_reload)
         
         # Atualizar progresso - 40%
         if progress_bar:
@@ -261,7 +271,7 @@ def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=No
         if df_deal.empty:
             if debug:
                 st.warning("Falha ao carregar dados com filtros. Tentando sem filtros...")
-            df_deal = load_bitrix_data(BITRIX_CRM_DEAL_URL, show_logs=debug)
+            df_deal = load_bitrix_data(BITRIX_CRM_DEAL_URL, show_logs=debug, force_reload=force_reload)
         
         # Verificar se temos dados
         if df_deal.empty:
@@ -317,7 +327,7 @@ def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=No
         if debug:
             st.subheader("Carregando tabela crm_deal_uf")
             st.write("Filtro para crm_deal_uf:", deal_filter)  # Debug adicional
-        df_deal_uf = load_bitrix_data(BITRIX_CRM_DEAL_UF_URL, deal_filter, show_logs=debug)
+        df_deal_uf = load_bitrix_data(BITRIX_CRM_DEAL_UF_URL, deal_filter, show_logs=debug, force_reload=force_reload)
         
         # Atualizar progresso - 70%
         if progress_bar:
@@ -326,7 +336,7 @@ def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=No
         # Se não conseguimos conectar, tentar com o filtro original
         if df_deal_uf.empty and debug:
             st.warning("Falha ao carregar dados com filtro de IDs. Tentando com filtro original...")
-            df_deal_uf = load_bitrix_data(BITRIX_CRM_DEAL_UF_URL, filters if filters["dimensionsFilters"][0] else None, show_logs=debug)
+            df_deal_uf = load_bitrix_data(BITRIX_CRM_DEAL_UF_URL, filters if filters["dimensionsFilters"][0] else None, show_logs=debug, force_reload=force_reload)
             
         # Verificar se temos dados
         if df_deal_uf.empty:
