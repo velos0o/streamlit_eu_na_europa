@@ -61,6 +61,20 @@ def show_inicio():
     """
     Exibe a página inicial do dashboard
     """
+    # Verificar se está no modo de demonstração
+    demo_mode = st.session_state.get('demo_mode', False)
+    
+    # Verificar se foi acionado atualização via botão flutuante
+    if st.session_state.get('reload_trigger', False):
+        # Limpar dados em cache para forçar recarregamento
+        for key in ['df_inicio', 'macro_counts', 'conclusoes_recentes']:
+            if key in st.session_state:
+                del st.session_state[key]
+        
+        # Resetar flag de recarregamento
+        st.session_state['reload_trigger'] = False
+        st.rerun()
+    
     st.title("Dashboard CRM Bitrix24")
     st.markdown("---")
     

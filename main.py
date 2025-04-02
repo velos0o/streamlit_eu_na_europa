@@ -31,10 +31,53 @@ from views.comune.comune_main import show_comune
 from components.report_guide import show_guide_sidebar, show_page_guide, show_contextual_help
 from components.search_component import show_search_box
 from components.table_of_contents import render_toc
+# Importar o componente de botão de atualização
+from components.refresh_button import render_refresh_button, render_sidebar_refresh_button
 
 # Carregando CSS ainda necessário
 with open('assets/styles.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# CSS adicional para o botão de atualização gigante
+st.markdown("""
+<style>
+/* CSS específico para o botão de atualização na barra lateral usando ID */
+div.stButton > button#btn_sidebar_refresh_all {
+    height: 120px !important;
+    font-size: 24px !important;
+    font-weight: 900 !important;
+    letter-spacing: 1px !important;
+    border-radius: 12px !important;
+    margin: 15px 0 !important;
+    padding: 10px !important;
+    background-color: #FF5722 !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.2) !important;
+    transition: all 0.3s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+div.stButton > button#btn_sidebar_refresh_all:hover {
+    background-color: #E64A19 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 15px rgba(0,0,0,0.3) !important;
+}
+
+/* Adicionar animação pulsante para chamar mais atenção */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+    100% { transform: scale(1); }
+}
+
+div.stButton > button#btn_sidebar_refresh_all {
+    animation: pulse 2s infinite;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Adicionar CSS para centralizar imagens no sidebar
 st.markdown("""
@@ -73,6 +116,10 @@ st.sidebar.image("assets/LOGO-EU.NA.EUROPA-MAIO.24-COLORIDO-VERTICAL.svg", width
 
 # Menu de navegação simplificado
 st.sidebar.title("Dashboard CRM Bitrix24")
+
+# Adicionar o botão grande de atualização na barra lateral
+render_sidebar_refresh_button()
+
 st.sidebar.markdown("---")
 
 # Adicionar barra de pesquisa no topo do sidebar

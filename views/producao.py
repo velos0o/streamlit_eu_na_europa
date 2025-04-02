@@ -277,6 +277,14 @@ def show_producao():
     if 'loading_state' not in st.session_state:
         st.session_state['loading_state'] = 'loading'
         st.rerun()
+    
+    # Verificar se foi acionado atualização via botão flutuante
+    if st.session_state.get('reload_trigger', False):
+        st.session_state['loading_state'] = 'loading'
+        st.session_state['reload_trigger'] = False
+        if st.session_state.get('debug_mode', False):
+            st.info("Atualização iniciada via botão flutuante")
+        st.rerun()
 
     loading_state = st.session_state.get('loading_state', 'loading')
     demo_mode = st.session_state.get('demo_mode', False)
