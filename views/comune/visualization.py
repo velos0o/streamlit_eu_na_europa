@@ -1164,6 +1164,13 @@ def visualizar_analise_evidencia(df_comune):
     if 'COMPROVANTE_VALIDADO' in df_analise.columns and 'EVIDENCIA_ANEXADA' in df_analise.columns:
         df_comp_sim_evid_nao = df_analise[(df_analise['COMPROVANTE_VALIDADO'] == True) & (df_analise['EVIDENCIA_ANEXADA'] == False)].copy()
         comp_sim_evid_nao = len(df_comp_sim_evid_nao)
+    
+    # Novo caso específico: Comprovante Não E Evidência Sim
+    comp_nao_evid_sim = 0
+    df_comp_nao_evid_sim = pd.DataFrame()
+    if 'COMPROVANTE_VALIDADO' in df_analise.columns and 'EVIDENCIA_ANEXADA' in df_analise.columns:
+        df_comp_nao_evid_sim = df_analise[(df_analise['COMPROVANTE_VALIDADO'] == False) & (df_analise['EVIDENCIA_ANEXADA'] == True)].copy()
+        comp_nao_evid_sim = len(df_comp_nao_evid_sim)
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -1178,8 +1185,9 @@ def visualizar_analise_evidencia(df_comune):
     with col3:
         metric_container = st.container()
         metric_container.metric("⚠️ Comprovante 'Sim' SEM Evidência Anexada", comp_sim_evid_nao)
+        metric_container.metric("⚠️ Comprovante 'Não' COM Evidência Anexada", comp_nao_evid_sim)
         
-        # Adicionar expander com detalhes dos registros com problema
+        # Adicionar expander com detalhes dos registros com problema (Comprovante Sim SEM Evidência)
         if comp_sim_evid_nao > 0:
             with st.expander("Detalhamento dos registros com Comprovante 'Sim' SEM Evidência Anexada", expanded=True):
                 st.markdown("""
@@ -1210,6 +1218,39 @@ def visualizar_analise_evidencia(df_comune):
                     file_name=f'comprovantes_sem_evidencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
                     mime='text/csv',
                     key='download-comp-sem-evid-csv',
+                    use_container_width=False
+                )
+        
+        # Adicionar expander com detalhes dos registros com problema (Comprovante Não COM Evidência)
+        if comp_nao_evid_sim > 0:
+            with st.expander("Detalhamento dos registros com Comprovante 'Não' COM Evidência Anexada", expanded=True):
+                st.markdown("""
+                <div style="background-color: #e8f5e9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 5px solid #43a047;">
+                <h4 style="color: #1b5e20; margin-top: 0;">Atenção: Registros para Validação</h4>
+                <p style="margin-bottom: 5px;">Os registros abaixo possuem <strong>Evidência Anexada</strong> mas o campo <strong>Comprovante Validado</strong> está marcado como <strong>Não</strong>. Isso pode indicar:</p>
+                <ul style="margin-bottom: 0;">
+                <li>Evidência anexada aguardando validação</li>
+                <li>Esquecimento de atualizar o status do comprovante após anexar evidência</li>
+                <li>Evidência anexada que precisa ser revisada</li>
+                </ul>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Selecionar colunas relevantes para exibição na tabela
+                colunas_tabela = ['id_processo', 'titulo', 'provincia_id', 'comune_paroquia_id', 'Comprovante Validado?', 'Evidência Anexada?', 'data_solicitacao_original']
+                colunas_tabela_presentes = [col for col in colunas_tabela if col in df_comp_nao_evid_sim.columns]
+                
+                # Exibir tabela com os dados
+                st.dataframe(df_comp_nao_evid_sim[colunas_tabela_presentes], use_container_width=True)
+
+                # Adicionar opção de download
+                csv = df_comp_nao_evid_sim[colunas_tabela_presentes].to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Baixar CSV",
+                    data=csv,
+                    file_name=f'comprovantes_nao_com_evidencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                    mime='text/csv',
+                    key='download-comp-nao-com-evid-csv',
                     use_container_width=False
                 )
 
@@ -1298,7 +1339,7 @@ def visualizar_analise_evidencia(df_comune):
 def visualizar_providencias(df_comune):
     """
     Exibe um mapa, métricas de correspondência e tabelas separadas agrupadas 
-    por Província e por Comune/Paróquia.
+    por Província e por Comune/Paróquia, com algoritmo de geocodificação aprimorado.
     """
     st.markdown("""
     <h3 style="font-size: 26px; font-weight: 800; color: #1A237E; margin: 30px 0 15px 0; 
@@ -1325,8 +1366,518 @@ def visualizar_providencias(df_comune):
     
     # Verificar se as colunas de coordenadas existem
     if col_lat in df_comune.columns and col_lon in df_comune.columns:
+        # Backup dos dados originais antes de aplicar melhorias
+        df_original = df_comune.copy()
+        
+        # --- NOVO: Aplicar algoritmo de correspondência aprimorado ---
+        try:
+            from thefuzz import process, fuzz
+            # Instale as bibliotecas necessárias
+            try:
+                import folium
+                from streamlit_folium import folium_static
+            except ImportError:
+                st.warning("Para visualização aprimorada de mapas, instale: pip install folium streamlit-folium")
+                
+            # Carregar dados geográficos de referência (usando o mesmo procedimento do data_loader)
+            import os
+            import json
+            
+            # Dicionário de correções manuais para casos específicos (pode ser expandido)
+            correcoes_manuais = {
+                # Comune: (latitude, longitude, fonte)
+                "piavon": (45.7167, 12.4333, "Correção Manual"),
+                "vazzola": (45.8333, 12.3333, "Correção Manual"),
+                "oderzo": (45.7833, 12.4833, "Correção Manual"),
+                "valdobbiadene": (45.9000, 12.0333, "Correção Manual"),
+                "motta di livenza": (45.7833, 12.6167, "Correção Manual"),
+                "susegana": (45.8500, 12.2500, "Correção Manual"),
+                "vittorio veneto": (45.9833, 12.3000, "Correção Manual"),
+                "boara polesine": (45.0333, 11.7833, "Correção Manual"),
+                "mansuè": (45.8333, 12.5167, "Correção Manual"),
+                "san dona di piave": (45.6333, 12.5667, "Correção Manual"),
+                "godego": (45.7000, 11.8667, "Correção Manual"),
+                "castello di godego": (45.7000, 11.8667, "Correção Manual"),
+                "legnago": (45.1833, 11.3167, "Correção Manual"),
+                "stienta": (44.9500, 11.5500, "Correção Manual"),
+                "montebelluna": (45.7833, 12.0500, "Correção Manual"),
+                "vigasio": (45.3167, 10.9333, "Correção Manual"),
+                "villorba": (45.7333, 12.2333, "Correção Manual"),
+                "bondeno": (44.8833, 11.4167, "Correção Manual"),
+                "trevignano": (45.7333, 12.1000, "Correção Manual"),
+                "cavarzere": (45.1333, 12.0667, "Correção Manual"),
+                "arcade": (45.7333, 12.2000, "Correção Manual"),
+                "castelfranco veneto": (45.6667, 11.9333, "Correção Manual"),
+                "gaiarine": (45.9000, 12.4833, "Correção Manual"),
+                "borso del grappa": (45.8167, 11.8000, "Correção Manual"),
+                "cittadella": (45.6500, 11.7833, "Correção Manual"),
+                "albignasego": (45.3667, 11.8500, "Correção Manual"),
+                "zero branco": (45.6167, 12.1667, "Correção Manual"),
+                "sona": (45.4333, 10.8333, "Correção Manual"),
+                "lendinara": (45.0833, 11.5833, "Correção Manual"),
+            }
+            
+            # Adicionar correções de províncias típicas italianas
+            provincias_manuais = {
+                "treviso": (45.6667, 12.2500, "Correção Província"),
+                "venezia": (45.4375, 12.3358, "Correção Província"),
+                "padova": (45.4167, 11.8667, "Correção Província"),
+                "verona": (45.4386, 10.9928, "Correção Província"),
+                "vicenza": (45.5500, 11.5500, "Correção Província"),
+                "rovigo": (45.0667, 11.7833, "Correção Província"),
+                "mantova": (45.1500, 10.7833, "Correção Província"),
+                "belluno": (46.1333, 12.2167, "Correção Província"),
+                "pordenone": (45.9667, 12.6500, "Correção Província"),
+                "udine": (46.0667, 13.2333, "Correção Província"),
+                "cremona": (45.1333, 10.0333, "Correção Província"),
+                "brescia": (45.5417, 10.2167, "Correção Província"),
+                "bergamo": (45.6950, 9.6700, "Correção Província"),
+                "milano": (45.4669, 9.1900, "Correção Província"),
+                "cosenza": (39.3000, 16.2500, "Correção Província"),
+                "salerno": (40.6806, 14.7594, "Correção Província"),
+                "caserta": (41.0667, 14.3333, "Correção Província"),
+                "napoli": (40.8333, 14.2500, "Correção Província"),
+                "potenza": (40.6333, 15.8000, "Correção Província"),
+                "ferrara": (44.8333, 11.6167, "Correção Província"),
+                "bologna": (44.4939, 11.3428, "Correção Província"),
+                "lucca": (43.8428, 10.5039, "Correção Província"),
+                "roma": (41.9000, 12.5000, "Correção Província"),
+                "benevento": (41.1333, 14.7833, "Correção Província"),
+                "campobasso": (41.5667, 14.6667, "Correção Província"),
+                "cagliari": (39.2278, 9.1111, "Correção Província"),
+                "messina": (38.1936, 15.5542, "Correção Província"),
+                "catanzaro": (38.9000, 16.6000, "Correção Província"),
+                "palermo": (38.1111, 13.3517, "Correção Província"),
+            }
+            
+            df_mapa_ref = None
+            
+            # Tentar carregar o arquivo de referência geográfica existente
+            script_dir = os.path.dirname(__file__)
+            json_path = os.path.join(script_dir, 'Mapa', 'mapa_italia.json')
+            
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    data_json = json.load(f)
+                df_mapa_ref = pd.DataFrame(data_json)
+                
+                # Verificar e processar colunas
+                if 'city' in df_mapa_ref.columns and 'admin_name' in df_mapa_ref.columns and 'lat' in df_mapa_ref.columns and 'lng' in df_mapa_ref.columns:
+                    # Renomear colunas para clareza
+                    df_mapa_ref = df_mapa_ref.rename(columns={
+                        'city': 'comune',
+                        'admin_name': 'provincia',
+                        'lat': 'lat',
+                        'lng': 'lng'
+                    })
+                    
+                    # Criar versões normalizadas para matching
+                    df_mapa_ref['comune_norm'] = df_mapa_ref['comune'].astype(str).str.lower()
+                    df_mapa_ref['provincia_norm'] = df_mapa_ref['provincia'].astype(str).str.lower()
+                    
+                    # Remover acentos e caracteres especiais
+                    import unicodedata
+                    import re
+                    
+                    def normalizar_texto(texto):
+                        if not isinstance(texto, str):
+                            return ""
+                        # Converter para lowercase
+                        texto = texto.lower()
+                        # Remover acentos
+                        texto = unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('utf-8')
+                        # Remover caracteres especiais
+                        texto = re.sub(r'[^\w\s]', '', texto)
+                        # Remover prefixos comuns
+                        prefixos = [
+                            'comune di ', 'provincia di ', 'san ', 'santa ', 'santo ', 's ', 'ss ', 
+                            'parrocchia di ', 'parrocchia ', 'chiesa di ', 'chiesa ', 'natti', 'matri'
+                        ]
+                        for prefixo in prefixos:
+                            if texto.startswith(prefixo):
+                                texto = texto[len(prefixo):]
+                        # Remover sufixos comuns
+                        sufixos = [
+                            ' ve', ' tv', ' pd', ' vr', ' vi', ' ro', ' mn', ' bl', ' pn', ' ud', 
+                            ' cr', ' bs', ' bg', ' mi', ' cs', ' sa', ' ce', ' na', ' pz', ' fe', 
+                            ' bo', ' lu', ' rm', ' bn', ' cb', ' ca', ' me', ' cz', ' pa'
+                        ]
+                        for sufixo in sufixos:
+                            if texto.endswith(sufixo):
+                                texto = texto[:-len(sufixo)]
+                        return texto.strip()
+                    
+                    df_mapa_ref['comune_norm'] = df_mapa_ref['comune_norm'].apply(normalizar_texto)
+                    df_mapa_ref['provincia_norm'] = df_mapa_ref['provincia_norm'].apply(normalizar_texto)
+                    
+                    st.success(f"Carregadas {len(df_mapa_ref)} referências geográficas italianas.")
+                else:
+                    st.warning("Arquivo de referência não possui as colunas necessárias.")
+                    df_mapa_ref = None
+            except Exception as e:
+                st.warning(f"Não foi possível carregar o arquivo de referência: {e}")
+                df_mapa_ref = None
+            
+            # ---- IMPLEMENTAR ALGORITMO DE MATCHING AVANÇADO ----
+            if df_mapa_ref is not None:
+                with st.spinner("Aplicando algoritmo de geocodificação avançado..."):
+                    # Criar função de normalização de nomes para o dataframe atual
+                    def normalizar_nome_para_match(nome):
+                        if not isinstance(nome, str):
+                            return ""
+                        # Normalizar: lowercase, remover acentos, remover caracteres especiais
+                        nome = nome.lower()
+                        # Remover acentos
+                        nome = unicodedata.normalize('NFKD', nome).encode('ASCII', 'ignore').decode('utf-8')
+                        # Remover caracteres especiais e símbolos
+                        nome = re.sub(r'[^\w\s]', '', nome)
+                        # Remover prefixos comuns italianos
+                        prefixos = [
+                            'comune di ', 'provincia di ', 'chiesa di ', 'chiesa parrocchiale di ',
+                            'parrocchia di ', 'parrocchia ', 'paroquia ', 'diocesi di ', 'diocesi ',
+                            'san ', 'santa ', 'santo ', 's ', 'ss ', 'st ', 'nativita ', 'santangelo ',
+                            'santambrogio ', 'frazione ', 'comune ', 'citta di ', 'beato ', 'beata '
+                        ]
+                        for prefixo in prefixos:
+                            if nome.startswith(prefixo):
+                                nome = nome[len(prefixo):]
+                                
+                        # Remover sufixos comuns como códigos de província italianos
+                        sufixos = [
+                            ' ve', ' tv', ' pd', ' vr', ' vi', ' ro', ' mn', ' bl', ' pn', ' ud', 
+                            ' cr', ' bs', ' bg', ' mi', ' cs', ' sa', ' ce', ' na', ' pz', ' fe', 
+                            ' bo', ' lu', ' rm', ' bn', ' cb', ' ca', ' me', ' cz', ' pa', ' to',
+                            ' ar', ' fg', ' ch', ' en', ' ag', ' ct', ' tp', ' mc', ' ta',
+                            ' veneto', ' italia', ' al', ' ap', ' ao', ' at', ' bz', ' fm', ' fr',
+                            ' ge', ' go', ' im', ' aq', ' le', ' lt', ' mb', ' no', ' nu',
+                            ' or', ' pc', ' pe', ' pg', ' pi', ' pn', ' po', ' pt', ' pu',
+                            ' ra', ' rc', ' re', ' ri', ' rn', ' si', ' so', ' sp', ' sr',
+                            ' ss', ' sv', ' te', ' tn', ' tp', ' ts', ' va', ' vb', ' vc',
+                            ' vs', ' vt'
+                        ]
+                        for sufixo in sufixos:
+                            if nome.endswith(sufixo):
+                                nome = nome[:-len(sufixo)]
+                                
+                        # Tratar casos específicos comuns na Itália
+                        substituicoes = {
+                            'monte s ': 'monte san ',
+                            'sangiovanni': 'san giovanni',
+                            'sanmartino': 'san martino',
+                            'sanpietro': 'san pietro',
+                            'santangelo': 'san angelo',
+                            'santantonio': 'san antonio',
+                            'santamaria': 'santa maria',
+                            'vescov': 'vescovo',
+                            'battist': 'battista',
+                            'evangelist': 'evangelista',
+                            'maggior': 'maggiore',
+                            'martir': 'martire',
+                            'dadig': 'd adige',
+                            'delladig': 'dell adige',
+                            'delgrapp': 'del grappa',
+                            'deltagliament': 'del tagliamento',
+                            'apostol': 'apostolo',
+                            'vergine mari': 'vergine maria',
+                            ' ve': '',
+                            ' tv': '',
+                            ' pd': '',
+                            ' vr': '',
+                            ' vi': '',
+                            ' ro': '',
+                            ' mn': '',
+                            ' bl': '',
+                            ' pn': '',
+                            ' ud': ''
+                        }
+                        for velho, novo in substituicoes.items():
+                            nome = nome.replace(velho, novo)
+                            
+                        # Remover palavras que não ajudam no matching
+                        palavras_remover = [
+                            'chiesa', 'parrocchia', 'parrocchiale', 'paroquia', 'comune', 'provincia',
+                            'diocesi', 'frazione', 'nativita', 'annunciazione', 'assunzione', 'abate',
+                            'apostolo', 'dottore', 'martire', 'sacerdote', 'vescovo', 'beata', 'beato',
+                            'vergine', 'evangelista', 'maria', 'santissima', 'ssma', 'padre', 'madre'
+                        ]
+                        
+                        nome_partes = nome.split()
+                        nome_partes = [parte for parte in nome_partes if parte not in palavras_remover]
+                        nome = ' '.join(nome_partes)
+                        
+                        return nome.strip()
+                    
+                    # Aplicar normalização adicional para melhorar matching
+                    df_comune['comune_match'] = df_comune[col_comune_orig].apply(normalizar_nome_para_match)
+                    df_comune['provincia_match'] = df_comune[col_provincia_orig].apply(normalizar_nome_para_match)
+                    
+                    # 0. APLICAR CORREÇÕES MANUAIS
+                    registros_atualizados = 0
+                    
+                    for idx, row in df_comune.iterrows():
+                        # Pular se já tem coordenadas
+                        if pd.notna(row[col_lat]) and pd.notna(row[col_lon]):
+                            continue
+                            
+                        # Verificar nome do comune nas correções manuais
+                        comune_match = row['comune_match']
+                        if comune_match in correcoes_manuais:
+                            lat, lon, source = correcoes_manuais[comune_match]
+                            df_comune.at[idx, col_lat] = lat
+                            df_comune.at[idx, col_lon] = lon
+                            df_comune.at[idx, col_coord_source] = source
+                            registros_atualizados += 1
+                            continue
+                            
+                        # Verificar província se o comune não foi encontrado
+                        provincia_match = row['provincia_match']
+                        if (pd.isna(row[col_lat]) or pd.isna(row[col_lon])) and provincia_match in provincias_manuais:
+                            lat, lon, source = provincias_manuais[provincia_match]
+                            df_comune.at[idx, col_lat] = lat
+                            df_comune.at[idx, col_lon] = lon
+                            df_comune.at[idx, col_coord_source] = source
+                            registros_atualizados += 1
+                    
+                    print(f"Aplicadas {registros_atualizados} correções manuais")
+
+                    # 1. MATCHING EXATO (Comune + Província)
+                    df_mapa_exact = df_mapa_ref.copy()
+                    df_comune_sem_coord = df_comune[df_comune[col_lat].isna() | df_comune[col_lon].isna()].copy()
+                    
+                    # Função para encontrar correspondências exatas
+                    def encontrar_match_exato(row):
+                        # Se já tem coordenadas, não precisa de matching
+                        if pd.notna(row[col_lat]) and pd.notna(row[col_lon]):
+                            return row
+                        
+                        # Tentar correspondência exata (Comune + Província)
+                        mask_exact = (df_mapa_exact['comune_norm'] == row['comune_match']) & (df_mapa_exact['provincia_norm'] == row['provincia_match'])
+                        if mask_exact.any():
+                            match_row = df_mapa_exact[mask_exact].iloc[0]
+                            row[col_lat] = match_row['lat']
+                            row[col_lon] = match_row['lng']
+                            row[col_coord_source] = 'ExactMatch_ComuneProv'
+                        return row
+                    
+                    # Aplicar correspondência exata
+                    df_comune_matched = df_comune_sem_coord.apply(encontrar_match_exato, axis=1)
+                    
+                    # Atualizar o dataframe original com as correspondências exatas
+                    df_comune.update(df_comune_matched)
+                    
+                    # 2. MATCHING FUZZY AVANÇADO (múltiplos algoritmos e critérios)
+                    df_sem_coord_apos_exato = df_comune[df_comune[col_lat].isna() | df_comune[col_lon].isna()].copy()
+                    
+                    # Obter comunes únicos sem correspondência
+                    comunes_sem_match = df_sem_coord_apos_exato['comune_match'].dropna().unique()
+                    
+                    # Dicionário para armazenar resultados de matching
+                    matches_fuzzy = {}
+                    
+                    # Lista de comunes de referência para matching
+                    ref_comunes = df_mapa_ref['comune_norm'].unique().tolist()
+                    
+                    # Aplicar múltiplos algoritmos de matching com threshold reduzido
+                    for comune in comunes_sem_match:
+                        if not comune or comune == 'nao especificado':
+                            continue
+                        
+                        # Verificar se o nome tem pelo menos 3 caracteres para evitar falsos positivos
+                        if len(comune) < 3:
+                            continue
+                        
+                        # Combinar diferentes métricas para um matching mais robusto
+                        best_matches = []
+                        
+                        # 1. Token Sort Ratio (melhor para palavras na ordem errada)
+                        token_sort_matches = process.extractBests(
+                            comune, 
+                            ref_comunes,
+                            scorer=fuzz.token_sort_ratio,
+                            score_cutoff=70,  # Threshold mais baixo para aumentar matches
+                            limit=3
+                        )
+                        if token_sort_matches:
+                            best_matches.extend(token_sort_matches)
+                        
+                        # 2. Token Set Ratio (melhor para palavras parciais)
+                        token_set_matches = process.extractBests(
+                            comune, 
+                            ref_comunes,
+                            scorer=fuzz.token_set_ratio,
+                            score_cutoff=75,
+                            limit=3
+                        )
+                        if token_set_matches:
+                            best_matches.extend(token_set_matches)
+                        
+                        # 3. Partial Ratio (melhor para substrings)
+                        partial_matches = process.extractBests(
+                            comune, 
+                            ref_comunes,
+                            scorer=fuzz.partial_ratio,
+                            score_cutoff=80,
+                            limit=3
+                        )
+                        if partial_matches:
+                            best_matches.extend(partial_matches)
+                            
+                        # 4. Ratio básico (distância de Levenshtein)
+                        ratio_matches = process.extractBests(
+                            comune, 
+                            ref_comunes,
+                            scorer=fuzz.ratio,
+                            score_cutoff=75,
+                            limit=3
+                        )
+                        if ratio_matches:
+                            best_matches.extend(ratio_matches)
+                            
+                        # Caso especial para nomes muito curtos, ser mais flexível
+                        if len(comune) <= 5 and not best_matches:
+                            special_matches = process.extractBests(
+                                comune, 
+                                ref_comunes,
+                                scorer=fuzz.ratio,
+                                score_cutoff=65,  # Threshold ainda mais baixo para nomes curtos
+                                limit=2
+                            )
+                            if special_matches:
+                                best_matches.extend(special_matches)
+                            
+                        # Consolidar e escolher o melhor match
+                        if best_matches:
+                            # Agrupar por nome do match
+                            match_scores = {}
+                            for match, score in best_matches:
+                                if match in match_scores:
+                                    match_scores[match] = max(match_scores[match], score)
+                                else:
+                                    match_scores[match] = score
+                            
+                            # Obter o melhor match
+                            best_match = max(match_scores.items(), key=lambda x: x[1])
+                            matches_fuzzy[comune] = (best_match[0], best_match[1])
+                    
+                    # Aplicar os matches fuzzy encontrados
+                    for idx, row in df_sem_coord_apos_exato.iterrows():
+                        comune_match = row['comune_match']
+                        if comune_match in matches_fuzzy:
+                            best_match, score = matches_fuzzy[comune_match]
+                            
+                            # Encontrar as coordenadas do match
+                            match_row = df_mapa_ref[df_mapa_ref['comune_norm'] == best_match].iloc[0]
+                            
+                            # Atualizar as coordenadas
+                            df_comune.at[idx, col_lat] = match_row['lat']
+                            df_comune.at[idx, col_lon] = match_row['lng']
+                            df_comune.at[idx, col_coord_source] = f'FuzzyMatch_Comune_{score}'
+                    
+                    # 3. ADICIONA CASOS ESPECÍFICOS - BUSCA POR FRAGMENTOS NOS NOMES
+                    df_sem_coord_apos_fuzzy = df_comune[df_comune[col_lat].isna() | df_comune[col_lon].isna()].copy()
+                    
+                    # Dividir nomes de comune em partes para tentar encontrar fragmentos
+                    fragmentos_matches = {}
+                    
+                    for idx, row in df_sem_coord_apos_fuzzy.iterrows():
+                        comune_match = row['comune_match']
+                        if not comune_match or comune_match == 'nao especificado' or len(comune_match) < 4:
+                            continue
+                            
+                        # Dividir o nome em partes
+                        partes = comune_match.split()
+                        partes = [p for p in partes if len(p) >= 4]  # Filtrar partes muito pequenas
+                        
+                        # Procurar cada parte separadamente
+                        for parte in partes:
+                            # Ignorar partes muito comuns como artigos e preposições
+                            if parte in ['alla', 'del', 'con', 'per', 'sul', 'della', 'delle', 'dal', 'dei', 'dal', 'dagli', 'degli', 'che', 'nel']:
+                                continue
+                                
+                            # Filtrar referências que contêm esta parte
+                            matches = [(c, fuzz.partial_ratio(parte, c)) for c in ref_comunes if parte in c]
+                            
+                            # Pegar os melhores matches (se houver)
+                            if matches:
+                                # Ordenar por score (decrescente)
+                                matches.sort(key=lambda x: x[1], reverse=True)
+                                best_match, score = matches[0]
+                                
+                                if score >= 85:  # Usar threshold alto para fragmentos
+                                    match_row = df_mapa_ref[df_mapa_ref['comune_norm'] == best_match].iloc[0]
+                                    
+                                    # Atualizar as coordenadas
+                                    df_comune.at[idx, col_lat] = match_row['lat']
+                                    df_comune.at[idx, col_lon] = match_row['lng']
+                                    df_comune.at[idx, col_coord_source] = f'PartialMatch_Fragment_{score}'
+                                    break  # Sair do loop de partes se encontrou match
+                    
+                    # 4. BUSCA POR TERMOS FIXOS - DETECTAR PADRÕES DE LOCALIZAÇÃO
+                    df_sem_coord_apos_fragmentos = df_comune[df_comune[col_lat].isna() | df_comune[col_lon].isna()].copy()
+                    
+                    # Lista de localidades italianas populares para buscar
+                    termos_localidades = [
+                        ('venezia', 45.4375, 12.3358),
+                        ('roma', 41.9000, 12.5000),
+                        ('milano', 45.4669, 9.1900),
+                        ('napoli', 40.8333, 14.2500),
+                        ('torino', 45.0703, 7.6869),
+                        ('palermo', 38.1300, 13.3417),
+                        ('genova', 44.4056, 8.9464),
+                        ('bologna', 44.4939, 11.3428),
+                        ('firenze', 43.7800, 11.2500),
+                        ('bari', 41.1253, 16.8667),
+                        ('verona', 45.4386, 10.9928),
+                        ('torino', 45.0700, 7.6800),
+                        ('padova', 45.4167, 11.8667),
+                        ('bergamo', 45.6950, 9.6700),
+                        ('siena', 43.3178, 11.3317),
+                        ('lecce', 40.3500, 18.1700),
+                        ('parma', 44.8015, 10.3280)
+                    ]
+                    
+                    for idx, row in df_sem_coord_apos_fragmentos.iterrows():
+                        # Verificar se há menção a localidades conhecidas no texto
+                        texto_completo = str(row.get(col_comune_orig, '')) + ' ' + str(row.get(col_provincia_orig, ''))
+                        texto_completo = texto_completo.lower()
+                        
+                        for localidade, lat, lon in termos_localidades:
+                            if localidade in texto_completo:
+                                df_comune.at[idx, col_lat] = lat
+                                df_comune.at[idx, col_lon] = lon
+                                df_comune.at[idx, col_coord_source] = f'TextMatch_{localidade}'
+                                break
+                    
+                    # Remover colunas temporárias
+                    df_comune.drop(['comune_match', 'provincia_match'], axis=1, errors='ignore', inplace=True)
+                    
+                    # Calcular estatísticas de correspondência
+                    registros_mapeados = df_comune[df_comune[col_lat].notna() & df_comune[col_lon].notna()]
+                    total_mapeados = len(registros_mapeados)
+                    
+                    # Mostrar resultados do processamento
+                    st.success(f"Processamento concluído! Taxa de correspondência: {total_mapeados}/{len(df_comune)} registros ({total_mapeados/len(df_comune)*100:.1f}%).")
+            else:
+                st.warning("Não foi possível aplicar o algoritmo avançado sem dados de referência.")
+        except ImportError:
+            st.warning("Para melhor processamento, instale: pip install thefuzz python-Levenshtein")
+        except Exception as e:
+            st.error(f"Erro ao aplicar algoritmo de correspondência: {e}")
+            # Restaurar dados originais em caso de erro
+            df_comune = df_original
+        
         # Filtrar dados que possuem coordenadas válidas
-        df_mapa = df_comune[[col_lat, col_lon]].dropna()
+        # Primeiro tentar converter para numérico, ignorando erros
+        for col in [col_lat, col_lon]:
+            if col in df_comune.columns:
+                try:
+                    # Converter para numérico, preservando apenas valores válidos
+                    df_comune[col] = pd.to_numeric(df_comune[col], errors='coerce')
+                except Exception as e:
+                    st.warning(f"Erro ao converter coluna {col} para numérico: {e}")
+        
+        # Agora filtrar apenas linhas com coordenadas numéricas válidas
+        df_mapa = df_comune[pd.notna(df_comune[col_lat]) & pd.notna(df_comune[col_lon])].copy()
         pontos_no_mapa = len(df_mapa)
         total_processos = len(df_comune)
         percentual_mapeado = (pontos_no_mapa / total_processos * 100) if total_processos > 0 else 0
@@ -1334,11 +1885,21 @@ def visualizar_providencias(df_comune):
         # Calcular contagens por tipo de match
         count_exact = 0
         count_fuzzy = 0
+        count_partial = 0
+        count_text = 0
+        count_manual = 0
+        count_provincia = 0
+        
         if col_coord_source in df_comune.columns:
-            counts = df_comune[col_coord_source].value_counts()
-            count_exact = counts.get('ExactMatch_ComuneProv', 0)
-            count_fuzzy = counts.get('FuzzyMatch_Comune', 0)
-        count_no_match = total_processos - count_exact - count_fuzzy
+            # Contar matches por tipo
+            count_exact = df_comune[df_comune[col_coord_source].str.contains('ExactMatch', na=False)].shape[0]
+            count_fuzzy = df_comune[df_comune[col_coord_source].str.contains('FuzzyMatch', na=False)].shape[0]
+            count_partial = df_comune[df_comune[col_coord_source].str.contains('PartialMatch', na=False)].shape[0]
+            count_text = df_comune[df_comune[col_coord_source].str.contains('TextMatch', na=False)].shape[0]
+            count_manual = df_comune[df_comune[col_coord_source].str.contains('Correção Manual', na=False)].shape[0]
+            count_provincia = df_comune[df_comune[col_coord_source].str.contains('Correção Província', na=False)].shape[0]
+            
+        count_no_match = total_processos - count_exact - count_fuzzy - count_partial - count_text - count_manual - count_provincia
 
         # Exibir Métricas
         col1, col2, col3 = st.columns(3)
@@ -1349,17 +1910,286 @@ def visualizar_providencias(df_comune):
         with col3:
             st.metric("Sem Coordenadas", count_no_match)
 
-        st.markdown(f"*   **Match Exato (Comune+Província):** {count_exact}")
-        st.markdown(f"*   **Match Fuzzy (Apenas Comune):** {count_fuzzy}")
+        # Mostrar estatísticas detalhadas por tipo de correspondência
+        st.markdown("### Estatísticas de Correspondência")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown(f"*   **Match Exato (Comune+Província):** {count_exact}")
+            st.markdown(f"*   **Match Fuzzy (Comune):** {count_fuzzy}")
+            st.markdown(f"*   **Match Parcial (Fragmentos):** {count_partial}")
+        
+        with col2:
+            st.markdown(f"*   **Match por Texto:** {count_text}")
+            st.markdown(f"*   **Correções Manuais:** {count_manual}")
+            st.markdown(f"*   **Correções por Província:** {count_provincia}")
 
-        # Exibir Mapa
+        # Exibir Mapa aprimorado com Folium (se disponível)
         if not df_mapa.empty:
-            st.map(df_mapa, latitude=col_lat, longitude=col_lon, size=10)
+            try:
+                import folium
+                from streamlit_folium import folium_static
+                from folium.plugins import MarkerCluster
+                
+                # Criar um mapa interativo centrado na Itália
+                m = folium.Map(location=[42.5, 12.5], zoom_start=6)
+                
+                # Adicionar um cluster de marcadores para melhor visualização com muitos pontos
+                marker_cluster = MarkerCluster().add_to(m)
+                
+                # Definir cores para cada tipo de correspondência
+                cores = {
+                    'ExactMatch': 'green',
+                    'FuzzyMatch': 'orange',
+                    'PartialMatch': 'blue',
+                    'TextMatch': 'cadetblue',
+                    'Correção Manual': 'purple',
+                    'Correção Província': 'red',
+                    'default': 'gray'
+                }
+                
+                # Adicionar marcadores para cada ponto com cores diferentes por tipo de match
+                for idx, row in df_comune[df_comune[col_lat].notna() & df_comune[col_lon].notna()].iterrows():
+                    # Determinar a cor do marcador com base no tipo de match
+                    color = 'default'  # padrão
+                    if col_coord_source in row and pd.notna(row[col_coord_source]):
+                        for key in cores.keys():
+                            if key in str(row[col_coord_source]):
+                                color = cores[key]
+                                break
+                    
+                    # Função para formatar coordenadas com segurança
+                    def format_coord(val):
+                        try:
+                            if pd.notna(val):
+                                return f"{float(val):.4f}"
+                            return "N/A"
+                        except (ValueError, TypeError):
+                            return str(val)
+                    
+                    # Criar popup com informações detalhadas
+                    lat_formatted = format_coord(row[col_lat])
+                    lon_formatted = format_coord(row[col_lon])
+                    
+                    popup_html = f"""
+                    <div style="font-family: Arial; width: 250px">
+                        <h4 style="color: #1A237E; margin-bottom: 5px">{row.get('TITLE', 'Processo')}</h4>
+                        <p><strong>ID:</strong> {row.get(col_id, 'N/A')}</p>
+                        <p><strong>Comune:</strong> {row.get(col_comune_orig, 'N/A')}</p>
+                        <p><strong>Província:</strong> {row.get(col_provincia_orig, 'N/A')}</p>
+                        <p><strong>Estágio:</strong> {row.get('STAGE_NAME', 'N/A')}</p>
+                        <p><strong>Tipo de Match:</strong> {row.get(col_coord_source, 'N/A')}</p>
+                        <p><strong>Coordenadas:</strong> [{lat_formatted}, {lon_formatted}]</p>
+                    </div>
+                    """
+                    
+                    # Adicionar marcador ao cluster
+                    try:
+                        # Garantir que as coordenadas são numéricas
+                        lat_num = float(row[col_lat])
+                        lon_num = float(row[col_lon])
+                        
+                        folium.Marker(
+                            location=[lat_num, lon_num],
+                            popup=folium.Popup(popup_html, max_width=300),
+                            tooltip=row.get(col_comune_orig, 'Localidade'),
+                            icon=folium.Icon(color=cores.get(color, 'gray'))
+                        ).add_to(marker_cluster)
+                    except (ValueError, TypeError) as e:
+                        # Registrar erro de conversão (opcionalmente)
+                        print(f"Erro ao converter coordenadas para o registro {row.get(col_id, 'ID?')}: {e}")
+                
+                # Adicionar legenda ao mapa
+                legend_html = '''
+                <div style="position: fixed; bottom: 50px; right: 50px; z-index: 1000; 
+                            background-color: white; padding: 10px; border: 2px solid grey; border-radius: 5px">
+                    <p><strong>Legenda</strong></p>
+                    <p><i class="fa fa-circle" style="color:green"></i> Match Exato</p>
+                    <p><i class="fa fa-circle" style="color:orange"></i> Match Fuzzy</p>
+                    <p><i class="fa fa-circle" style="color:blue"></i> Match Parcial</p>
+                    <p><i class="fa fa-circle" style="color:cadetblue"></i> Match por Texto</p>
+                    <p><i class="fa fa-circle" style="color:purple"></i> Correção Manual</p>
+                    <p><i class="fa fa-circle" style="color:red"></i> Correção Província</p>
+                </div>
+                '''
+                m.get_root().html.add_child(folium.Element(legend_html))
+                
+                # Exibir o mapa
+                st.subheader("Mapa Interativo de Processos")
+                
+                # Adicionar CSS para que o mapa ocupe toda a largura da tela e remova margens laterais
+                st.markdown("""
+                <style>
+                /* Estilo para o container do Streamlit - remove margens laterais */
+                [data-testid="stAppViewContainer"] > .main {
+                    max-width: 100vw !important;
+                    padding-left: 0 !important;
+                    padding-right: 0 !important;
+                }
+                
+                /* Estilo específico para a seção do mapa */
+                .mapa-container {
+                    margin-left: -4rem !important;
+                    margin-right: -4rem !important;
+                    width: 100vw !important;
+                }
+                
+                /* Estilos para o mapa */
+                .folium-map {
+                    width: 100% !important;
+                    height: 500px !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+                iframe {
+                    width: 100% !important;
+                    height: 600px !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    border: none !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Usar um container HTML com a classe especial para o mapa
+                st.markdown('<div class="mapa-container">', unsafe_allow_html=True)
+                folium_static(m, width=None, height=600)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Adicionar explicação abaixo do mapa
+                st.info("""
+                **Informações do Mapa:**
+                - **Marcadores verdes:** Correspondência exata (Comune+Província)
+                - **Marcadores laranjas:** Correspondência fuzzy (apenas Comune)
+                - **Marcadores azuis:** Correspondência parcial (fragmentos do nome)
+                - **Marcadores azul claro:** Correspondência por texto
+                - **Marcadores roxos:** Correção manual
+                - **Marcadores vermelhos:** Correção por província
+                
+                Clique nos marcadores para ver informações detalhadas de cada processo.
+                """)
+            except ImportError:
+                # Fallback para o mapa padrão do Streamlit
+                st.markdown("""
+                <style>
+                /* Estilo para o container do Streamlit - remove margens laterais */
+                [data-testid="stAppViewContainer"] > .main {
+                    max-width: 100vw !important;
+                    padding-left: 0 !important;
+                    padding-right: 0 !important;
+                }
+                
+                /* Estilo específico para o mapa do Streamlit */
+                .mapa-container {
+                    margin-left: -4rem !important;
+                    margin-right: -4rem !important;
+                    width: 100vw !important;
+                }
+                
+                /* Estilos para o mapa do Streamlit */
+                .element-container:has([data-testid="stDecoration"]) {
+                    width: 100% !important;
+                    max-width: 100vw !important;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                st.markdown('<div class="mapa-container">', unsafe_allow_html=True)
+                st.map(df_mapa, latitude=col_lat, longitude=col_lon, size=10, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                st.info("Para uma visualização mais detalhada, instale as bibliotecas folium e streamlit-folium.")
         else:
             st.warning("Nenhum processo com coordenadas válidas encontrado para exibir no mapa.")
+        
+        # Interface para melhorias manuais
+        with st.expander("🔍 Ferramenta de Correção Manual", expanded=False):
+            st.markdown("""
+            <h4 style="color: #1A237E;">Corrigir Coordenadas Manualmente</h4>
+            <p>Use esta ferramenta para adicionar coordenadas manualmente aos processos sem correspondência geográfica.</p>
+            """, unsafe_allow_html=True)
             
+            # Selecionar um processo para corrigir
+            processos_sem_coord = df_comune[(df_comune[col_lat].isna()) | (df_comune[col_lon].isna())]
+            
+            if not processos_sem_coord.empty:
+                # Criar lista de opções para seleção
+                opcoes_processo = [f"{row.get('TITLE', 'Sem título')} - {row.get(col_comune_orig, 'Sem comune')} ({row.get(col_id, 'ID?')})" 
+                                for _, row in processos_sem_coord.iterrows()]
+                
+                processo_selecionado = st.selectbox(
+                    "Selecione um processo para corrigir:",
+                    options=opcoes_processo
+                )
+                
+                # Extrair ID do processo selecionado
+                id_selecionado = None
+                if processo_selecionado:
+                    import re
+                    match = re.search(r'\(([^)]+)\)$', processo_selecionado)
+                    if match:
+                        id_selecionado = match.group(1)
+                
+                if id_selecionado:
+                    # Mostrar informações do processo
+                    processo_row = df_comune[df_comune[col_id] == id_selecionado].iloc[0]
+                    
+                    st.markdown(f"""
+                    **Detalhes do processo:**
+                    - **ID:** {processo_row.get(col_id, 'N/A')}
+                    - **Título:** {processo_row.get('TITLE', 'N/A')}
+                    - **Comune:** {processo_row.get(col_comune_orig, 'N/A')}
+                    - **Província:** {processo_row.get(col_provincia_orig, 'N/A')}
+                    """)
+                    
+                    # Adicionar sugestão de busca
+                    st.markdown("""
+                    **Dica:** Você pode buscar coordenadas de localidades italianas usando:
+                    - Google Maps: https://www.google.com/maps
+                    - OpenStreetMap: https://www.openstreetmap.org
+                    - GeoNames: http://www.geonames.org
+                    """)
+                    
+                    # Campos para inserir coordenadas
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        latitude = st.number_input("Latitude", value=42.0, format="%.6f", min_value=35.0, max_value=48.0, step=0.000001)
+                    with col2:
+                        longitude = st.number_input("Longitude", value=12.5, format="%.6f", min_value=6.0, max_value=19.0, step=0.000001)
+                    
+                    # Botão para salvar
+                    if st.button("Salvar Coordenadas"):
+                        # Esta implementação apenas mostra como seria feito
+                        # Em uma implementação real, seria necessário atualizar o banco de dados
+                        st.success(f"Coordenadas atualizadas para o processo {id_selecionado}!")
+                        st.info("Nota: Esta é uma demonstração. Em um ambiente real, estas coordenadas seriam salvas no banco de dados.")
+                        
+                        # Mostrar como ficaria no mapa
+                        try:
+                            import folium
+                            from streamlit_folium import folium_static
+                            
+                            # Garantir que temos valores numéricos para o mapa
+                            lat_num = float(latitude)
+                            lon_num = float(longitude)
+                            
+                            st.subheader("Prévia do Mapa com Nova Coordenada")
+                            m_preview = folium.Map(location=[lat_num, lon_num], zoom_start=10)
+                            folium.Marker(
+                                location=[lat_num, lon_num],
+                                popup=f"<b>{processo_row.get('TITLE', 'Processo')}</b><br>Coordenadas atualizadas manualmente",
+                                icon=folium.Icon(color='red')
+                            ).add_to(m_preview)
+                            folium_static(m_preview)
+                        except ImportError:
+                            st.info(f"Latitude: {latitude}, Longitude: {longitude}")
+                        except (ValueError, TypeError) as e:
+                            st.error(f"Erro ao criar prévia do mapa: {e}")
+                            st.info(f"Latitude: {latitude}, Longitude: {longitude}")
+            else:
+                st.success("Todos os processos já possuem coordenadas! 🎉")
+        
         # Tabela de Diagnóstico Expansível
-        with st.expander("Ver Detalhes da Correspondência de Coordenadas"):
+        with st.expander("Ver Detalhes da Correspondência de Coordenadas", expanded=False):
             cols_diagnostico = [
                 col_id, 
                 col_provincia_orig, 
@@ -1374,7 +2204,40 @@ def visualizar_providencias(df_comune):
             cols_diagnostico_presentes = [c for c in cols_diagnostico if c in df_comune.columns]
             df_diag = df_comune[cols_diagnostico_presentes].copy()
             df_diag[col_coord_source] = df_diag[col_coord_source].fillna('No Match') # Preencher nulos na fonte
-            st.dataframe(df_diag, use_container_width=True)
+            
+            # Adicionar filtros para a tabela
+            st.subheader("Filtros da tabela de diagnóstico")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                tipo_match = st.multiselect(
+                    "Filtrar por tipo de match:",
+                    options=['ExactMatch_ComuneProv', 'FuzzyMatch_Comune', 'PartialMatch_Fragment', 
+                            'TextMatch', 'Correção Manual', 'Correção Província', 'No Match'],
+                    default=[]
+                )
+            
+            with col2:
+                search_term = st.text_input("Pesquisar por comune ou província:", "")
+            
+            # Aplicar filtros
+            df_diag_filtered = df_diag.copy()
+            
+            if tipo_match:
+                mask_tipo = pd.Series(False, index=df_diag_filtered.index)
+                for tm in tipo_match:
+                    mask_tipo = mask_tipo | df_diag_filtered[col_coord_source].str.contains(tm, case=False, na=False)
+                df_diag_filtered = df_diag_filtered[mask_tipo]
+            
+            if search_term:
+                mask_search = (
+                    df_diag_filtered[col_comune_orig].astype(str).str.contains(search_term, case=False, na=False) | 
+                    df_diag_filtered[col_provincia_orig].astype(str).str.contains(search_term, case=False, na=False)
+                )
+                df_diag_filtered = df_diag_filtered[mask_search]
+            
+            # Exibir tabela filtrada
+            st.dataframe(df_diag_filtered, use_container_width=True)
             
             # Download da tabela de diagnóstico
             csv_diag = df_diag.to_csv(index=False).encode('utf-8')
@@ -1385,6 +2248,15 @@ def visualizar_providencias(df_comune):
                 mime='text/csv',
                 key='download-diag-coord-csv'
             )
+            
+            # Dicas de uso
+            st.markdown("""
+            **Dicas para melhorar o matching:**
+            1. Padronize a entrada de dados nos campos de Comune e Província
+            2. Verifique os nomes sem correspondência (No Match) e tente padronizá-los
+            3. Use a ferramenta de correção manual para casos difíceis
+            4. Adicione mais entradas ao dicionário de correções manuais para casos recorrentes
+            """)
 
     else:
         st.error(f"Colunas de coordenadas ('{col_lat}', '{col_lon}') não encontradas nos dados carregados.")
@@ -1459,6 +2331,45 @@ def visualizar_providencias(df_comune):
     else:
         st.warning(f"Não foi possível gerar a tabela por comune/paróquia. Colunas necessárias: {col_comune_norm}, {col_id}")
 
+    # Nova seção: Instruções para melhoria contínua
+    st.markdown("---")
+    st.subheader("💡 Recomendações para Melhorar a Correspondência Geográfica")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **Padronização de Dados:**
+        - Padronizar a entrada de dados no Bitrix24
+        - Separar claramente Comune e Província
+        - Usar nomes oficiais das localidades
+        - Evitar abreviações e variações de nomes
+        """)
+        
+        st.markdown("""
+        **Enriquecimento de Dados:**
+        - Atualizar regularmente a base geográfica de referência
+        - Adicionar variações comuns de nomes à base
+        - Incluir códigos postais e outras referências
+        - Manter um dicionário de correções manuais atualizado
+        """)
+    
+    with col2:
+        st.markdown("""
+        **Melhoria de Processo:**
+        - Verificar e corrigir manualmente casos sem correspondência
+        - Criar uma lista de equivalências para casos problemáticos
+        - Documentar padrões de nomenclatura para referência futura
+        - Implementar um sistema de feedback para correções
+        """)
+        
+        st.markdown("""
+        **Configuração do Sistema:**
+        - Reduzir o threshold de similaridade para casos específicos
+        - Utilizar a API de Geocodificação Google para casos difíceis
+        - Implementar um sistema de cache para correspondências já encontradas
+        - Considerar usar aprendizado de máquina para casos complexos
+        """)
 
 # Funções auxiliares para formatação de tempo
 def formatar_tempo_meses(meses):
