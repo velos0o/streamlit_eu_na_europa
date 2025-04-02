@@ -444,12 +444,15 @@ def criar_metricas_certidoes(df_comune):
         ],
         "Pendência de Solicitação Comune - Empresa": [
             "NEGATIVA COMUNE",
-            "CANCELADO",
             "DEVOLUTIVA EMISSOR"
         ],
         "Entregas": [
             "DOCUMENTO FISICO ENTREGUE",
             "ENTREGUE PDF"
+        ],
+        "Processos Cancelados/Inativos": [
+            "CANCELADO",
+            "INSOLAR"  # Incluir outros estágios inativos aqui, se necessário
         ]
     }
     

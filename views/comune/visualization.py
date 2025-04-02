@@ -865,7 +865,8 @@ def visualizar_metricas_certidoes(metricas):
         "Solicitado - Aguardando Retorno": "#3F51B5",  # Azul
         "Pendência de Solicitação Comune - Parceiro": "#FF9800",  # Laranja
         "Pendência de Solicitação Comune - Empresa": "#F44336",  # Vermelho
-        "Entregas": "#4CAF50"  # Verde
+        "Entregas": "#4CAF50",  # Verde
+        "Processos Cancelados/Inativos": "#E53935"  # Vermelho mais forte
     }
     
     # Exibir métricas em cards com tabelas
@@ -1159,8 +1160,10 @@ def visualizar_analise_evidencia(df_comune):
     
     # Caso específico: Comprovante Sim E Evidência Não
     comp_sim_evid_nao = 0
+    df_comp_sim_evid_nao = pd.DataFrame()
     if 'COMPROVANTE_VALIDADO' in df_analise.columns and 'EVIDENCIA_ANEXADA' in df_analise.columns:
-         comp_sim_evid_nao = df_analise[(df_analise['COMPROVANTE_VALIDADO'] == True) & (df_analise['EVIDENCIA_ANEXADA'] == False)].shape[0]
+        df_comp_sim_evid_nao = df_analise[(df_analise['COMPROVANTE_VALIDADO'] == True) & (df_analise['EVIDENCIA_ANEXADA'] == False)].copy()
+        comp_sim_evid_nao = len(df_comp_sim_evid_nao)
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -1173,7 +1176,42 @@ def visualizar_analise_evidencia(df_comune):
         st.metric("Evidência Anexada (Não)", evidencia_nao)
         
     with col3:
-         st.metric("⚠️ Comprovante 'Sim' SEM Evidência Anexada", comp_sim_evid_nao)
+        metric_container = st.container()
+        metric_container.metric("⚠️ Comprovante 'Sim' SEM Evidência Anexada", comp_sim_evid_nao)
+        
+        # Adicionar expander com detalhes dos registros com problema
+        if comp_sim_evid_nao > 0:
+            with st.expander("Detalhamento dos registros com Comprovante 'Sim' SEM Evidência Anexada", expanded=True):
+                st.markdown("""
+                <div style="background-color: #ffebee; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 5px solid #f44336;">
+                <h4 style="color: #b71c1c; margin-top: 0;">Atenção: Registros Incompletos</h4>
+                <p style="margin-bottom: 5px;">Os registros abaixo possuem o campo <strong>Comprovante Validado</strong> marcado como <strong>Sim</strong>, 
+                porém não têm <strong>Evidência Anexada</strong>. Isso pode indicar:</p>
+                <ul style="margin-bottom: 0;">
+                <li>Falha no procedimento de anexar a evidência</li>
+                <li>Erro de preenchimento do campo "Comprovante Validado"</li>
+                <li>Possíveis processos com documentação incompleta</li>
+                </ul>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Selecionar colunas relevantes para exibição na tabela
+                colunas_tabela = ['id_processo', 'titulo', 'provincia_id', 'comune_paroquia_id', 'Comprovante Validado?', 'Evidência Anexada?', 'data_solicitacao_original']
+                colunas_tabela_presentes = [col for col in colunas_tabela if col in df_comp_sim_evid_nao.columns]
+                
+                # Exibir tabela com os dados
+                st.dataframe(df_comp_sim_evid_nao[colunas_tabela_presentes], use_container_width=True)
+
+                # Adicionar opção de download
+                csv = df_comp_sim_evid_nao[colunas_tabela_presentes].to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Baixar CSV",
+                    data=csv,
+                    file_name=f'comprovantes_sem_evidencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                    mime='text/csv',
+                    key='download-comp-sem-evid-csv',
+                    use_container_width=False
+                )
 
 
     st.markdown("---") # Divisor
