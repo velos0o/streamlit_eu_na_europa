@@ -7,9 +7,7 @@ python-dotenv==1.0.0
 plotly==5.18.0
 matplotlib==3.8.0
 xlsxwriter==3.1.9
-thefuzz==
-Levenshtein== 
-python-Levenshtein==
+thefuzz[speedup]==0.22.1
 
 # Biblioteca opcional para animações de carregamento
 streamlit-lottie==0.0.5 
