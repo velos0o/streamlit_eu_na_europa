@@ -144,3 +144,5 @@ O dashboard segue um design minimalista com esquema de cores em azul e branco, c
 Última atualização: Agosto 2024
 
 **Observação sobre estrutura:** A pasta `views` foi adotada em vez de `pages` para evitar a criação automática de menu pelo Streamlit, que gera navegação duplicada. 
+
+By Lucas
