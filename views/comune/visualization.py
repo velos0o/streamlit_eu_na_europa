@@ -836,7 +836,7 @@ def visualizar_tempo_solicitacao(df_tempo_solicitacao):
     st.download_button(
         label="📥 Baixar Dados em CSV",
         data=csv_str,
-        file_name=f"tempo_solicitacao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        file_name=f"tempo_solicitacao_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
         mime="text/csv",
     )
 
@@ -1097,6 +1097,28 @@ def visualizar_analise_evidencia(df_comune):
         st.warning("Nenhum dado de COMUNE disponível para análise.")
         return
 
+    # Filtrar e excluir os estágios conforme solicitado
+    estagios_excluidos = [
+        "DT1052_22:UC_2QZ8S2",  # PENDENTE
+        "DT1052_22:UC_E1VKYT",  # PESQUISA NÃO FINALIZADA
+        "DT1052_22:UC_MVS02R",  # DEVOLUTIVA EMISSOR
+        "DT1052_22:CLIENT",     # ENTREGUE PDF
+        "DT1052_22:FAIL",       # CANCELADO
+        "DT1052_22:SUCCESS"     # DOCUMENTO FISICO ENTREGUE
+    ]
+    
+    # Verificar se STAGE_ID existe no DataFrame
+    if 'STAGE_ID' in df_comune.columns:
+        # Filtrar o DataFrame excluindo os estágios mencionados
+        df_filtrado = df_comune[~df_comune['STAGE_ID'].isin(estagios_excluidos)].copy()
+        # Mostrar aviso sobre os registros filtrados
+        registros_excluidos = len(df_comune) - len(df_filtrado)
+        if registros_excluidos > 0:
+            st.info(f"Foram excluídos {registros_excluidos} registros dos estágios: PENDENTE, PESQUISA NÃO FINALIZADA, DEVOLUTIVA EMISSOR, ENTREGUE PDF, CANCELADO e DOCUMENTO FISICO ENTREGUE.")
+    else:
+        df_filtrado = df_comune.copy()
+        st.warning("Coluna STAGE_ID não encontrada. Não foi possível aplicar o filtro de estágios.")
+
     # Colunas necessárias (verifique os IDs corretos no seu Bitrix)
     cols_necessarias = {
         'id_processo': 'ID', 
@@ -1109,8 +1131,8 @@ def visualizar_analise_evidencia(df_comune):
     }
 
     # Verificar colunas existentes
-    cols_presentes_map = {k: v for k, v in cols_necessarias.items() if v in df_comune.columns}
-    cols_faltantes = set(cols_necessarias.values()) - set(df_comune.columns)
+    cols_presentes_map = {k: v for k, v in cols_necessarias.items() if v in df_filtrado.columns}
+    cols_faltantes = set(cols_necessarias.values()) - set(df_filtrado.columns)
     
     if cols_faltantes:
         st.warning(f"Colunas necessárias ausentes nos dados carregados: {', '.join(cols_faltantes)}. A análise pode estar incompleta.")
@@ -1126,7 +1148,7 @@ def visualizar_analise_evidencia(df_comune):
              return # Não podemos continuar sem ID e data
 
     # Selecionar e renomear colunas presentes
-    df_analise = df_comune[[v for v in cols_presentes_map.values()]].copy()
+    df_analise = df_filtrado[[v for v in cols_presentes_map.values()]].copy()
     df_analise = df_analise.rename(columns={v: k for k, v in cols_presentes_map.items()})
 
     # --- Processamento das Colunas de Status (Comprovante e Evidência) --- 
