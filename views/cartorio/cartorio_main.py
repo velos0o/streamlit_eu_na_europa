@@ -12,6 +12,7 @@ from .movimentacoes import analisar_produtividade as analisar_movimentacoes
 from .produtividade import analisar_produtividade_etapas
 from .analise_tempo_crm import mostrar_dashboard_tempo_crm
 from .protocolado import exibir_dashboard_protocolado
+from .emissoes_cartao import exibir_dashboard_emissoes_cartao
 import pandas as pd
 import io
 from datetime import datetime
@@ -122,7 +123,7 @@ def show_cartorio():
     # Mostrar informações relevantes com a nova estrutura de abas
     if not df_cartorio_filtrado.empty:
         # Criar 7 abas reorganizadas (adicionando a nova aba de Análise de Tempo)
-        tab_visao_geral, tab_prod_etapas, tab_tempo_crm, tab_movimentacoes, tab_acomp_emissao, tab_qualidade, tab_protocolado, tab_visao_anterior = st.tabs([
+        tab_visao_geral, tab_prod_etapas, tab_tempo_crm, tab_movimentacoes, tab_acomp_emissao, tab_qualidade, tab_protocolado, tab_emissoes_cartao, tab_visao_anterior = st.tabs([
             "📊 Visão Geral",
             "⏱️ Produtividade por Etapas",
             "⏳ Análise de Tempo",
@@ -130,6 +131,7 @@ def show_cartorio():
             "📈 Acompanhamento Emissão",
             "🔍 Qualidade dos Dados",
             "📋 Status Protocolado",
+            "🪪 Certidões Carrão",
             "📑 Visão Anterior"
         ])
 
@@ -582,6 +584,11 @@ def show_cartorio():
             
             # Chamar a função que exibe o dashboard de protocolado
             exibir_dashboard_protocolado()
+
+        # Nova Aba: Emissões Cartão
+        with tab_emissoes_cartao:
+            # Chamar a função que exibe o dashboard de emissões cartão
+            exibir_dashboard_emissoes_cartao()
 
         # Aba 6: Visão Anterior
         with tab_visao_anterior:

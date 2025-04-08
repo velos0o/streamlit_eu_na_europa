@@ -1103,6 +1103,7 @@ def visualizar_analise_evidencia(df_comune):
         "DT1052_22:UC_E1VKYT",  # PESQUISA NÃO FINALIZADA
         "DT1052_22:UC_MVS02R",  # DEVOLUTIVA EMISSOR
         "DT1052_22:CLIENT",     # ENTREGUE PDF
+        "DT1052_22:NEW",        # SOLICITAR
         "DT1052_22:FAIL",       # CANCELADO
         "DT1052_22:SUCCESS"     # DOCUMENTO FISICO ENTREGUE
     ]
@@ -1114,7 +1115,7 @@ def visualizar_analise_evidencia(df_comune):
         # Mostrar aviso sobre os registros filtrados
         registros_excluidos = len(df_comune) - len(df_filtrado)
         if registros_excluidos > 0:
-            st.info(f"Foram excluídos {registros_excluidos} registros dos estágios: PENDENTE, PESQUISA NÃO FINALIZADA, DEVOLUTIVA EMISSOR, ENTREGUE PDF, CANCELADO e DOCUMENTO FISICO ENTREGUE.")
+            st.info(f"Foram excluídos {registros_excluidos} registros dos estágios: PENDENTE, PESQUISA NÃO FINALIZADA, DEVOLUTIVA EMISSOR, ENTREGUE PDF, SOLICITAR, CANCELADO e DOCUMENTO FISICO ENTREGUE.")
     else:
         df_filtrado = df_comune.copy()
         st.warning("Coluna STAGE_ID não encontrada. Não foi possível aplicar o filtro de estágios.")
