@@ -1126,27 +1126,20 @@ def visualizar_analise_evidencia(df_comune):
         'titulo': 'TITLE',
         'comprovante_validado_id': 'UF_CRM_12_1743013093', # Comprovante Validado (Sim/Não)
         'evidencia_anexo_id': 'UF_CRM_12_1743013064',      # Evidência Anexo (Arquivo)
-        'provincia_id': 'UF_CRM_12_1743018869',        # Provincia (Usado na tabela detalhada)
-        'comune_paroquia_id': 'UF_CRM_12_1722881735827', # Comune/Paróquia (Usado na tabela detalhada)
-        'data_solicitacao_original': 'DATA_SOLICITACAO_ORIGINAL' # Data vinda do CSV
+        'provincia_id': 'UF_CRM_12_1743018869',        # Província 
+        'comune_paroquia_id': 'UF_CRM_12_1722881735827', # Comune/Paróquia
+        'data_solicitacao_original': 'DATA_SOLICITACAO_ORIGINAL', # Data
+        'stage_name': 'STAGE_NAME',  # Nome do estágio
+        'data_alteracao': 'DATE_MODIFY',  # Data da última alteração
     }
 
     # Verificar colunas existentes
     cols_presentes_map = {k: v for k, v in cols_necessarias.items() if v in df_filtrado.columns}
-    cols_faltantes = set(cols_necessarias.values()) - set(df_filtrado.columns)
     
-    if cols_faltantes:
-        st.warning(f"Colunas necessárias ausentes nos dados carregados: {', '.join(cols_faltantes)}. A análise pode estar incompleta.")
-        # Verificar se colunas cruciais para métricas estão faltando
-        metric_cols_needed = ['id_processo', 'comprovante_validado_id', 'evidencia_anexo_id']
-        if not all(k in cols_presentes_map for k in metric_cols_needed):
-            st.error("Faltam colunas essenciais (ID, Comprovante, Evidência) para calcular as métricas macro. Verifique os mapeamentos de campos.")
-            # Ainda tentar mostrar a tabela se possível
-        # Verificar se colunas cruciais para a tabela estão faltando
-        table_cols_needed = ['id_processo', 'data_solicitacao_original']
-        if not all(k in cols_presentes_map for k in table_cols_needed):
-             st.error("Faltam colunas essenciais (ID, Data Solicitação) para a tabela detalhada. Verifique os mapeamentos de campos e o carregamento de dados.")
-             return # Não podemos continuar sem ID e data
+    # Verificar se colunas essenciais estão presentes
+    if 'id_processo' not in cols_presentes_map or 'evidencia_anexo_id' not in cols_presentes_map:
+        st.error("Colunas essenciais (ID, Evidência Anexada) não encontradas. Verifique os mapeamentos de campos.")
+        return
 
     # Selecionar e renomear colunas presentes
     df_analise = df_filtrado[[v for v in cols_presentes_map.values()]].copy()
@@ -1156,16 +1149,17 @@ def visualizar_analise_evidencia(df_comune):
 
     # 1. Comprovante Validado 
     if 'comprovante_validado_id' in df_analise.columns:
-        df_analise['COMPROVANTE_VALIDADO'] = df_analise['comprovante_validado_id'].fillna('').astype(str).str.strip().str.lower().isin(['sim', 'y', '1']) # Ajuste '1' se for o ID da opção 'Sim'
-        df_analise['Comprovante Validado?'] = np.where(df_analise['COMPROVANTE_VALIDADO'], 'Sim', 'Não')
+        df_analise['COMPROVANTE_VALIDADO'] = df_analise['comprovante_validado_id'].astype(str).str.lower().isin(['sim', 'yes', 'true', '1', 's', 'y', 't'])
+        df_analise['Comprovante Validado?'] = df_analise['COMPROVANTE_VALIDADO'].map({True: 'Sim', False: 'Não'})
     else:
         df_analise['Comprovante Validado?'] = 'N/A'
         df_analise['COMPROVANTE_VALIDADO'] = False # Default para cálculo
 
     # 2. Evidência Anexada (Arquivo)
     if 'evidencia_anexo_id' in df_analise.columns:
-        df_analise['EVIDENCIA_ANEXADA'] = df_analise['evidencia_anexo_id'].fillna('').astype(str).str.strip().apply(lambda x: x not in ['', '[]', '{}', 'null', 'None', '0'])
-        df_analise['Evidência Anexada?'] = np.where(df_analise['EVIDENCIA_ANEXADA'], 'Sim', 'Não')
+        # Verifica se tem um valor válido no campo de evidência
+        df_analise['EVIDENCIA_ANEXADA'] = df_analise['evidencia_anexo_id'].notna() & (~df_analise['evidencia_anexo_id'].astype(str).isin(['', '[]', '{}', 'null', 'None', '0', 'nan']))
+        df_analise['Evidência Anexada?'] = df_analise['EVIDENCIA_ANEXADA'].map({True: 'Sim', False: 'Não'})
     else:
         df_analise['Evidência Anexada?'] = 'N/A'
         df_analise['EVIDENCIA_ANEXADA'] = False # Default para cálculo
@@ -1194,6 +1188,12 @@ def visualizar_analise_evidencia(df_comune):
     if 'COMPROVANTE_VALIDADO' in df_analise.columns and 'EVIDENCIA_ANEXADA' in df_analise.columns:
         df_comp_nao_evid_sim = df_analise[(df_analise['COMPROVANTE_VALIDADO'] == False) & (df_analise['EVIDENCIA_ANEXADA'] == True)].copy()
         comp_nao_evid_sim = len(df_comp_nao_evid_sim)
+        
+    # Novo caso específico: Evidência Não (independente do comprovante)
+    df_sem_evidencia = pd.DataFrame()
+    if 'EVIDENCIA_ANEXADA' in df_analise.columns:
+        df_sem_evidencia = df_analise[df_analise['EVIDENCIA_ANEXADA'] == False].copy()
+        evidencia_nao = len(df_sem_evidencia)
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -1209,78 +1209,78 @@ def visualizar_analise_evidencia(df_comune):
         metric_container = st.container()
         metric_container.metric("⚠️ Comprovante 'Sim' SEM Evidência Anexada", comp_sim_evid_nao)
         metric_container.metric("⚠️ Comprovante 'Não' COM Evidência Anexada", comp_nao_evid_sim)
-        
-        # Adicionar expander com detalhes dos registros com problema (Comprovante Sim SEM Evidência)
-        if comp_sim_evid_nao > 0:
-            with st.expander("Detalhamento dos registros com Comprovante 'Sim' SEM Evidência Anexada", expanded=True):
-                st.markdown("""
-                <div style="background-color: #ffebee; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 5px solid #f44336;">
-                <h4 style="color: #b71c1c; margin-top: 0;">Atenção: Registros Incompletos</h4>
-                <p style="margin-bottom: 5px;">Os registros abaixo possuem o campo <strong>Comprovante Validado</strong> marcado como <strong>Sim</strong>, 
-                porém não têm <strong>Evidência Anexada</strong>. Isso pode indicar:</p>
-                <ul style="margin-bottom: 0;">
-                <li>Falha no procedimento de anexar a evidência</li>
-                <li>Erro de preenchimento do campo "Comprovante Validado"</li>
-                <li>Possíveis processos com documentação incompleta</li>
-                </ul>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Selecionar colunas relevantes para exibição na tabela
-                colunas_tabela = ['id_processo', 'titulo', 'provincia_id', 'comune_paroquia_id', 'Comprovante Validado?', 'Evidência Anexada?', 'data_solicitacao_original']
-                colunas_tabela_presentes = [col for col in colunas_tabela if col in df_comp_sim_evid_nao.columns]
-                
-                # Exibir tabela com os dados
-                st.dataframe(df_comp_sim_evid_nao[colunas_tabela_presentes], use_container_width=True)
-
-                # Adicionar opção de download
-                csv = df_comp_sim_evid_nao[colunas_tabela_presentes].to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="Baixar CSV",
-                    data=csv,
-                    file_name=f'comprovantes_sem_evidencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
-                    mime='text/csv',
-                    key='download-comp-sem-evid-csv',
-                    use_container_width=False
-                )
-        
-        # Adicionar expander com detalhes dos registros com problema (Comprovante Não COM Evidência)
-        if comp_nao_evid_sim > 0:
-            with st.expander("Detalhamento dos registros com Comprovante 'Não' COM Evidência Anexada", expanded=True):
-                st.markdown("""
-                <div style="background-color: #e8f5e9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 5px solid #43a047;">
-                <h4 style="color: #1b5e20; margin-top: 0;">Atenção: Registros para Validação</h4>
-                <p style="margin-bottom: 5px;">Os registros abaixo possuem <strong>Evidência Anexada</strong> mas o campo <strong>Comprovante Validado</strong> está marcado como <strong>Não</strong>. Isso pode indicar:</p>
-                <ul style="margin-bottom: 0;">
-                <li>Evidência anexada aguardando validação</li>
-                <li>Esquecimento de atualizar o status do comprovante após anexar evidência</li>
-                <li>Evidência anexada que precisa ser revisada</li>
-                </ul>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Selecionar colunas relevantes para exibição na tabela
-                colunas_tabela = ['id_processo', 'titulo', 'provincia_id', 'comune_paroquia_id', 'Comprovante Validado?', 'Evidência Anexada?', 'data_solicitacao_original']
-                colunas_tabela_presentes = [col for col in colunas_tabela if col in df_comp_nao_evid_sim.columns]
-                
-                # Exibir tabela com os dados
-                st.dataframe(df_comp_nao_evid_sim[colunas_tabela_presentes], use_container_width=True)
-
-                # Adicionar opção de download
-                csv = df_comp_nao_evid_sim[colunas_tabela_presentes].to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="Baixar CSV",
-                    data=csv,
-                    file_name=f'comprovantes_nao_com_evidencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
-                    mime='text/csv',
-                    key='download-comp-nao-com-evid-csv',
-                    use_container_width=False
-                )
-
-
+    
+    # --- Continuar com expanders originais ---
     st.markdown("---") # Divisor
+    
+    # Adicionar expander com detalhes dos registros com problema (Comprovante Sim SEM Evidência)
+    if comp_sim_evid_nao > 0:
+        with st.expander("Detalhamento dos registros com Comprovante 'Sim' SEM Evidência Anexada", expanded=False):
+            st.markdown("""
+            <div style="background-color: #ffebee; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 5px solid #f44336;">
+            <h4 style="color: #b71c1c; margin-top: 0;">Atenção: Registros Incompletos</h4>
+            <p style="margin-bottom: 5px;">Os registros abaixo possuem o campo <strong>Comprovante Validado</strong> marcado como <strong>Sim</strong>, 
+            porém não têm <strong>Evidência Anexada</strong>. Isso pode indicar:</p>
+            <ul style="margin-bottom: 0;">
+            <li>Falha no procedimento de anexar a evidência</li>
+            <li>Erro de preenchimento do campo "Comprovante Validado"</li>
+            <li>Possíveis documentos perdidos ou não escaneados</li>
+            </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Selecionar colunas relevantes para exibição na tabela
+            colunas_tabela = ['id_processo', 'titulo', 'provincia_id', 'comune_paroquia_id', 'Comprovante Validado?', 'Evidência Anexada?', 'data_solicitacao_original', 'stage_name']
+            colunas_tabela_presentes = [col for col in colunas_tabela if col in df_comp_sim_evid_nao.columns]
+            
+            # Exibir tabela com os dados
+            st.dataframe(df_comp_sim_evid_nao[colunas_tabela_presentes], use_container_width=True)
 
-    # --- Processamento da Tabela Detalhada (continua como antes) ---
+            # Adicionar opção de download
+            csv = df_comp_sim_evid_nao[colunas_tabela_presentes].to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Baixar CSV",
+                data=csv,
+                file_name=f'comprovantes_sem_evidencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                mime='text/csv',
+                key='download-comp-sem-evid-csv',
+                use_container_width=False
+            )
+    
+    # Adicionar expander com detalhes dos registros com problema (Comprovante Não COM Evidência)
+    if comp_nao_evid_sim > 0:
+        with st.expander("Detalhamento dos registros com Comprovante 'Não' COM Evidência Anexada", expanded=False):
+            st.markdown("""
+            <div style="background-color: #e8f5e9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 5px solid #43a047;">
+            <h4 style="color: #1b5e20; margin-top: 0;">Atenção: Registros para Validação</h4>
+            <p style="margin-bottom: 5px;">Os registros abaixo possuem <strong>Evidência Anexada</strong> mas o campo <strong>Comprovante Validado</strong> está marcado como <strong>Não</strong>. Isso pode indicar:</p>
+            <ul style="margin-bottom: 0;">
+            <li>Evidência anexada aguardando validação</li>
+            <li>Esquecimento de atualizar o status do comprovante após anexar evidência</li>
+            <li>Evidência anexada que precisa ser revisada</li>
+            </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Selecionar colunas relevantes para exibição na tabela
+            colunas_tabela = ['id_processo', 'titulo', 'provincia_id', 'comune_paroquia_id', 'Comprovante Validado?', 'Evidência Anexada?', 'data_solicitacao_original', 'stage_name']
+            colunas_tabela_presentes = [col for col in colunas_tabela if col in df_comp_nao_evid_sim.columns]
+            
+            # Exibir tabela com os dados
+            st.dataframe(df_comp_nao_evid_sim[colunas_tabela_presentes], use_container_width=True)
+
+            # Adicionar opção de download
+            csv = df_comp_nao_evid_sim[colunas_tabela_presentes].to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Baixar CSV",
+                data=csv,
+                file_name=f'comprovantes_nao_com_evidencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                mime='text/csv',
+                key='download-comp-nao-com-evid-csv',
+                use_container_width=False
+            )
+
+    # --- Processamento da Tabela Detalhada ---
 
     # 3. Tempo desde Solicitação
     if 'data_solicitacao_original' in df_analise.columns:
@@ -1292,7 +1292,7 @@ def visualizar_analise_evidencia(df_comune):
         hoje = pd.Timestamp('now')
         df_analise['TEMPO_SOLICITACAO_DIAS'] = (hoje - df_analise['data_solicitacao_original']).dt.days
         
-        # Formatar para exibição (tratar NaT e valores negativos se a data for futura)
+        # Formatar para exibição (tratar NaT e valores negativos)
         def formatar_dias(dias):
             if pd.isna(dias):
                 return "Data Inválida/Ausente"
@@ -1312,6 +1312,7 @@ def visualizar_analise_evidencia(df_comune):
         'titulo': 'Título Processo',
         'provincia_id': 'Província',
         'comune_paroquia_id': 'Comune/Paróquia',
+        'stage_name': 'Estágio do Processo'
         # As colunas 'Comprovante Validado?', 'Evidência Anexada?', 'Tempo Desde Solicitação' já foram criadas com os nomes desejados
     }
     # Renomear apenas as colunas que existem no df_analise
@@ -1320,15 +1321,15 @@ def visualizar_analise_evidencia(df_comune):
 
     # Definir a ordem final das colunas para exibição
     cols_finais_ordem = [
-        'ID Processo', 'Título Processo', 'Província', 'Comune/Paróquia',
+        'ID Processo', 'Título Processo', 'Província', 'Comune/Paróquia', 'Estágio do Processo',
         'Comprovante Validado?', 'Evidência Anexada?', 'Tempo Desde Solicitação'
     ]
     
     # Filtrar pelas colunas que realmente existem no df_display
     cols_exibicao_final = [col for col in cols_finais_ordem if col in df_display.columns]
 
-    st.markdown("#### Detalhamento por Processo")
-    st.info("Tabela abaixo mostra cada processo individualmente com o status das evidências e o tempo desde a solicitação original (baseado no arquivo CSV). Use os filtros das colunas para explorar.")
+    st.markdown("#### Detalhamento Completo por Processo")
+    st.info("Tabela abaixo mostra todos os processos com status de evidências e tempo desde a solicitação original. Use os filtros das colunas para explorar.")
     
     # Exibir a tabela
     st.dataframe(df_display[cols_exibicao_final], use_container_width=True)
@@ -1336,28 +1337,103 @@ def visualizar_analise_evidencia(df_comune):
     # Adicionar opção de download
     csv = df_display[cols_exibicao_final].to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Baixar dados da análise em CSV",
+        label="📥 Baixar dados completos da análise em CSV",
         data=csv,
         file_name=f'analise_evidencia_comprovante_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
         mime='text/csv',
         key='download-evidencia-csv' # Adicionar chave única
     )
     
-    # --- Futuras Melhorias --- 
-    # st.subheader("Visão Agregada por Província/Comune (Exemplo)")
-    # if all(c in df_display.columns for c in ['Província', 'Comune/Paróquia', 'Comprovante Validado?', 'Evidência Anexada?']):
-    #     df_agregado = df_display.groupby(['Província', 'Comune/Paróquia']).agg(
-    #         Total_Processos = ('ID Processo', 'count'),
-    #         Comprovante_Sim = ('Comprovante Validado?', lambda x: (x == 'Sim').sum()),
-    #         Evidencia_Sim = ('Evidência Anexada?', lambda x: (x == 'Sim').sum()),
-    #         Tempo_Medio_Dias = ('TEMPO_SOLICITACAO_DIAS', 'mean')
-    #     ).reset_index()
-    #     df_agregado['Tempo_Medio_Dias'] = df_agregado['Tempo_Medio_Dias'].round(1)
-    #     st.dataframe(df_agregado, use_container_width=True)
-    # else:
-    #     st.warning("Não foi possível gerar visão agregada por falta de colunas.")
+    # NOVA SEÇÃO: Detalhe expandido dos processos sem comprovante anexado (MOVIDO PARA O FINAL)    
+    st.markdown("---") # Divisor adicional para separar
+    st.markdown("#### Evidência Anexada (Não)")
+    
+    if 'EVIDENCIA_ANEXADA' in df_analise.columns:
+        # Extrair apenas os registros sem evidência anexada
+        df_sem_evidencia = df_analise[df_analise['EVIDENCIA_ANEXADA'] == False].copy()
         
-    # Adicionar Mapa aqui se necessário no futuro
+        # Verificar se há registros
+        if not df_sem_evidencia.empty:
+            # Exibir alerta sobre os registros sem evidência
+            st.markdown("""
+            <div style="background-color: #ffebee; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 5px solid #f44336;">
+            <h4 style="color: #b71c1c; margin-top: 0;">Alerta: Comprovantes sem Evidências Anexadas</h4>
+            <p style="margin-bottom: 5px;">Os processos abaixo não possuem evidências anexadas. Estes documentos precisam ser verificados com prioridade.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Selecionar colunas para exibição na tabela expandida
+            colunas_exibir = ['id_processo', 'titulo', 'Comprovante Validado?', 'stage_name', 'provincia_id', 'comune_paroquia_id']
+            colunas_presentes = [col for col in colunas_exibir if col in df_sem_evidencia.columns]
+            
+            # Ordenar por ID para facilitar a visualização
+            df_sem_evidencia_exibir = df_sem_evidencia.sort_values(by='id_processo')[colunas_presentes].copy()
+            
+            # Renomear colunas para melhor exibição
+            colunas_renomear = {
+                'id_processo': 'ID',
+                'titulo': 'Título do Processo', 
+                'stage_name': 'Estágio',
+                'provincia_id': 'Província',
+                'comune_paroquia_id': 'Comune'
+            }
+            df_sem_evidencia_exibir = df_sem_evidencia_exibir.rename(columns={k: v for k, v in colunas_renomear.items() if k in df_sem_evidencia_exibir.columns})
+            
+            # Exibir a tabela com os IDs expandidos
+            with st.expander("Evidência Anexada (Não) - Expandir IDs Detalhados", expanded=True):
+                # Adicionar filtros interativos
+                cols = st.columns(3)
+                
+                # Verificar e criar filtros para colunas disponíveis
+                if 'Estágio' in df_sem_evidencia_exibir.columns:
+                    with cols[0]:
+                        estagios = ['Todos'] + sorted(df_sem_evidencia_exibir['Estágio'].dropna().unique().tolist())
+                        estagio_filtro = st.selectbox('Filtrar por Estágio:', estagios)
+                
+                if 'Província' in df_sem_evidencia_exibir.columns:
+                    with cols[1]:
+                        provincias = ['Todas'] + sorted(df_sem_evidencia_exibir['Província'].dropna().astype(str).unique().tolist())
+                        provincia_filtro = st.selectbox('Filtrar por Província:', provincias)
+                
+                with cols[2]:
+                    busca = st.text_input('Buscar por texto:', placeholder='Digite para filtrar...')
+                
+                # Aplicar filtros
+                df_filtrado = df_sem_evidencia_exibir.copy()
+                
+                if 'Estágio' in df_sem_evidencia_exibir.columns and estagio_filtro != 'Todos':
+                    df_filtrado = df_filtrado[df_filtrado['Estágio'] == estagio_filtro]
+                
+                if 'Província' in df_sem_evidencia_exibir.columns and provincia_filtro != 'Todas':
+                    df_filtrado = df_filtrado[df_filtrado['Província'].astype(str) == provincia_filtro]
+                
+                if busca:
+                    # Aplicar filtro de texto em todas as colunas que são do tipo string
+                    mask = pd.Series(False, index=df_filtrado.index)
+                    for col in df_filtrado.columns:
+                        if df_filtrado[col].dtype == 'object':  # Se for texto
+                            mask = mask | df_filtrado[col].astype(str).str.contains(busca, case=False, na=False)
+                    df_filtrado = df_filtrado[mask]
+                
+                # Mostrar contador de resultados
+                st.write(f"Exibindo {len(df_filtrado)} de {len(df_sem_evidencia_exibir)} registros sem evidência anexada")
+                
+                # Exibir tabela com resultados filtrados
+                st.dataframe(df_filtrado, use_container_width=True, height=400)
+                
+                # Adicionar botão de download
+                csv = df_filtrado.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Exportar lista sem evidência anexada",
+                    data=csv,
+                    file_name=f'registros_sem_evidencia_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
+                    mime='text/csv',
+                    key='download-sem-evidencia-csv'
+                )
+        else:
+            st.success("Parabéns! Todos os processos possuem evidências anexadas.")
+    else:
+        st.warning("Não foi possível verificar evidências anexadas. Campo não encontrado nos dados.")
 
 def visualizar_providencias(df_comune):
     """
