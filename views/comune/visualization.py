@@ -1176,14 +1176,24 @@ def visualizar_analise_evidencia(df_comune):
     comprovante_sim = df_analise[df_analise['Comprovante Validado?'] == 'Sim'].shape[0] if 'Comprovante Validado?' in df_analise.columns else 0
     comprovante_nao = df_analise[df_analise['Comprovante Validado?'] == 'Não'].shape[0] if 'Comprovante Validado?' in df_analise.columns else 0
     
-    evidencia_sim = df_analise[df_analise['Evidência Anexada?'] == 'Sim'].shape[0] if 'Evidência Anexada?' in df_analise.columns else 0
-    evidencia_nao = df_analise[df_analise['Evidência Anexada?'] == 'Não'].shape[0] if 'Evidência Anexada?' in df_analise.columns else 0
+    # Calcular métricas de evidência de forma explícita
+    if 'EVIDENCIA_ANEXADA' in df_analise.columns:
+        evidencia_sim = df_analise[df_analise['EVIDENCIA_ANEXADA'] == True].shape[0]
+        evidencia_nao = df_analise[df_analise['EVIDENCIA_ANEXADA'] == False].shape[0]
+        df_sem_evidencia = df_analise[df_analise['EVIDENCIA_ANEXADA'] == False].copy()
+    else:
+        evidencia_sim = df_analise[df_analise['Evidência Anexada?'] == 'Sim'].shape[0] if 'Evidência Anexada?' in df_analise.columns else 0
+        evidencia_nao = df_analise[df_analise['Evidência Anexada?'] == 'Não'].shape[0] if 'Evidência Anexada?' in df_analise.columns else 0
+        df_sem_evidencia = df_analise[df_analise['Evidência Anexada?'] == 'Não'].copy() if 'Evidência Anexada?' in df_analise.columns else pd.DataFrame()
     
     # Caso específico: Comprovante Sim E Evidência Não
     comp_sim_evid_nao = 0
     df_comp_sim_evid_nao = pd.DataFrame()
     if 'COMPROVANTE_VALIDADO' in df_analise.columns and 'EVIDENCIA_ANEXADA' in df_analise.columns:
         df_comp_sim_evid_nao = df_analise[(df_analise['COMPROVANTE_VALIDADO'] == True) & (df_analise['EVIDENCIA_ANEXADA'] == False)].copy()
+        comp_sim_evid_nao = len(df_comp_sim_evid_nao)
+    elif 'Comprovante Validado?' in df_analise.columns and 'Evidência Anexada?' in df_analise.columns:
+        df_comp_sim_evid_nao = df_analise[(df_analise['Comprovante Validado?'] == 'Sim') & (df_analise['Evidência Anexada?'] == 'Não')].copy()
         comp_sim_evid_nao = len(df_comp_sim_evid_nao)
     
     # Novo caso específico: Comprovante Não E Evidência Sim
@@ -1192,12 +1202,9 @@ def visualizar_analise_evidencia(df_comune):
     if 'COMPROVANTE_VALIDADO' in df_analise.columns and 'EVIDENCIA_ANEXADA' in df_analise.columns:
         df_comp_nao_evid_sim = df_analise[(df_analise['COMPROVANTE_VALIDADO'] == False) & (df_analise['EVIDENCIA_ANEXADA'] == True)].copy()
         comp_nao_evid_sim = len(df_comp_nao_evid_sim)
-        
-    # Novo caso específico: Evidência Não (independente do comprovante)
-    df_sem_evidencia = pd.DataFrame()
-    if 'EVIDENCIA_ANEXADA' in df_analise.columns:
-        df_sem_evidencia = df_analise[df_analise['EVIDENCIA_ANEXADA'] == False].copy()
-        evidencia_nao = len(df_sem_evidencia)
+    elif 'Comprovante Validado?' in df_analise.columns and 'Evidência Anexada?' in df_analise.columns:
+        df_comp_nao_evid_sim = df_analise[(df_analise['Comprovante Validado?'] == 'Não') & (df_analise['Evidência Anexada?'] == 'Sim')].copy()
+        comp_nao_evid_sim = len(df_comp_nao_evid_sim)
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -1207,7 +1214,8 @@ def visualizar_analise_evidencia(df_comune):
         
     with col2:
         st.metric("Evidência Anexada (Sim)", evidencia_sim)
-        st.metric("Evidência Anexada (Não)", evidencia_nao)
+        # Destacando a métrica que precisa corresponder à tabela abaixo
+        st.metric("Evidência Anexada (Não)", evidencia_nao, help="Processos sem evidência anexada no sistema")
         
     with col3:
         metric_container = st.container()
@@ -1353,19 +1361,25 @@ def visualizar_analise_evidencia(df_comune):
     st.markdown("---") # Divisor adicional para separar
     st.markdown("#### Evidência Anexada (Não)")
     
+    # Usar o mesmo df_sem_evidencia calculado na seção de métricas para garantir consistência
     if 'EVIDENCIA_ANEXADA' in df_analise.columns:
-        # Extrair apenas os registros sem evidência anexada
+        # Garantir que estamos usando o mesmo DataFrame da métrica
         df_sem_evidencia = df_analise[df_analise['EVIDENCIA_ANEXADA'] == False].copy()
+        evidencia_nao_count = len(df_sem_evidencia)
         
         # Verificar se há registros
         if not df_sem_evidencia.empty:
             # Exibir alerta sobre os registros sem evidência
-            st.markdown("""
+            st.markdown(f"""
             <div style="background-color: #ffebee; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 5px solid #f44336;">
-            <h4 style="color: #b71c1c; margin-top: 0;">Alerta: Comprovantes sem Evidências Anexadas</h4>
+            <h4 style="color: #b71c1c; margin-top: 0;">Alerta: {evidencia_nao_count} Comprovantes sem Evidências Anexadas</h4>
             <p style="margin-bottom: 5px;">Os processos abaixo não possuem evidências anexadas. Estes documentos precisam ser verificados com prioridade.</p>
+            <p><strong>A tabela abaixo contém exatamente os mesmos {evidencia_nao_count} registros refletidos na métrica acima.</strong></p>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Verificação explícita para debug
+            st.info(f"Total de registros sem evidência anexada: {evidencia_nao_count} (EVIDENCIA_ANEXADA=False)")
             
             # Selecionar colunas para exibição na tabela expandida
             colunas_exibir = ['id_processo', 'titulo', 'Comprovante Validado?', 'stage_name', 'provincia_id', 'comune_paroquia_id', 'Conteúdo Evidência']
@@ -1373,6 +1387,10 @@ def visualizar_analise_evidencia(df_comune):
             
             # Ordenar por ID para facilitar a visualização
             df_sem_evidencia_exibir = df_sem_evidencia.sort_values(by='id_processo')[colunas_presentes].copy()
+            
+            # Verificação adicional
+            if len(df_sem_evidencia_exibir) != evidencia_nao_count:
+                st.warning(f"INCONSISTÊNCIA DETECTADA: A tabela contém {len(df_sem_evidencia_exibir)} registros após processamento, mas a métrica mostra {evidencia_nao_count}.")
             
             # Renomear colunas para melhor exibição
             colunas_renomear = {
@@ -1385,8 +1403,8 @@ def visualizar_analise_evidencia(df_comune):
             }
             df_sem_evidencia_exibir = df_sem_evidencia_exibir.rename(columns={k: v for k, v in colunas_renomear.items() if k in df_sem_evidencia_exibir.columns})
             
-            # Exibir a tabela com os IDs expandidos
-            with st.expander("Evidência Anexada (Não) - Expandir IDs Detalhados", expanded=True):
+            # Exibir a tabela com os IDs expandidos - sempre expandido para maior visibilidade
+            with st.expander("Evidência Anexada (Não) - Lista Detalhada", expanded=True):
                 # Adicionar filtros interativos
                 cols = st.columns(3)
                 
@@ -1395,11 +1413,15 @@ def visualizar_analise_evidencia(df_comune):
                     with cols[0]:
                         estagios = ['Todos'] + sorted(df_sem_evidencia_exibir['Estágio'].dropna().unique().tolist())
                         estagio_filtro = st.selectbox('Filtrar por Estágio:', estagios)
+                else:
+                    estagio_filtro = 'Todos'  # Valor padrão se não houver a coluna
                 
                 if 'Província' in df_sem_evidencia_exibir.columns:
                     with cols[1]:
                         provincias = ['Todas'] + sorted(df_sem_evidencia_exibir['Província'].dropna().astype(str).unique().tolist())
                         provincia_filtro = st.selectbox('Filtrar por Província:', provincias)
+                else:
+                    provincia_filtro = 'Todas'  # Valor padrão se não houver a coluna
                 
                 with cols[2]:
                     busca = st.text_input('Buscar por texto:', placeholder='Digite para filtrar...')
@@ -1422,7 +1444,7 @@ def visualizar_analise_evidencia(df_comune):
                     df_filtrado = df_filtrado[mask]
                 
                 # Mostrar contador de resultados
-                st.write(f"Exibindo {len(df_filtrado)} de {len(df_sem_evidencia_exibir)} registros sem evidência anexada")
+                st.write(f"Exibindo {len(df_filtrado)} de {evidencia_nao_count} registros sem evidência anexada")
                 
                 # Exibir tabela com resultados filtrados
                 st.dataframe(df_filtrado, use_container_width=True, height=400)
