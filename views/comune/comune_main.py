@@ -5,11 +5,42 @@ from .visualization import visualizar_comune_dados, visualizar_funil_comune, vis
 import pandas as pd
 import io
 from datetime import datetime
+import time
+import sys
+from pathlib import Path
+
+# Adicionar caminhos para importação
+api_path = Path(__file__).parents[2] / 'api'
+utils_path = Path(__file__).parents[2] / 'utils'
+sys.path.insert(0, str(api_path))
+sys.path.insert(0, str(utils_path))
+
+# Importar funções necessárias
+from bitrix_connector import load_bitrix_data
+from refresh_utils import handle_refresh_trigger, get_force_reload_status, clear_force_reload_flag
 
 def show_comune():
     """
     Exibe a página principal do COMUNE
     """
+    # Aplicar estilo personalizado para botão de atualização
+    st.markdown("""
+    <style>
+    div[data-testid="stButton"] button.atualizar-btn {
+        background-color: #4CAF50;
+        color: white;
+        font-weight: bold;
+        border: none;
+        border-radius: 4px;
+        transition-duration: 0.3s;
+    }
+    div[data-testid="stButton"] button.atualizar-btn:hover {
+        background-color: #45a049;
+        box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     # Título centralizado
     st.markdown("""
     <h1 style="font-size: 2.8rem; font-weight: 900; color: #1A237E; text-align: center; 
@@ -19,10 +50,55 @@ def show_comune():
     """, unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; font-size: 16px; color: #555; font-family: Arial, Helvetica, sans-serif;'>Monitoramento completo do processo de emissão de documentos de Comune.</p>", unsafe_allow_html=True)
     
+    # Botão de atualização no topo da página
+    col1, col2 = st.columns([5, 1])
+    with col2:
+        if st.button("🔄 Atualizar Dados", key="btn_atualizar_comune", help="Força a atualização dos dados ignorando o cache", type="primary", use_container_width=True):
+            with st.spinner("Atualizando dados e limpando cache..."):
+                # Mostrar mensagem de feedback
+                st.info("Limpando cache e recarregando dados em tempo real...")
+                
+                # Limpar todos os caches antes de recarregar
+                st.cache_data.clear()
+                
+                # Limpar também o cache específico da API Bitrix
+                load_bitrix_data.clear()
+                
+                # Definir flags no estado da sessão para consistência com o resto do projeto
+                st.session_state['full_refresh'] = True
+                st.session_state['force_reload'] = True
+                st.session_state['loading_state'] = 'loading'
+                
+                # Pequena pausa para garantir que o cache seja completamente limpo
+                time.sleep(0.5)
+                st.success("Cache limpo! Recarregando página...")
+                time.sleep(0.5)
+                st.rerun()
+        
+        # Texto de ajuda para o botão de atualização
+        st.caption("""
+        Use este botão para forçar a atualização 
+        dos dados em tempo real e limpar o cache
+        """)
+    
+    # Verificar se há atualização global acionada por outro botão do sistema
+    if handle_refresh_trigger():
+        # Indicar que estamos atualizando
+        st.info("⏳ Atualizando dados como parte de uma atualização global...")
+        time.sleep(0.5)
+        st.rerun()
+    
+    # Se estiver forçando recarregamento, exibir indicador
+    force_reload = get_force_reload_status()
+    if force_reload:
+        st.info("⏳ Dados sendo atualizados diretamente da API (ignorando cache)...")
+        # Limpar a flag após seu uso
+        clear_force_reload_flag()
+    
     # Carregar os dados
     with st.spinner("Carregando dados..."):
-        df_comune = carregar_dados_comune()
-        df_deal, df_deal_uf = carregar_dados_negocios()
+        df_comune = carregar_dados_comune(force_reload=force_reload)
+        df_deal, df_deal_uf = carregar_dados_negocios(force_reload=force_reload)
     
     if df_comune.empty:
         st.warning("Não foi possível carregar os dados de COMUNE. Verifique a conexão com o Bitrix24.")

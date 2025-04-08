@@ -167,18 +167,28 @@ def carregar_coordenadas_mapa():
         st.error(f"Erro ao ler ou processar o arquivo JSON de coordenadas: {e}")
         return pd.DataFrame()
 
-def carregar_dados_comune():
+def carregar_dados_comune(force_reload=False):
     """
     Carrega dados do Bitrix, normaliza locais (com limpeza prévia), 
     junta datas e coordenadas (APENAS fuzzy matching no Comune).
+    
+    Args:
+        force_reload (bool): Se True, força o recarregamento dos dados ignorando o cache
+        
+    Returns:
+        pandas.DataFrame: DataFrame com os dados processados
     """
+    # Verificar se deve forçar o recarregamento
+    if force_reload:
+        st.info("Forçando recarregamento completo dos dados do Comune (ignorando cache)")
+    
     # --- Carregar Bitrix --- 
     BITRIX_TOKEN, BITRIX_URL = get_credentials()
     url_items = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_dynamic_items_1052"
     category_filter = {"dimensionsFilters": [[{
         "fieldName": "CATEGORY_ID", "values": ["22"], "type": "INCLUDE", "operator": "EQUALS"
     }]]}
-    df_items = load_bitrix_data(url_items, filters=category_filter)
+    df_items = load_bitrix_data(url_items, filters=category_filter, force_reload=force_reload)
     if df_items is None or df_items.empty: return pd.DataFrame()
     if 'ID' not in df_items.columns: return pd.DataFrame()
     df_items['ID'] = df_items['ID'].astype(str)
@@ -299,13 +309,20 @@ def carregar_dados_comune():
     df_items.loc[:, 'NOME_SEGMENTO'] = "COMUNE BITRIX24"
     return df_items
 
-def carregar_dados_negocios():
+def carregar_dados_negocios(force_reload=False):
     """
     Carrega os dados dos negócios da categoria 32 e seus campos personalizados
     
+    Args:
+        force_reload (bool): Se True, força o recarregamento dos dados ignorando o cache
+        
     Returns:
         tuple: (DataFrame com negócios, DataFrame com campos personalizados)
     """
+    # Verificar se deve forçar o recarregamento
+    if force_reload:
+        st.info("Forçando recarregamento completo dos dados de negócios (ignorando cache)")
+    
     # Obter token do Bitrix24
     BITRIX_TOKEN, BITRIX_URL = get_credentials()
     
@@ -326,7 +343,7 @@ def carregar_dados_negocios():
     print(f"Aplicando filtro para CRM_DEAL: {category_filter}")
     
     # Carregar dados principais dos negócios com filtro de categoria
-    df_deal = load_bitrix_data(url_deal, filters=category_filter)
+    df_deal = load_bitrix_data(url_deal, filters=category_filter, force_reload=force_reload)
     
     # Verificar se conseguiu carregar os dados
     if df_deal.empty:
@@ -379,7 +396,7 @@ def carregar_dados_negocios():
     print(f"Aplicando filtro para CRM_DEAL_UF com {len(deal_ids)} IDs")
     
     # Carregar dados da tabela crm_deal_uf (onde estão os campos personalizados do funil de negócios)
-    df_deal_uf = load_bitrix_data(url_deal_uf, filters=deal_filter)
+    df_deal_uf = load_bitrix_data(url_deal_uf, filters=deal_filter, force_reload=force_reload)
     
     # Verificar se conseguiu carregar os dados
     if df_deal_uf.empty:
@@ -416,19 +433,26 @@ def carregar_dados_negocios():
     
     return df_deal, df_deal_uf
 
-def carregar_estagios_bitrix():
+def carregar_estagios_bitrix(force_reload=False):
     """
     Carrega os estágios dos funis do Bitrix24
     
+    Args:
+        force_reload (bool): Se True, força o recarregamento dos dados ignorando o cache
+        
     Returns:
         pandas.DataFrame: DataFrame com os estágios
     """
+    # Verificar se deve forçar o recarregamento
+    if force_reload:
+        st.info("Forçando recarregamento completo dos dados de estágios (ignorando cache)")
+    
     # Obter token e URL do Bitrix24
     BITRIX_TOKEN, BITRIX_URL = get_credentials()
     
     # Obter estágios únicos do pipeline
     url_stages = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_status"
-    df_stages = load_bitrix_data(url_stages)
+    df_stages = load_bitrix_data(url_stages, force_reload=force_reload)
     
     return df_stages
 

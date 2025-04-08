@@ -4,6 +4,21 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import numpy as np
+import sys
+from pathlib import Path
+import time
+
+# Adicionar o caminho da API para importação
+api_path = Path(__file__).parents[2] / 'api'
+sys.path.insert(0, str(api_path))
+
+# Adicionar o caminho dos utils para importação
+utils_path = Path(__file__).parents[2] / 'utils'
+sys.path.insert(0, str(utils_path))
+
+# Importar a função que usa cache da API Bitrix
+from bitrix_connector import load_bitrix_data
+from refresh_utils import handle_refresh_trigger, get_force_reload_status, clear_force_reload_flag
 
 def analisar_produtividade(df):
     """
@@ -12,6 +27,24 @@ def analisar_produtividade(df):
     Args:
         df (pandas.DataFrame): DataFrame com os dados dos cartórios
     """
+    # Aplicar estilo personalizado para botão de atualização
+    st.markdown("""
+    <style>
+    div[data-testid="stButton"] button {
+        background-color: #4CAF50;
+        color: white;
+        font-weight: bold;
+        border: none;
+        border-radius: 4px;
+        transition-duration: 0.3s;
+    }
+    div[data-testid="stButton"] button:hover {
+        background-color: #45a049;
+        box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     # Verificar se temos as colunas necessárias para a análise
     colunas_necessarias = [
         'PREVIOUS_STAGE_ID',
@@ -35,6 +68,52 @@ def analisar_produtividade(df):
     df = mapear_estagio_para_nome(df)
     
     st.markdown("## Visão de Movimentações")
+    
+    # Botão de atualização que força a recarga da página e limpa o cache
+    col1, col2 = st.columns([6, 1])
+    with col2:
+        if st.button("🔄 Atualizar Dados", key="btn_atualizar", help="Força a atualização dos dados ignorando o cache"):
+            with st.spinner("Atualizando dados e limpando cache..."):
+                # Mostrar mensagem de feedback
+                st.info("Limpando cache e recarregando dados em tempo real...")
+                
+                # Limpar todos os caches antes de recarregar
+                st.cache_data.clear()
+                
+                # Limpar também o cache específico da API Bitrix
+                load_bitrix_data.clear()
+                
+                # Definir flags no estado da sessão para consistência com o resto do projeto
+                st.session_state['full_refresh'] = True
+                st.session_state['force_reload'] = True
+                st.session_state['loading_state'] = 'loading'
+                
+                # Pequena pausa para garantir que o cache seja completamente limpo
+                time.sleep(0.5)
+                st.success("Cache limpo! Recarregando página...")
+                time.sleep(0.5)
+                st.rerun()
+        
+        # Texto de ajuda para o botão de atualização
+        st.caption("""
+        Use este botão para forçar a atualização 
+        dos dados em tempo real e limpar o cache
+        """)
+    
+    # Verificar se há atualização global acionada por outro botão do sistema
+    if handle_refresh_trigger():
+        # Indicar que estamos atualizando
+        st.info("⏳ Atualizando dados como parte de uma atualização global...")
+        time.sleep(0.5)
+        st.rerun()
+    
+    # Se estiver forçando recarregamento, exibir indicador
+    force_reload = get_force_reload_status()
+    if force_reload:
+        st.info("⏳ Dados sendo atualizados diretamente da API (ignorando cache)...")
+        # Limpar a flag após seu uso
+        clear_force_reload_flag()
+    
     st.info("""
     **O que é a Visão de Movimentações?**
     • Esta visão mostra a análise detalhada das movimentações dos cards entre etapas do fluxo de trabalho.
@@ -49,7 +128,7 @@ def analisar_produtividade(df):
     hoje = datetime.now()
     data_inicio = st.sidebar.date_input(
         "Data Inicial",
-        value=hoje - timedelta(days=30),
+        value=hoje - timedelta(days=30),    
         max_value=hoje,
         key="mov_data_inicio"
     )
