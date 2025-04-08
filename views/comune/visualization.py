@@ -1105,7 +1105,8 @@ def visualizar_analise_evidencia(df_comune):
         "DT1052_22:CLIENT",     # ENTREGUE PDF
         "DT1052_22:NEW",        # SOLICITAR
         "DT1052_22:FAIL",       # CANCELADO
-        "DT1052_22:SUCCESS"     # DOCUMENTO FISICO ENTREGUE
+        "DT1052_22:SUCCESS",    # DOCUMENTO FISICO ENTREGUE
+        "DT1052_22:UC_A9UEMO"   # Novo estágio a ser excluído
     ]
     
     # Verificar se STAGE_ID existe no DataFrame
@@ -1115,7 +1116,7 @@ def visualizar_analise_evidencia(df_comune):
         # Mostrar aviso sobre os registros filtrados
         registros_excluidos = len(df_comune) - len(df_filtrado)
         if registros_excluidos > 0:
-            st.info(f"Foram excluídos {registros_excluidos} registros dos estágios: PENDENTE, PESQUISA NÃO FINALIZADA, DEVOLUTIVA EMISSOR, ENTREGUE PDF, SOLICITAR, CANCELADO e DOCUMENTO FISICO ENTREGUE.")
+            st.info(f"Foram excluídos {registros_excluidos} registros dos estágios: PENDENTE, PESQUISA NÃO FINALIZADA, DEVOLUTIVA EMISSOR, ENTREGUE PDF, SOLICITAR, CANCELADO, DOCUMENTO FISICO ENTREGUE e DT1052_22:UC_A9UEMO.")
     else:
         df_filtrado = df_comune.copy()
         st.warning("Coluna STAGE_ID não encontrada. Não foi possível aplicar o filtro de estágios.")
@@ -1160,9 +1161,12 @@ def visualizar_analise_evidencia(df_comune):
         # Verifica se tem um valor válido no campo de evidência
         df_analise['EVIDENCIA_ANEXADA'] = df_analise['evidencia_anexo_id'].notna() & (~df_analise['evidencia_anexo_id'].astype(str).isin(['', '[]', '{}', 'null', 'None', '0', 'nan']))
         df_analise['Evidência Anexada?'] = df_analise['EVIDENCIA_ANEXADA'].map({True: 'Sim', False: 'Não'})
+        # Manter o conteúdo do campo evidencia_anexo_id para exibição
+        df_analise['Conteúdo Evidência'] = df_analise['evidencia_anexo_id'].astype(str)
     else:
         df_analise['Evidência Anexada?'] = 'N/A'
         df_analise['EVIDENCIA_ANEXADA'] = False # Default para cálculo
+        df_analise['Conteúdo Evidência'] = 'N/A'
 
     # --- Cálculo e Exibição das Métricas Macro ---
     st.markdown("#### Resumo Geral")
@@ -1230,7 +1234,7 @@ def visualizar_analise_evidencia(df_comune):
             """, unsafe_allow_html=True)
             
             # Selecionar colunas relevantes para exibição na tabela
-            colunas_tabela = ['id_processo', 'titulo', 'provincia_id', 'comune_paroquia_id', 'Comprovante Validado?', 'Evidência Anexada?', 'data_solicitacao_original', 'stage_name']
+            colunas_tabela = ['id_processo', 'titulo', 'provincia_id', 'comune_paroquia_id', 'Comprovante Validado?', 'Evidência Anexada?', 'Conteúdo Evidência', 'data_solicitacao_original', 'stage_name']
             colunas_tabela_presentes = [col for col in colunas_tabela if col in df_comp_sim_evid_nao.columns]
             
             # Exibir tabela com os dados
@@ -1263,7 +1267,7 @@ def visualizar_analise_evidencia(df_comune):
             """, unsafe_allow_html=True)
             
             # Selecionar colunas relevantes para exibição na tabela
-            colunas_tabela = ['id_processo', 'titulo', 'provincia_id', 'comune_paroquia_id', 'Comprovante Validado?', 'Evidência Anexada?', 'data_solicitacao_original', 'stage_name']
+            colunas_tabela = ['id_processo', 'titulo', 'provincia_id', 'comune_paroquia_id', 'Comprovante Validado?', 'Evidência Anexada?', 'Conteúdo Evidência', 'data_solicitacao_original', 'stage_name']
             colunas_tabela_presentes = [col for col in colunas_tabela if col in df_comp_nao_evid_sim.columns]
             
             # Exibir tabela com os dados
@@ -1312,7 +1316,8 @@ def visualizar_analise_evidencia(df_comune):
         'titulo': 'Título Processo',
         'provincia_id': 'Província',
         'comune_paroquia_id': 'Comune/Paróquia',
-        'stage_name': 'Estágio do Processo'
+        'stage_name': 'Estágio do Processo',
+        'Conteúdo Evidência': 'Conteúdo do Campo UF_CRM_12_1743013064'
         # As colunas 'Comprovante Validado?', 'Evidência Anexada?', 'Tempo Desde Solicitação' já foram criadas com os nomes desejados
     }
     # Renomear apenas as colunas que existem no df_analise
@@ -1322,7 +1327,7 @@ def visualizar_analise_evidencia(df_comune):
     # Definir a ordem final das colunas para exibição
     cols_finais_ordem = [
         'ID Processo', 'Título Processo', 'Província', 'Comune/Paróquia', 'Estágio do Processo',
-        'Comprovante Validado?', 'Evidência Anexada?', 'Tempo Desde Solicitação'
+        'Comprovante Validado?', 'Evidência Anexada?', 'Conteúdo do Campo UF_CRM_12_1743013064', 'Tempo Desde Solicitação'
     ]
     
     # Filtrar pelas colunas que realmente existem no df_display
@@ -1363,7 +1368,7 @@ def visualizar_analise_evidencia(df_comune):
             """, unsafe_allow_html=True)
             
             # Selecionar colunas para exibição na tabela expandida
-            colunas_exibir = ['id_processo', 'titulo', 'Comprovante Validado?', 'stage_name', 'provincia_id', 'comune_paroquia_id']
+            colunas_exibir = ['id_processo', 'titulo', 'Comprovante Validado?', 'stage_name', 'provincia_id', 'comune_paroquia_id', 'Conteúdo Evidência']
             colunas_presentes = [col for col in colunas_exibir if col in df_sem_evidencia.columns]
             
             # Ordenar por ID para facilitar a visualização
@@ -1375,7 +1380,8 @@ def visualizar_analise_evidencia(df_comune):
                 'titulo': 'Título do Processo', 
                 'stage_name': 'Estágio',
                 'provincia_id': 'Província',
-                'comune_paroquia_id': 'Comune'
+                'comune_paroquia_id': 'Comune',
+                'Conteúdo Evidência': 'UF_CRM_12_1743013064'
             }
             df_sem_evidencia_exibir = df_sem_evidencia_exibir.rename(columns={k: v for k, v in colunas_renomear.items() if k in df_sem_evidencia_exibir.columns})
             
