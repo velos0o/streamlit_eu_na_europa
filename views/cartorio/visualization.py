@@ -146,6 +146,38 @@ def visualizar_cartorio_dados(df):
             </div>
             """, unsafe_allow_html=True)
         
+        # Verificar se temos os dados de comparação do CRM
+        tem_dados_crm = any(col.startswith('CRM_') for col in df.columns)
+        
+        if tem_dados_crm:
+            # Card 4 - Status de Correspondência com CRM
+            st.markdown('<div class="section-subtitle"><strong>Status de Correspondência com CRM</strong></div>', unsafe_allow_html=True)
+            
+            # Calcular quantos IDs têm correspondência no CRM
+            if 'CRM_UF_CRM_CAMPO_COMPARACAO' in df.columns:
+                total_com_correspondencia = df['CRM_UF_CRM_CAMPO_COMPARACAO'].notna().sum()
+                percentual_correspondencia = round((total_com_correspondencia / len(df) * 100), 1) if len(df) > 0 else 0
+                
+                col1, col2 = st.columns(2)
+                
+                # Card - Total de IDs com correspondência no CRM
+                with col1:
+                    st.markdown(f"""
+                    <div class="metric-card cartorios">
+                        <div class="metric-value">{total_com_correspondencia}</div>
+                        <div class="metric-title">IDs com correspondência no CRM</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Card - Percentual de correspondência
+                with col2:
+                    st.markdown(f"""
+                    <div class="metric-card processos">
+                        <div class="metric-value">{percentual_correspondencia}%</div>
+                        <div class="metric-title">Taxa de correspondência</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
         # Métricas por estágio
         st.markdown('<div class="section-subtitle"><strong>Métricas por Estágio</strong></div>', unsafe_allow_html=True)
         
@@ -653,245 +685,124 @@ def visualizar_grafico_cartorio(df):
 
 def aplicar_estilos_cartorio():
     """
-    Aplica estilos CSS para a página de cartório, similar ao estilo da página de conclusões
+    Aplica os estilos CSS para a visualização dos dados do cartório
     """
     st.markdown("""
     <style>
-    /* Estilos globais de tipografia */
-    body, .stApp {
-        font-family: Arial, Helvetica, sans-serif !important;
-        font-size: 16px;
-        color: #333333;
-    }
-    
-    /* Estilos para títulos */
-    h1, h2, h3, h4, h5, h6 {
-        font-family: Arial, Helvetica, sans-serif !important;
-        font-weight: 900 !important;
-        color: #1A237E !important;
-        letter-spacing: -0.5px;
-    }
-    
-    h1 {
-        font-size: 2.8rem !important;
-        margin-bottom: 1.5rem !important;
-        font-weight: 900 !important;
-    }
-    
-    h2, .stSubheader {
-        font-size: 2rem !important;
-        margin-top: 2rem !important;
-        margin-bottom: 1rem !important;
-        padding-bottom: 0.5rem;
-        border-bottom: 3px solid #E0E0E0;
-        font-weight: 800 !important;
-    }
-    
-    h3 {
-        font-size: 1.6rem !important;
-        margin-top: 1.5rem !important;
-        margin-bottom: 0.75rem !important;
-        font-weight: 700 !important;
-    }
-    
-    strong {
-        font-weight: 700 !important;
-    }
-    
-    /* Estilos para cards de métricas */
-    .metric-card {
-        border-radius: 12px;
-        padding: 28px;
-        box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-        text-align: center;
-        background: linear-gradient(to bottom, white, #f8f9fa);
-        margin: 15px 0;
-        transition: transform 0.3s, box-shadow 0.3s;
-        border: 3px solid;
-        font-family: Arial, Helvetica, sans-serif;
-    }
-    
-    .metric-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 12px 16px rgba(0,0,0,0.15);
-    }
-    
-    .metric-card.cartorios {
-        border-color: #1976D2;
-        border-left: 10px solid #1976D2;
-    }
-    
-    .metric-card.processos {
-        border-color: #673AB7;
-        border-left: 10px solid #673AB7;
-    }
-    
-    .metric-card.concluidos {
-        border-color: #4CAF50;
-        border-left: 10px solid #4CAF50;
-    }
-    
-    .metric-value {
-        font-size: 58px !important;
-        font-weight: 900 !important;
-        line-height: 1.2;
-        margin-bottom: 10px;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-    }
-    
-    .metric-card.cartorios .metric-value {
-        color: #1976D2;
-    }
-    
-    .metric-card.processos .metric-value {
-        color: #673AB7;
-    }
-    
-    .metric-card.concluidos .metric-value {
-        color: #4CAF50;
-    }
-    
-    .metric-title {
-        font-size: 20px !important;
-        font-weight: 800 !important;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .metric-card.cartorios .metric-title {
-        color: #1976D2;
-    }
-    
-    .metric-card.processos .metric-title {
-        color: #673AB7;
-    }
-    
-    .metric-card.concluidos .metric-title {
-        color: #4CAF50;
-    }
-    
-    .section-title {
-        font-size: 24px !important;
-        font-weight: 900 !important;
-        color: #1A237E !important;
-        margin-top: 30px;
-        margin-bottom: 20px;
-        border-bottom: 3px solid #4285f4;
-        padding-bottom: 10px;
-    }
-    
-    .section-subtitle {
-        font-size: 20px !important;
-        font-weight: 800 !important;
-        color: #1976D2 !important;
-        margin-top: 30px;
-        margin-bottom: 15px;
-        border-left: 5px solid #34a853;
-        padding: 8px 15px;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-    }
-    
-    /* Estilos para gráficos */
-    .stPlotlyChart {
-        background-color: white !important;
-        border-radius: 10px;
-        padding: 20px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.08);
-        margin: 15px 0;
-    }
-    
-    /* Estilos para tabelas */
-    [data-testid="stDataFrame"] table {
-        font-size: 16px !important;
-    }
-    
-    [data-testid="stDataFrame"] th {
-        font-weight: 800 !important;
-        background-color: #F5F5F5 !important;
-        color: #1A237E !important;
-        text-transform: uppercase;
-        font-size: 14px !important;
-        padding: 12px !important;
-    }
-    
-    [data-testid="stDataFrame"] td {
-        font-size: 15px !important;
-        padding: 10px !important;
-        font-weight: 600;
-    }
-    
-    [data-testid="stDataFrame"] tr:hover td {
-        background-color: rgba(25, 118, 210, 0.05) !important;
-    }
-    
-    /* Estilos para tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        white-space: pre-wrap;
-        background-color: #FFFFFF;
-        border-radius: 8px;
-        color: #1976D2;
-        font-weight: 700;
-        font-size: 16px !important;
-        border: 2px solid #E0E0E0;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background-color: #1976D2 !important;
-        color: white !important;
-        border: 2px solid #1976D2 !important;
-    }
-    
-    /* Estilos para cards de estágio aprimorado */
-    .stage-card {
-        background: white;
-        border-radius: 8px;
-        padding: 8px 5px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.08);
-        text-align: center;
-        height: 80px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        margin-bottom: 12px;
-        transition: transform 0.2s, box-shadow 0.2s;
-        border: 1px solid #f0f0f0;
-    }
-    
-    .stage-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 3px 8px rgba(0,0,0,0.12);
-    }
-    
-    .stage-card-header {
-        background-color: #f8f9fa;
-        border-radius: 6px;
-        padding: 5px 3px;
-        margin-bottom: 5px;
-        height: 35px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .stage-card-count {
-        font-size: 26px !important;
-        font-weight: 900 !important;
-        margin: 0;
-    }
-    
-    /* Estilos para divisores */
-    .divisor {
-        border-top: 1px dashed #ccc;
-        margin: 15px 0;
-    }
+        /* Cards das métricas principais */
+        .metric-card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px 15px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 25px;
+            position: relative;
+            overflow: hidden;
+            border-top: 5px solid #1A237E;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        /* Cor específica para cada tipo de card */
+        .metric-card.cartorios {
+            border-top-color: #1976D2;
+        }
+        
+        .metric-card.processos {
+            border-top-color: #512DA8;
+        }
+        
+        .metric-card.concluidos {
+            border-top-color: #00897B;
+        }
+        
+        /* Estilo para o valor dentro do card */
+        .metric-value {
+            font-size: 38px;
+            font-weight: 900;
+            color: #0D47A1;
+            margin-bottom: 10px;
+            line-height: 1;
+        }
+        
+        /* Estilo para o título do card */
+        .metric-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #5C6BC0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Seções e subtítulos */
+        .section-subtitle {
+            margin-top: 30px;
+            margin-bottom: 20px;
+            padding: 8px 15px;
+            background-color: #E8EAF6;
+            border-radius: 8px;
+            color: #1A237E;
+            font-size: 18px;
+            border-left: 5px solid #3F51B5;
+        }
+        
+        /* Estilo para os cards de estágios */
+        .stage-card {
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: all 0.2s ease;
+        }
+        
+        .stage-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .stage-card-header {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #F5F5F5;
+        }
+        
+        /* Divisor visual entre categorias */
+        .divisor {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #3F51B5, transparent);
+            margin: 25px 0;
+            opacity: 0.5;
+        }
+        
+        /* Estilo para destacar registros com correspondência no CRM */
+        .stDataFrame [data-testid="stDataFrameCell"]:has(span:contains("✅ Com correspondência")) {
+            background-color: #E8F5E9 !important;
+        }
+        
+        /* Estilo para destacar registros sem correspondência no CRM */
+        .stDataFrame [data-testid="stDataFrameCell"]:has(span:contains("❌ Sem correspondência")) {
+            background-color: #FFEBEE !important;
+        }
+        
+        /* Estilo especial para o status de correspondência na tabela de detalhes */
+        div[data-testid="stVerticalBlock"] div[data-testid="stDataFrame"] [data-testid="stDataFrameCell"]:has(span:contains("✅")) {
+            background-color: #E8F5E9 !important;
+            font-weight: 600;
+            color: #2E7D32 !important;
+        }
+        
+        div[data-testid="stVerticalBlock"] div[data-testid="stDataFrame"] [data-testid="stDataFrameCell"]:has(span:contains("❌")) {
+            background-color: #FFEBEE !important;
+            font-weight: 600;
+            color: #C62828 !important;
+        }
     </style>
-    """, unsafe_allow_html=True) 
+    """, unsafe_allow_html=True)
 
 def visualizar_conversao_por_cartorio(df):
     """

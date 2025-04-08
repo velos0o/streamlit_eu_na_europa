@@ -1,5 +1,5 @@
 import streamlit as st
-from .data_loader import carregar_dados_cartorio
+from .data_loader import carregar_dados_cartorio, carregar_dados_crm_deal_com_uf
 from .analysis import (
     criar_visao_geral_cartorio,
     analyze_cartorio_ids,
@@ -44,23 +44,217 @@ def show_cartorio():
 
     # Carregar os dados dos cartórios
     with st.spinner("Carregando dados dos cartórios..."):
-        df_cartorio = carregar_dados_cartorio()
+        try:
+            df_cartorio = carregar_dados_cartorio()
+            if not df_cartorio.empty:
+                st.success(f"Dados dos cartórios carregados: {len(df_cartorio)} registros encontrados.")
+            else:
+                st.warning("Não foi possível carregar os dados dos cartórios. Nenhum registro encontrado.")
+                return
+        except Exception as e:
+            st.error(f"Erro ao carregar dados dos cartórios: {str(e)}")
+            return
 
-    if df_cartorio.empty:
-        st.warning("Não foi possível carregar os dados dos cartórios. Verifique a conexão com o Bitrix24.")
-        return
+    # Carregar dados do crm_deal com UF_CRM_1722605592778 para comparação
+    with st.spinner("Carregando dados de CRM para comparação..."):
+        try:
+            df_crm_deal = carregar_dados_crm_deal_com_uf()
+            if not df_crm_deal.empty:
+                st.success(f"Dados de CRM (categoria 0) carregados: {len(df_crm_deal)} registros encontrados.")
+                
+                # Verificar se o campo UF_CRM_1722605592778 está presente
+                if 'UF_CRM_CAMPO_COMPARACAO' not in df_crm_deal.columns:
+                    st.warning("Campo UF_CRM_1722605592778 não encontrado nos dados do CRM. A comparação não estará disponível.")
+            else:
+                st.info("Não foram encontrados dados na categoria 0 do CRM para comparação.")
+        except Exception as e:
+            st.error(f"Erro ao carregar dados do CRM: {str(e)}")
+            df_crm_deal = pd.DataFrame()  # Garantir que temos um DataFrame vazio em caso de erro
+
+    st.divider() # Adiciona um separador
+
+    # Renomear a coluna para facilitar a comparação
+    if 'UF_CRM_12_1723552666' in df_cartorio.columns:
+        # Normalizar o ID da família para comparação
+        df_cartorio['ID_FAMILIA'] = df_cartorio['UF_CRM_12_1723552666'].astype(str).str.strip()
+        # Remover espaços em branco e garantir que é string
+        df_cartorio['ID_FAMILIA'] = df_cartorio['ID_FAMILIA'].str.replace(' ', '')
     else:
-        st.success(f"Dados carregados: {len(df_cartorio)} registros encontrados.")
-        st.divider() # Adiciona um separador
+        st.warning("Campo UF_CRM_12_1723552666 não encontrado nos dados do cartório. A comparação não estará disponível.")
+        df_cartorio['ID_FAMILIA'] = None  # Adicionar coluna vazia para evitar erros
+    
+    # Mesclar os dados do cartório com os dados do CRM_DEAL
+    if not df_crm_deal.empty and 'UF_CRM_CAMPO_COMPARACAO' in df_crm_deal.columns:
+        # Adicionar informações sobre a operação
+        st.info("Comparando ID da família (UF_CRM_12_1723552666) com dados do CRM categoria 0 (UF_CRM_1722605592778)...")
+        
+        # Normalizar para facilitar a junção
+        df_crm_deal['ID_FAMILIA'] = df_crm_deal['UF_CRM_CAMPO_COMPARACAO'].astype(str).str.strip()
+        # Remover espaços em branco e garantir que é string
+        df_crm_deal['ID_FAMILIA'] = df_crm_deal['ID_FAMILIA'].str.replace(' ', '')
+        
+        # Debug: Exibir alguns exemplos para verificar o formato
+        with st.expander("📊 Debug: Exemplos de IDs para comparação", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("Exemplos de IDs do Cartório (UF_CRM_12_1723552666)")
+                ids_cartorio = df_cartorio['ID_FAMILIA'].dropna().unique()
+                if len(ids_cartorio) > 0:
+                    st.write(ids_cartorio[:10].tolist())
+                else:
+                    st.warning("Nenhum ID encontrado no cartório.")
+                
+                st.metric("Total de IDs únicos do Cartório", len(ids_cartorio))
+                
+            with col2:
+                st.subheader("Exemplos de IDs do CRM (UF_CRM_1722605592778)")
+                ids_crm = df_crm_deal['ID_FAMILIA'].dropna().unique()
+                if len(ids_crm) > 0:
+                    st.write(ids_crm[:10].tolist())
+                else:
+                    st.warning("Nenhum ID encontrado no CRM.")
+                
+                st.metric("Total de IDs únicos do CRM", len(ids_crm))
+            
+            # Verificar interseção
+            ids_comuns = set(ids_cartorio) & set(ids_crm)
+            st.subheader("Comparação de IDs")
+            st.metric("Total de IDs em comum", len(ids_comuns))
+            if len(ids_comuns) > 0:
+                st.write("Exemplos de IDs em comum:")
+                st.write(list(ids_comuns)[:10])
+        
+        # Adicionar um prefixo nas colunas do crm_deal para evitar conflitos
+        colunas_crm = {col: f'CRM_{col}' for col in df_crm_deal.columns if col != 'ID_FAMILIA'}
+        df_crm_deal = df_crm_deal.rename(columns=colunas_crm)
+        
+        # Realizar o merge com outer join para preservar todos os registros
+        try:
+            df_cartorio = pd.merge(
+                df_cartorio,
+                df_crm_deal,
+                on='ID_FAMILIA',
+                how='left',
+                suffixes=('', '_crm')
+            )
+            
+            # Contar quantos registros têm correspondência
+            registros_com_correspondencia = df_cartorio['CRM_ID'].notna().sum()
+            percentual = round((registros_com_correspondencia / len(df_cartorio) * 100), 1) if len(df_cartorio) > 0 else 0
+            
+            st.success(f"Correspondência encontrada: {registros_com_correspondencia} de {len(df_cartorio)} registros ({percentual}%).")
+        except Exception as e:
+            st.error(f"Erro ao mesclar dados do cartório com CRM: {str(e)}")
+    else:
+        st.info("Dados de CRM não disponíveis para comparação ou campo UF_CRM_1722605592778 não encontrado.")
 
     # Filtro de cartório (mantido no topo para aplicação global)
     st.markdown("#### Filtros Gerais")
-    cartorio_filter = st.multiselect(
-        "Selecione os Cartórios:",
-        options=sorted(df_cartorio['NOME_CARTORIO'].unique()), # Opções dinâmicas
-        default=sorted(df_cartorio['NOME_CARTORIO'].unique()), # Padrão: todos
-        help="Selecione um ou mais cartórios para filtrar os dados exibidos abaixo."
-    )
+    
+    # Criar colunas para os filtros
+    col_cartorio, col_id_familia = st.columns(2)
+    
+    with col_cartorio:
+        cartorio_filter = st.multiselect(
+            "Selecione os Cartórios:",
+            options=sorted(df_cartorio['NOME_CARTORIO'].unique()), # Opções dinâmicas
+            default=sorted(df_cartorio['NOME_CARTORIO'].unique()), # Padrão: todos
+            help="Selecione um ou mais cartórios para filtrar os dados exibidos abaixo."
+        )
+    
+    # Adicionar filtro para IDs de família que têm correspondência com UF_CRM_1722605592778
+    if 'CRM_UF_CRM_CAMPO_COMPARACAO' in df_cartorio.columns:
+        with col_id_familia:
+            # Identificar registros com correspondência
+            tem_correspondencia = df_cartorio['CRM_UF_CRM_CAMPO_COMPARACAO'].notna()
+            
+            # Opções para o filtro de ID Família
+            opcoes_id_familia = [
+                "Todos", 
+                "Com correspondência no CRM", 
+                "Sem correspondência no CRM"
+            ]
+            
+            id_familia_filter = st.selectbox(
+                "Filtrar por correspondência com CRM:",
+                options=opcoes_id_familia,
+                index=0,
+                help="Filtra IDs de família com base na correspondência com o campo UF_CRM_1722605592778 do CRM."
+            )
+    
+    # Adicionar filtro de data (criado em/data da venda)
+    st.markdown("""
+    <div style="background-color: #f0f2f6; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 5px solid #1976D2;">
+        <h4 style="margin-top: 0; color: #1A237E; font-size: 1.1rem;">📅 Filtro por Data da Venda</h4>
+        <p style="margin-bottom: 5px; font-size: 0.9rem; color: #555;">
+            Selecione o período desejado para visualizar os registros por data de criação.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col_data_inicio, col_data_fim = st.columns(2)
+    
+    # Determinar campo de data disponível
+    campo_data = None
+    if 'DATE_CREATE' in df_cartorio.columns:
+        campo_data = 'DATE_CREATE'
+    elif 'CRM_DATE_CREATE' in df_cartorio.columns:
+        campo_data = 'CRM_DATE_CREATE'
+    
+    if campo_data:
+        # Converter para formato datetime se necessário
+        if not pd.api.types.is_datetime64_any_dtype(df_cartorio[campo_data]):
+            try:
+                df_cartorio[campo_data] = pd.to_datetime(df_cartorio[campo_data], errors='coerce')
+            except:
+                st.warning(f"Não foi possível converter o campo {campo_data} para formato de data.")
+        
+        # Obter a data mínima e máxima para os limites do calendário
+        try:
+            min_date = df_cartorio[campo_data].min().date()
+            max_date = df_cartorio[campo_data].max().date()
+            
+            # Se as datas são inválidas, usar valores padrão
+            if pd.isna(min_date) or pd.isna(max_date):
+                from datetime import datetime, timedelta
+                today = datetime.now().date()
+                min_date = today - timedelta(days=365)  # 1 ano atrás
+                max_date = today
+            
+            with col_data_inicio:
+                data_inicio = st.date_input(
+                    "Data da Venda (início):",
+                    value=min_date,
+                    min_value=min_date,
+                    max_value=max_date,
+                    help="Filtrar registros a partir desta data de criação"
+                )
+            
+            with col_data_fim:
+                data_fim = st.date_input(
+                    "Data da Venda (fim):",
+                    value=max_date,
+                    min_value=min_date,
+                    max_value=max_date,
+                    help="Filtrar registros até esta data de criação"
+                )
+            
+            # Formatação bonita para as datas
+            inicio_formatado = data_inicio.strftime('%d/%m/%Y')
+            fim_formatado = data_fim.strftime('%d/%m/%Y')
+            
+            # Mostrar intervalo de datas selecionado
+            st.markdown(f"""
+            <div style="background-color: #E3F2FD; padding: 10px; border-radius: 5px; text-align: center; margin-top: 10px; margin-bottom: 15px;">
+                <p style="margin: 0; font-weight: 600; color: #1976D2;">
+                    Período selecionado: {inicio_formatado} a {fim_formatado}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        except Exception as e:
+            st.warning(f"Erro ao configurar filtro de data: {str(e)}")
+    else:
+        st.warning("Não foi possível encontrar um campo de data para filtragem. O filtro de Data da Venda não está disponível.")
 
     # Aplicar filtro de cartório aos dados
     if cartorio_filter:
@@ -69,6 +263,63 @@ def show_cartorio():
     else:
         st.warning("Nenhum cartório selecionado. Exibindo todos os dados.")
         df_cartorio_filtrado = df_cartorio.copy()
+    
+    # Aplicar filtro de ID Família se selecionado
+    if 'CRM_UF_CRM_CAMPO_COMPARACAO' in df_cartorio_filtrado.columns and id_familia_filter != "Todos":
+        if id_familia_filter == "Com correspondência no CRM":
+            df_cartorio_filtrado = df_cartorio_filtrado[df_cartorio_filtrado['CRM_UF_CRM_CAMPO_COMPARACAO'].notna()]
+            st.info(f"Filtrando por IDs de família com correspondência no CRM: {len(df_cartorio_filtrado)} registros.")
+        elif id_familia_filter == "Sem correspondência no CRM":
+            df_cartorio_filtrado = df_cartorio_filtrado[df_cartorio_filtrado['CRM_UF_CRM_CAMPO_COMPARACAO'].isna()]
+            st.info(f"Filtrando por IDs de família sem correspondência no CRM: {len(df_cartorio_filtrado)} registros.")
+    
+    # Aplicar filtro de data
+    if campo_data and 'data_inicio' in locals() and 'data_fim' in locals():
+        # Converter as datas para datetime para comparação
+        data_inicio_dt = pd.to_datetime(data_inicio)
+        data_fim_dt = pd.to_datetime(data_fim) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)  # Até o final do dia
+        
+        # Contar registros antes de aplicar o filtro
+        total_antes = len(df_cartorio_filtrado)
+        
+        # Aplicar filtro de data
+        mask_data = (df_cartorio_filtrado[campo_data] >= data_inicio_dt) & (df_cartorio_filtrado[campo_data] <= data_fim_dt)
+        df_cartorio_filtrado = df_cartorio_filtrado[mask_data]
+        
+        # Contar registros após o filtro
+        total_depois = len(df_cartorio_filtrado)
+        percentual = round(total_depois/total_antes*100 if total_antes > 0 else 0, 1)
+        
+        # Se pelo menos um filtro foi aplicado, mostrar resumo visual
+        if data_inicio != min_date or data_fim != max_date:
+            # Determinar a cor com base no percentual de filtragem
+            cor_fundo = "#E8F5E9" if percentual > 50 else "#FFF8E1" if percentual > 20 else "#FFEBEE"
+            cor_texto = "#2E7D32" if percentual > 50 else "#F57F17" if percentual > 20 else "#C62828"
+            
+            # Exibir um resumo visual do resultado do filtro
+            st.markdown(f"""
+            <div style="background-color: {cor_fundo}; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 5px solid {cor_texto}; display: flex; align-items: center;">
+                <div style="flex: 1;">
+                    <h4 style="margin-top: 0; color: {cor_texto}; font-size: 1.1rem;">Resultado do Filtro de Data</h4>
+                    <p style="margin-bottom: 0; font-size: 0.9rem;">
+                        De <strong>{total_antes}</strong> registros, <strong>{total_depois}</strong> atendem ao filtro de data ({percentual}%)
+                    </p>
+                </div>
+                <div style="width: 100px; height: 100px; margin-left: 15px;">
+                    <svg viewBox="0 0 36 36" width="100%" height="100%">
+                        <path d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none" stroke="#E0E0E0" stroke-width="3" />
+                        <path d="M18 2.0845
+                            a 15.9155 15.9155 0 0 1 0 31.831
+                            a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none" stroke="{cor_texto}" stroke-width="3" stroke-dasharray="{percentual}, 100" />
+                        <text x="18" y="20.5" font-family="Arial" font-size="10" text-anchor="middle" fill="{cor_texto}" font-weight="bold">{percentual}%</text>
+                    </svg>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
     st.divider() # Adiciona um separador
 
@@ -139,7 +390,113 @@ def show_cartorio():
         with tab_visao_geral:
             st.markdown("<h2 class='tab-title'>Visão Geral dos Dados</h2>", unsafe_allow_html=True)
             st.caption("Tabela com os dados brutos filtrados dos cartórios selecionados.")
+            
+            # Adicionar expander para mostrar estatísticas sobre a correspondência com o CRM
+            if 'CRM_UF_CRM_CAMPO_COMPARACAO' in df_cartorio_filtrado.columns:
+                with st.expander("Estatísticas de Correspondência com CRM", expanded=True):
+                    # Calcular estatísticas
+                    total_registros = len(df_cartorio_filtrado)
+                    com_correspondencia = df_cartorio_filtrado['CRM_UF_CRM_CAMPO_COMPARACAO'].notna().sum()
+                    sem_correspondencia = total_registros - com_correspondencia
+                    
+                    # Calcular percentuais
+                    perc_com = (com_correspondencia / total_registros * 100) if total_registros > 0 else 0
+                    perc_sem = (sem_correspondencia / total_registros * 100) if total_registros > 0 else 0
+                    
+                    # Exibir em colunas com métricas
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total de Registros", total_registros)
+                    with col2:
+                        st.metric("Com Correspondência", com_correspondencia, f"{perc_com:.1f}%")
+                    with col3:
+                        st.metric("Sem Correspondência", sem_correspondencia, f"{perc_sem:.1f}%")
+            
+            # Exibir a tabela de dados
             visualizar_cartorio_dados(df_cartorio_filtrado)
+            
+            # Adicionar expander para mostrar detalhes das correspondências entre ID_FAMILIA e UF_CRM_1722605592778
+            if 'CRM_UF_CRM_CAMPO_COMPARACAO' in df_cartorio_filtrado.columns:
+                with st.expander("Detalhes de Correspondência entre UF_CRM_12_1723552666 e UF_CRM_1722605592778", expanded=True):
+                    # Criar DataFrame para exibição focada na correspondência
+                    df_correspondencia = df_cartorio_filtrado[[
+                        'ID_FAMILIA', 'NOME_CARTORIO', 'TITLE', 'ASSIGNED_BY_NAME', 
+                        'CRM_ID', 'CRM_TITLE', 'CRM_ASSIGNED_BY_NAME', 'CRM_DATE_CREATE'
+                    ]].copy()
+                    
+                    # Renomear colunas para melhor visualização
+                    df_correspondencia = df_correspondencia.rename(columns={
+                        'ID_FAMILIA': 'ID Família',
+                        'NOME_CARTORIO': 'Cartório',
+                        'TITLE': 'Nome no Cartório',
+                        'ASSIGNED_BY_NAME': 'Responsável Cartório',
+                        'CRM_ID': 'ID no CRM',
+                        'CRM_TITLE': 'Nome no CRM',
+                        'CRM_ASSIGNED_BY_NAME': 'Responsável CRM',
+                        'CRM_DATE_CREATE': 'Data Criação CRM'
+                    })
+                    
+                    # Adicionar coluna de status
+                    df_correspondencia['Status'] = df_correspondencia['ID no CRM'].apply(
+                        lambda x: "✅ Com correspondência" if pd.notna(x) else "❌ Sem correspondência"
+                    )
+                    
+                    # Mostrar a tabela
+                    st.dataframe(
+                        df_correspondencia,
+                        column_config={
+                            "ID Família": st.column_config.TextColumn(
+                                "ID Família", 
+                                help="UF_CRM_12_1723552666"
+                            ),
+                            "Cartório": st.column_config.TextColumn(
+                                "Cartório", 
+                                width="medium"
+                            ),
+                            "Nome no Cartório": st.column_config.TextColumn(
+                                "Nome no Cartório", 
+                                width="medium"
+                            ),
+                            "Responsável Cartório": st.column_config.TextColumn(
+                                "Resp. Cartório", 
+                                width="medium"
+                            ),
+                            "ID no CRM": st.column_config.TextColumn(
+                                "ID no CRM", 
+                                width="small"
+                            ),
+                            "Nome no CRM": st.column_config.TextColumn(
+                                "Nome no CRM", 
+                                width="medium"
+                            ),
+                            "Responsável CRM": st.column_config.TextColumn(
+                                "Resp. CRM", 
+                                width="medium"
+                            ),
+                            "Data Criação CRM": st.column_config.DatetimeColumn(
+                                "Data Criação", 
+                                format="DD/MM/YYYY HH:mm", 
+                                width="medium"
+                            ),
+                            "Status": st.column_config.TextColumn(
+                                "Status", 
+                                width="medium"
+                            )
+                        },
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    
+                    # Adicionar botão para exportar
+                    csv = df_correspondencia.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Exportar Correspondências para CSV",
+                        data=csv,
+                        file_name=f"correspondencias_id_familia_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                        mime="text/csv",
+                        help="Baixar os dados de correspondência em formato CSV"
+                    )
+            
             # Gráfico de distribuição por cartório (mantido comentado)
             # st.subheader("Distribuição por Cartório")
             # visualizar_grafico_cartorio(df_cartorio_filtrado)
