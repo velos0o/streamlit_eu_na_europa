@@ -11,9 +11,15 @@ def date_filter_section(title="Filtro de Período", on_change=None):
         on_change (callable, optional): Função para chamar quando as datas são alteradas
     
     Returns:
-        tuple: (data_inicial, data_final) selecionadas
+        tuple: (data_inicial, data_final) selecionadas ou (None, None) se sem filtro
     """
     st.markdown(f"### {title}")
+    
+    # Opção para desativar o filtro de data
+    sem_filtro_data = st.checkbox("Sem filtro de data", value=False, key=f"sem_filtro_{title.replace(' ', '_').lower()}")
+    
+    if sem_filtro_data:
+        return None, None
     
     col1, col2 = st.columns(2)
     

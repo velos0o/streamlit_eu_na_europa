@@ -15,7 +15,8 @@ from .protocolado import exibir_dashboard_protocolado
 from .emissoes_cartao import exibir_dashboard_emissoes_cartao
 import pandas as pd
 import io
-from datetime import datetime
+import datetime  # Modificando para importar o módulo completo
+from datetime import datetime as dt  # Renomeando para evitar conflitos
 import os
 import sys
 from pathlib import Path
@@ -192,7 +193,11 @@ def show_cartorio():
     </div>
     """, unsafe_allow_html=True)
     
-    col_data_inicio, col_data_fim = st.columns(2)
+    # Adicionar checkbox para desativar o filtro de data em posição mais destacada
+    sem_filtro_data = st.checkbox("✅ Sem filtro de data (mostrar todos os registros independente da data)", 
+                               value=True, 
+                               key="sem_filtro_data_cartorio",
+                               help="Marque esta opção para desativar o filtro de data e ver todos os registros")
     
     # Determinar campo de data disponível
     campo_data = None
@@ -201,7 +206,9 @@ def show_cartorio():
     elif 'CRM_DATE_CREATE' in df_cartorio.columns:
         campo_data = 'CRM_DATE_CREATE'
     
-    if campo_data:
+    # Mostrar os campos de data somente se a opção "Sem filtro" NÃO estiver marcada
+    if campo_data and not sem_filtro_data:
+        col_data_inicio, col_data_fim = st.columns(2)
         # Converter para formato datetime se necessário
         if not pd.api.types.is_datetime64_any_dtype(df_cartorio[campo_data]):
             try:
@@ -216,8 +223,8 @@ def show_cartorio():
             
             # Se as datas são inválidas, usar valores padrão
             if pd.isna(min_date) or pd.isna(max_date):
-                from datetime import datetime, timedelta
-                today = datetime.now().date()
+                from datetime import timedelta
+                today = dt.now().date()
                 min_date = today - timedelta(days=365)  # 1 ano atrás
                 max_date = today
             
@@ -253,7 +260,9 @@ def show_cartorio():
             """, unsafe_allow_html=True)
         except Exception as e:
             st.warning(f"Erro ao configurar filtro de data: {str(e)}")
-    else:
+    elif sem_filtro_data:
+        st.success("✅ Filtro de data desativado. Exibindo todos os registros, independente da data.")
+    elif not campo_data:
         st.warning("Não foi possível encontrar um campo de data para filtragem. O filtro de Data da Venda não está disponível.")
 
     # Aplicar filtro de cartório aos dados
@@ -274,7 +283,7 @@ def show_cartorio():
             st.info(f"Filtrando por IDs de família sem correspondência no CRM: {len(df_cartorio_filtrado)} registros.")
     
     # Aplicar filtro de data
-    if campo_data and 'data_inicio' in locals() and 'data_fim' in locals():
+    if campo_data and 'data_inicio' in locals() and 'data_fim' in locals() and not sem_filtro_data:
         # Converter as datas para datetime para comparação
         data_inicio_dt = pd.to_datetime(data_inicio)
         data_fim_dt = pd.to_datetime(data_fim) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)  # Até o final do dia
@@ -492,7 +501,7 @@ def show_cartorio():
                     st.download_button(
                         label="📥 Exportar Correspondências para CSV",
                         data=csv,
-                        file_name=f"correspondencias_id_familia_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                        file_name=f"correspondencias_id_familia_{dt.now().strftime('%Y%m%d_%H%M')}.csv",
                         mime="text/csv",
                         help="Baixar os dados de correspondência em formato CSV"
                     )
@@ -644,7 +653,7 @@ def show_cartorio():
                         st.download_button(
                             label="📥 Exportar para CSV",
                             data=csv,
-                            file_name=f"acompanhamento_emissao_familia_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            file_name=f"acompanhamento_emissao_familia_{dt.now().strftime('%Y%m%d_%H%M')}.csv",
                             mime="text/csv",
                             help="Baixar os dados detalhados em formato CSV"
                         )
@@ -765,7 +774,7 @@ def show_cartorio():
                         st.download_button(
                             label="📥 Exportar Análise Higienização (CSV)",
                             data=csv_hig,
-                            file_name=f"analise_higienizacao_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            file_name=f"analise_higienizacao_{dt.now().strftime('%Y%m%d_%H%M')}.csv",
                             mime="text/csv",
                             key="export_hig"
                         )
@@ -857,7 +866,7 @@ def show_cartorio():
                         st.download_button(
                             label="📥 Exportar Verificação de IDs (Excel)",
                             data=excel_data,
-                            file_name=f"verificacao_ids_familia_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                            file_name=f"verificacao_ids_familia_{dt.now().strftime('%Y%m%d_%H%M')}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key="export_ids_excel"
                         )
@@ -913,11 +922,11 @@ def show_cartorio():
 
                         csv_ausentes = df_ausentes.to_csv(index=False).encode('utf-8')
                         st.download_button(
-                            label="📥 Exportar Negócios Ausentes (CSV)",
+                            label="📥 Exportar Dados para CSV",
                             data=csv_ausentes,
-                            file_name=f"negocios_familias_nao_cadastradas_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            file_name=f"negocios_familias_nao_cadastradas_{dt.now().strftime('%Y%m%d_%H%M')}.csv",
                             mime="text/csv",
-                            key="export_ausentes"
+                            key="exp_negocios_csv"
                         )
                     elif df_ausentes is not None and total_ausentes == 0:
                         st.success("✅ Confronto realizado! Todos os negócios da categoria 32 possuem famílias cadastradas.")
@@ -966,7 +975,7 @@ def show_cartorio():
 
     # Rodapé
     st.divider()
-    st.caption(f"Painel Cartório | Dados atualizados em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}") 
+    st.caption(f"Painel Cartório | Dados atualizados em: {dt.now().strftime('%d/%m/%Y %H:%M:%S')}") 
 
 # Para teste direto deste arquivo
 if __name__ == "__main__":

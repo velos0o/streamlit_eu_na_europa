@@ -131,14 +131,18 @@ def filter_dataframe_by_date(df, start_date, end_date, date_column='UF_CRM_17412
     
     Args:
         df (pandas.DataFrame): DataFrame com os dados
-        start_date (datetime): Data inicial
-        end_date (datetime): Data final
+        start_date (datetime): Data inicial ou None se sem filtro
+        end_date (datetime): Data final ou None se sem filtro
         date_column (str): Nome da coluna de data
         
     Returns:
         pandas.DataFrame: DataFrame filtrado
     """
     if df.empty or date_column not in df.columns:
+        return df
+    
+    # Se start_date ou end_date for None, não aplicar filtro de data
+    if start_date is None or end_date is None:
         return df
     
     # Converter a coluna para datetime
