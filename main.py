@@ -26,6 +26,8 @@ from views.extracoes.extracoes_main import show_extracoes
 from views.apresentacao import show_apresentacao
 # Importar nova página de COMUNE
 from views.comune.comune_main import show_comune
+# Importar nova página de Tickets
+from views.tickets import show_tickets
 
 # Importar os novos componentes do guia de relatório
 from components.report_guide import show_guide_sidebar, show_page_guide, show_contextual_help
@@ -141,6 +143,7 @@ def ir_para_cartorio(): st.session_state['pagina_atual'] = 'Cartório'
 def ir_para_comune(): st.session_state['pagina_atual'] = 'Comune'
 def ir_para_extracoes(): st.session_state['pagina_atual'] = 'Extrações de Dados'
 def ir_para_apresentacao(): st.session_state['pagina_atual'] = 'Apresentação Conclusões'
+def ir_para_tickets(): st.session_state['pagina_atual'] = 'Tickets'
 
 # Botões individuais para navegação (usando método tradicional)
 st.sidebar.button("Macro Higienização", key="btn_inicio", 
@@ -173,6 +176,11 @@ st.sidebar.button("Extrações", key="btn_extracoes",
             on_click=ir_para_extracoes,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Extrações de Dados" else "secondary")
+
+st.sidebar.button("Tickets de Suporte", key="btn_tickets", 
+            on_click=ir_para_tickets,
+            use_container_width=True,
+            type="primary" if st.session_state['pagina_atual'] == "Tickets" else "secondary")
 
 # Adicionar separador para seção de apresentação
 st.sidebar.markdown("---")
@@ -254,6 +262,16 @@ try:
         ]
         render_toc(sections, "Navegação Rápida", horizontal=True)
         show_extracoes()
+        
+    elif pagina == "Tickets":
+        # Definir as seções para o sumário da página
+        sections = [
+            {"label": "Visão Geral", "anchor": "visao_geral", "icon": "📊"},
+            {"label": "Por Tempo", "anchor": "por_tempo", "icon": "🕒"},
+            {"label": "Detalhes", "anchor": "detalhes", "icon": "🔍"}
+        ]
+        render_toc(sections, "Navegação Rápida", horizontal=True)
+        show_tickets()
         
     elif pagina == "Apresentação Conclusões":
         # Verificar se há parâmetro 'slide' na URL

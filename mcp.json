@@ -1,0 +1,120 @@
+{
+  "mcpServers": {},
+  "commands": {
+    "streamlit": {
+      "description": "Comandos para desenvolvimento Streamlit",
+      "commands": {
+        "run": {
+          "description": "Executar a aplicação Streamlit",
+          "command": "streamlit run main.py",
+          "isBackground": true
+        },
+        "debug": {
+          "description": "Executar Streamlit em modo debug",
+          "command": "streamlit run main.py --logger.level=debug",
+          "isBackground": true
+        },
+        "hot-reload": {
+          "description": "Executar com hot reload",
+          "command": "streamlit run main.py --server.runOnSave=true",
+          "isBackground": true
+        }
+      }
+    },
+    "componentes": {
+      "description": "Gerenciamento de componentes",
+      "commands": {
+        "criar": {
+          "description": "Criar novo componente",
+          "input": [
+            {
+              "name": "nome",
+              "description": "Nome do componente"
+            }
+          ],
+          "command": "echo \"import streamlit as st\\n\\ndef ${nome}():\\n    st.write('Componente ${nome}')\\n\\n# Exemplo de uso\\nif __name__ == '__main__':\\n    st.set_page_config(page_title='Teste ${nome}')\\n    ${nome}()\" > components/${nome}.py"
+        },
+        "listar": {
+          "description": "Listar componentes disponíveis",
+          "command": "dir components /b"
+        }
+      }
+    },
+    "views": {
+      "description": "Gerenciamento de views",
+      "commands": {
+        "criar": {
+          "description": "Criar nova view",
+          "input": [
+            {
+              "name": "nome",
+              "description": "Nome da view"
+            },
+            {
+              "name": "titulo",
+              "description": "Título da página"
+            }
+          ],
+          "command": "echo \"import streamlit as st\\n\\ndef show_${nome}():\\n    st.title('${titulo}')\\n    st.write('Conteúdo da página ${nome}')\\n\\n# Exemplo de uso\\nif __name__ == '__main__':\\n    st.set_page_config(page_title='${titulo}')\\n    show_${nome}()\" > views/${nome}.py"
+        },
+        "listar": {
+          "description": "Listar views disponíveis",
+          "command": "dir views /b"
+        }
+      }
+    },
+    "dados": {
+      "description": "Operações com dados",
+      "commands": {
+        "exportar-csv": {
+          "description": "Exportar dados para CSV",
+          "input": [
+            {
+              "name": "arquivo",
+              "description": "Nome do arquivo de saída"
+            }
+          ],
+          "command": "python -c \"import pandas as pd; import datetime; pd.DataFrame({'data': pd.date_range(start=datetime.datetime.now(), periods=10, freq='D'), 'valor': range(10)}).to_csv('${arquivo}.csv', index=False)\""
+        },
+        "limpar-cache": {
+          "description": "Limpar cache do Streamlit",
+          "command": "rd /s /q %USERPROFILE%\\.streamlit\\cache"
+        }
+      }
+    },
+    "ambiente": {
+      "description": "Gerenciamento do ambiente",
+      "commands": {
+        "instalar-deps": {
+          "description": "Instalar dependências",
+          "command": "pip install -r requirements.txt"
+        },
+        "criar-requirements": {
+          "description": "Criar arquivo requirements.txt",
+          "command": "echo \"streamlit>=1.27.0\\npandas>=2.0.0\\nplotly>=5.13.0\\nmatplotlib>=3.7.0\\nnumpy>=1.24.0\\nopenpyxl>=3.1.0\" > requirements.txt"
+        },
+        "limpar": {
+          "description": "Limpar arquivos temporários",
+          "command": "del /q *.pyc && (FOR /D %d IN (*__pycache__*) DO RD /S /Q %d)"
+        }
+      }
+    },
+    "utils": {
+      "description": "Utilitários",
+      "commands": {
+        "abrir": {
+          "description": "Abrir o projeto no navegador",
+          "command": "start http://localhost:8501"
+        },
+        "gerar-css": {
+          "description": "Gerar template CSS básico",
+          "command": "echo \"/* Estilos globais */\\n.main { padding: 1rem; }\\n\\n/* Cabeçalhos */\\nh1 { color: #2c3e50; }\\nh2 { color: #34495e; }\\nh3 { color: #7f8c8d; }\\n\\n/* Sidebar */\\n.css-1d391kg { background-color: #f8f9fa; }\\n\\n/* Cards e contêineres */\\n.card { background-color: white; padding: 1.5rem; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }\\n\" > assets/styles.css"
+        },
+        "check-code": {
+          "description": "Verificar qualidade do código",
+          "command": "pylint main.py views/*.py components/*.py --disable=C0111"
+        }
+      }
+    }
+  }
+} 
