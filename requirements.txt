@@ -18,4 +18,8 @@ oauth2client==4.1.3
 streamlit-lottie==0.0.5
 
 # Biblioteca para conexão MySQL
-mysql-connector-python==8.3.0 
+mysql-connector-python==8.3.0
+
+# Bibliotecas para componentes visuais adicionais
+streamlit-card==0.0.61
+streamlit-extras==0.3.6 

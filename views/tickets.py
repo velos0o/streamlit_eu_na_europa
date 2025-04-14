@@ -132,11 +132,11 @@ def connect_to_db():
     """Estabelece conexão com o banco de dados MySQL"""
     try:
         conn = mysql.connector.connect(
-            host="database-1.cdqa6ywqs8pz.us-west-2.rds.amazonaws.com",
-            port=3306,
-            user="admin",
-            password="4CzsgGMQRquwac5LdQhe",
-            database="chatSupportDB"
+            host=st.secrets["DB_HOST"],
+            port=int(st.secrets["DB_PORT"]),
+            user=st.secrets["DB_USER"],
+            password=st.secrets["DB_PASSWORD"],
+            database=st.secrets["DB_NAME"]
         )
         return conn
     except Exception as e:
