@@ -573,13 +573,17 @@ def visualizar_grafico_cartorio(df):
             },
             margin=dict(t=80, b=30, l=150, r=30),
             xaxis=dict(
-                title="Total de Processos",
-                titlefont=dict(size=16),
+                title=dict(
+                    text="Total de Processos",
+                    font=dict(size=16)
+                ),
                 tickfont=dict(size=14)
             ),
             yaxis=dict(
-                title="",
-                titlefont=dict(size=16),
+                title=dict(
+                    text="",
+                    font=dict(size=16)
+                ),
                 tickfont=dict(size=14)
             )
         )
@@ -625,14 +629,18 @@ def visualizar_grafico_cartorio(df):
         ),
         margin=dict(t=30, b=30, l=150, r=30),
         xaxis=dict(
-            title="Percentual do Total (%)",
-            titlefont=dict(size=16),
+            title=dict(
+                text="Percentual do Total (%)",
+                font=dict(size=16)
+            ),
             tickfont=dict(size=14),
             ticksuffix="%"
         ),
         yaxis=dict(
-            title="",
-            titlefont=dict(size=16),
+            title=dict(
+                text="",
+                font=dict(size=16)
+            ),
             tickfont=dict(size=14)
         )
     )
@@ -907,14 +915,18 @@ def visualizar_conversao_por_cartorio(df):
         },
         margin=dict(t=80, b=30, l=150, r=30),
         xaxis=dict(
-            title="Taxa de Conversão (%)",
-            titlefont=dict(size=16),
+            title=dict(
+                text="Taxa de Conversão (%)",
+                font=dict(size=16)
+            ),
             tickfont=dict(size=14),
             ticksuffix="%"
         ),
         yaxis=dict(
-            title="",
-            titlefont=dict(size=16),
+            title=dict(
+                text="",
+                font=dict(size=16)
+            ),
             tickfont=dict(size=14)
         )
     )
