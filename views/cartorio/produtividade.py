@@ -530,7 +530,7 @@ def mostrar_destaques_produtividade(destaques):
         st.warning("Não foram encontrados dados suficientes para exibir destaques de produtividade.")
         return
     
-    st.html("""
+    st.markdown("""
     <div style="background: linear-gradient(135deg, #FF8C00 0%, #FFC107 100%); padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
         <h3 style="margin-top: 0; color: white; font-size: 22px; font-weight: 700; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.2);">
             🏆 DESTAQUES DE PRODUTIVIDADE
@@ -539,7 +539,7 @@ def mostrar_destaques_produtividade(destaques):
             Responsáveis com maior produtividade em cada etapa do processo
         </p>
     </div>
-    """)
+    """, unsafe_allow_html=True)
     
     # Medalhas para os três primeiros lugares
     medal_badges = ["🥇 Primeiro Lugar", "🥈 Segundo Lugar", "🥉 Terceiro Lugar"]
@@ -1229,7 +1229,7 @@ def analisar_matriz_responsavel_data(df, campos_data, mapeamento_campos):
         campos_data (list): Lista de campos de data para análise
         mapeamento_campos (dict): Dicionário que mapeia campos de data para campos de responsável
     """
-    st.html("""
+    st.markdown("""
     <div style="background: linear-gradient(135deg, #4338CA 0%, #6366F1 100%); padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
         <h3 style="margin-top: 0; color: white; font-size: 22px; font-weight: 700; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); color: #FFFFFF !important;">
             🔄 MATRIZ RESPONSÁVEL x DATA
@@ -1238,7 +1238,7 @@ def analisar_matriz_responsavel_data(df, campos_data, mapeamento_campos):
             Visualização detalhada de responsáveis por data para cada etapa do processo
         </p>
     </div>
-    """)
+    """, unsafe_allow_html=True)
     
     # Usar badges para informações
     col1, col2, col3 = st.columns(3)
