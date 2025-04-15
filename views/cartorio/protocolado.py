@@ -707,8 +707,7 @@ def exibir_metricas_estagios(df_processado):
                     label="Certidão Entregue",
                     value="1917",
                     delta="32.0%",
-                    delta_color="off",
-                    border=True
+                    delta_color="off"
                 )
             st.markdown('</div>', unsafe_allow_html=True)
         
@@ -759,8 +758,7 @@ def exibir_metricas_estagios(df_processado):
                         label=estagio['nome'],
                         value=estagio['contagem'],
                         delta=delta_text,
-                        delta_color="off",  # Não usar cores no delta
-                        border=True
+                        delta_color="off"  # Não usar cores no delta
                     )
         
         # Fechar o container

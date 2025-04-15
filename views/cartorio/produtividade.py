@@ -789,8 +789,7 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
             label="📊 Total de Atividades",
             value=f"{total_geral:,}",
             help="Total em todas as etapas",
-            delta=None,
-            border=True
+            delta=None
         )
     
     with col2:
@@ -799,8 +798,7 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
             label="📅 Dias com Atividades",
             value=f"{num_dias_com_atividade} de {num_dias_periodo}",
             help=f"{taxa_dias_ativos:.0f}% do período",
-            delta=None,
-            border=True
+            delta=None
         )
     
     with col3:
@@ -810,8 +808,7 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
             label="📈 Média Diária",
             value=f"{media_valor:.1f}",
             help="Atividades por dia",
-            delta=None,
-            border=True
+            delta=None
         )
     
     # Exibir informações sobre a contagem
@@ -862,8 +859,7 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
                 value=f"{ganho_busca:,}",
                 help=f"{taxa_sucesso:.1f}% de sucesso",
                 delta="Positivo",
-                delta_color="normal",
-                border=True
+                delta_color="normal"
             )
             st.badge("SUCESSO")
             
@@ -878,8 +874,7 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
                 value=f"{perca_busca:,}",
                 help=f"{100-taxa_sucesso:.1f}% de insucesso",
                 delta="Negativo",
-                delta_color="inverse",
-                border=True
+                delta_color="inverse"
             )
             st.badge("INSUCESSO")
             
@@ -893,8 +888,7 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
                 label="Busca Realizada",
                 value=f"{total_busca:,}",
                 help=f"Soma de ganhos e percas ({ganho_busca:,} + {perca_busca:,})",
-                delta=None,
-                border=True
+                delta=None
             )
             st.badge("TOTAL")
             
@@ -960,8 +954,7 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
                             label=etapa.replace('_', ' '),
                             value=f"{dados['total']:,}",
                             help="Total de registros",
-                            delta=None,
-                            border=True
+                            delta=None
                         )
                         
                         # Usar badge para status
@@ -1024,8 +1017,7 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
                             label=etapa.replace('_', ' '),
                             value=f"{dados['total']:,}",
                             help="Total de registros",
-                            delta=None,
-                            border=True
+                            delta=None
                         )
                         
                         # Badge indicando problemas
