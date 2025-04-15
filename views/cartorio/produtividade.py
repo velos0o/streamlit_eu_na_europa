@@ -640,8 +640,8 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
         periodo_inicio (datetime): Data inicial do período
         periodo_fim (datetime): Data final do período
     """
-    # Usando st.html em vez de markdown com HTML
-    st.html("""
+    # Usando st.markdown em vez de st.html
+    st.markdown("""
     <div style="background: linear-gradient(135deg, #1976D2 0%, #64B5F6 100%); padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
         <h3 style="margin-top: 0; color: white; font-size: 22px; font-weight: 700; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); color: #FFFFFF !important;">
             📊 MÉTRICAS DE PRODUTIVIDADE POR ETAPA
@@ -650,7 +650,7 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
             Resumo das principais métricas de produtividade para cada etapa do processo.
         </p>
     </div>
-    """)
+    """, unsafe_allow_html=True)
     
     # Verificar e exibir informações sobre as colunas existentes
     colunas_existentes = [col for col in campos_data if col in df.columns]
@@ -772,13 +772,13 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
     taxa_dias_ativos = num_dias_com_atividade / num_dias_periodo * 100
     
     # Métricas gerais no topo com estilo aprimorado
-    st.html("""
+    st.markdown("""
     <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
         <h4 style="color: #1565C0; margin-top: 0; font-size: 18px; border-bottom: 2px solid #1976D2; padding-bottom: 8px; margin-bottom: 15px;">
             📈 Métricas Gerais
         </h4>
     </div>
-    """)
+    """, unsafe_allow_html=True)
     
     # Usando colunas com bordas para as métricas principais
     col1, col2, col3 = st.columns(3, gap="medium")
@@ -822,13 +822,13 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
             st.write("A diferença ocorre porque um mesmo registro pode estar em múltiplas etapas.")
     
     # Seção de métricas para o grupo Pesquisa
-    st.html("""
+    st.markdown("""
     <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 25px 0 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
         <h4 style="color: #1565C0; margin-top: 0; font-size: 18px; border-bottom: 2px solid #1976D2; padding-bottom: 8px; margin-bottom: 15px;">
             🔍 Métricas de Pesquisa
         </h4>
     </div>
-    """)
+    """, unsafe_allow_html=True)
     
     # Dicionário com descrições explicativas para cada métrica
     descricoes_metricas = {
@@ -905,13 +905,13 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
         st.info("Dados de pesquisa não disponíveis para o período selecionado.")
     
     # Seção de métricas por etapa com estilo aprimorado
-    st.html("""
+    st.markdown("""
     <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 25px 0 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
         <h4 style="color: #1565C0; margin-top: 0; font-size: 18px; border-bottom: 2px solid #1976D2; padding-bottom: 8px; margin-bottom: 15px;">
             🔍 Produtividade por Etapa
         </h4>
     </div>
-    """)
+    """, unsafe_allow_html=True)
     
     # Definir cores para as etapas - cores mais próximas e harmônicas
     cores_etapas = [
@@ -997,13 +997,13 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
     
     # Seção para etapas de perda (em vermelho)
     if campos_perda:
-        st.html("""
+        st.markdown("""
         <div style="background: #ffebee; border-radius: 10px; padding: 15px; margin: 25px 0 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
             <h4 style="color: #c62828; margin-top: 0; font-size: 18px; border-bottom: 2px solid #e53935; padding-bottom: 8px; margin-bottom: 15px;">
                 ⚠️ Devoluções e Duplicações
             </h4>
         </div>
-        """)
+        """, unsafe_allow_html=True)
         
         # Criar linhas de cards para etapas de perda
         for i in range(0, len(campos_perda), NUM_COLUNAS):
@@ -1060,13 +1060,13 @@ def mostrar_metricas_etapa(df, campos_data, periodo_inicio, periodo_fim):
                             st.write(f"**Registros únicos:** {num_ids}")
     
     # Criar tabela de resumo com estilo aprimorado
-    st.html("""
+    st.markdown("""
     <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; margin: 25px 0 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
         <h4 style="color: #1565C0; margin-top: 0; font-size: 18px; border-bottom: 2px solid #1976D2; padding-bottom: 8px; margin-bottom: 15px;">
             📋 Resumo Consolidado
         </h4>
     </div>
-    """)
+    """, unsafe_allow_html=True)
     
     # Criar dataframe de resumo
     df_resumo = pd.DataFrame([
