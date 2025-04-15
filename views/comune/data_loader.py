@@ -33,11 +33,16 @@ def _limpar_antes_normalizar(series):
     # Remover prefixos como "-natti..." ou "- matri..."
     series = series.str.replace(r'^-\s*natti\s*[:-]?\s*', '', regex=True)
     series = series.str.replace(r'^-\s*matri\s*[:-]?\s*', '', regex=True)
+    # MELHORIA: Remover prefixos de certidões específicos italianos
+    series = series.str.replace(r'^nascita\s*[:-]?\s*', '', regex=True)
+    series = series.str.replace(r'^matrimonio\s*[:-]?\s*', '', regex=True)
+    series = series.str.replace(r'^certidao de\s*[:-]?\s*', '', regex=True)
+    series = series.str.replace(r'^certidao\s*[:-]?\s*', '', regex=True)
 
     def clean_text(text):
         if pd.isna(text) or not isinstance(text, str): return text
         # Tenta dividir por separadores e pegar a primeira parte
-        separadores = [',', '(', '/', '-']
+        separadores = [',', '(', '/', '-', '[', ';', ':']  # Adicionados mais separadores
         for sep in separadores:
             if sep in text:
                 text = text.split(sep, 1)[0]
@@ -60,13 +65,40 @@ def _normalizar_localizacao(series):
          normalized = pd.Series([unidecode(str(x)) for x in series.fillna('')], index=series.index)
          normalized = normalized.str.lower()
 
-    # 3. Remover prefixos GERAIS comuns
-    prefixos_gerais = ['comune di ', 'provincia di ', 'parrocchia di ', 'parrocchia ', 'citta di ', 'diocese di ', 'chiesa di ', 'chiesa parrocchiale di ']
+    # 3. Remover prefixos GERAIS comuns - AMPLIADO
+    prefixos_gerais = [
+        'comune di ', 'provincia di ', 'parrocchia di ', 'parrocchia ', 'citta di ', 
+        'diocese di ', 'chiesa di ', 'chiesa parrocchiale di ', 'comune ', 'citta ',
+        'diocesi ', 'diocesi di ', 'archivio di ', 'anagrafe di ', 'frazione di ', 'frazione ',
+        'municipio di ', 'municipio ', 'ufficio anagrafe di ', 'ufficio di stato civile di ',
+        'ufficio anagrafe ', 'ufficio di stato civile ', 'ufficio dello stato civile ',
+        'parrocchia della ', 'parrocchia del ', 'parrocchia dei ', 'parrocchia degli ',
+        'comune della ', 'comune del ', 'comune dei ', 'comune degli ',
+        # Novas adições:
+        'archidiocesi di ', 'archidiocesi ', 'arcidiocesi di ', 'arcidiocesi ',
+        'basilica di ', 'basilica ', 'cappella di ', 'cappella ',
+        'cattedrale di ', 'cattedrale ', 'chiesa arcipretale di ', 'chiesa arcipretale ',
+        'chiesa collegiata di ', 'chiesa collegiata ', 'chiesa matrice di ', 'chiesa matrice ',
+        'convento di ', 'convento ', 'monastero di ', 'monastero ',
+        'pieve di ', 'pieve ', 'santuario di ', 'santuario ',
+        'parrocchiale di ', 'parrocchiale ', 'vicaria di ', 'vicaria '
+    ]
     for prefix in prefixos_gerais:
         normalized = normalized.str.replace(f'^{re.escape(prefix)}', '', regex=True)
         
-    # 3.5 Remover prefixos RELIGIOSOS comuns (após os gerais)
-    prefixos_religiosos = ['san ', 'santa ', 'santi ', 'santo ', 's ', 'ss '] # Adicionado 'ss '
+    # 3.5 Remover prefixos RELIGIOSOS comuns (após os gerais) - AMPLIADO
+    prefixos_religiosos = [
+        'san ', 'santa ', 'santi ', 'santo ', 's ', 'ss ', 'st ', 
+        'beato ', 'beata ', 'santissima ', 'santissimo ',
+        'natale ', 'nativita di ', 'nativita ', 'nascita di ', 'nascita ', 
+        'battesimo di ', 'battesimo ', 'maria ', 'madonna ',
+        # Novas adições:
+        'sant\'', 'sant ', 'santa maria ', 'santa maria di ', 'santa maria del ',
+        'sacro cuore di ', 'sacro cuore ', 'sacro ', 'san giovanni ', 'san giovanni di ',
+        'san michele ', 'san michele di ', 'san pietro ', 'san pietro di ',
+        'san nicola ', 'san nicola di ', 'san lorenzo ', 'san lorenzo di ',
+        'san martino ', 'san martino di ', 'san marco ', 'san marco di '
+    ]
     for prefix in prefixos_religiosos:
         # Usar word boundary (\b) para evitar remover 'san' de 'sanremo'
         normalized = normalized.str.replace(f'^{re.escape(prefix)}(\\b)?', '', regex=True)
@@ -79,6 +111,99 @@ def _normalizar_localizacao(series):
     normalized = normalized.str.replace(r'\s+[a-z]{2}$', '', regex=True) # Remove ' xx' no final
     normalized = normalized.str.replace(r'\s*\([a-z]{2}\)$', '', regex=True) # Remove ' (xx)' no final
     normalized = normalized.str.strip() # Garante remoção de espaços caso o sufixo fosse a única coisa após a limpeza
+
+    # MELHORIA: Remover palavras irrelevantes para correspondência
+    palavras_irrelevantes = [
+        'della', 'dello', 'delle', 'degli', 'dei', 'del', 'di', 'da', 'dal', 'e', 'ed', 'in', 'con',
+        'su', 'sul', 'sulla', 'sulle', 'sui', 'sugli', 'per', 'tra', 'fra', 'a', 'al', 'alla', 'alle',
+        'ai', 'agli', 'il', 'lo', 'la', 'le', 'i', 'gli', 'un', 'uno', 'una', 'nello', 'nella', 'nelle',
+        'negli', 'nei', 'all', 'dall', 'dall', 'dall',
+        # Novas adições:
+        'presso', 'vicino', 'sopra', 'sotto', 'davanti', 'dietro', 'accanto', 'oltre',
+        'verso', 'senza', 'secondo', 'lungo', 'durante', 'dentro', 'fuori', 'prima', 'dopo',
+        'contro', 'attraverso', 'circa', 'intorno', 'grazie', 'mediante', 'oltre', 'malgrado',
+        'nonostante', 'salvo', 'eccetto', 'fino', 'verso'
+    ]
+    for palavra in palavras_irrelevantes:
+        normalized = normalized.str.replace(r'\b' + palavra + r'\b', ' ', regex=True)
+
+    # MELHORIA: Substituições para casos comuns
+    substituicoes = {
+        'sangiovanni': 'giovanni',
+        'sangiuseppe': 'giuseppe',
+        'sanlorenzo': 'lorenzo',
+        'sanfrancesco': 'francesco',
+        'sanmartino': 'martino',
+        'santamaria': 'maria',
+        'santantonio': 'antonio',
+        'sanvincenzo': 'vincenzo',
+        'santangelo': 'angelo',
+        'santanna': 'anna',
+        'sanmichele': 'michele',
+        'sanmarco': 'marco',
+        'sannicola': 'nicola',
+        # Novas adições:
+        'sanbartolomeo': 'bartolomeo',
+        'ssantissima': 'santissima',
+        'santmaria': 'maria',
+        'santachiara': 'chiara',
+        'santacaterina': 'caterina',
+        'santandrea': 'andrea',
+        'santagnese': 'agnese',
+        'santarita': 'rita',
+        'santabarbara': 'barbara',
+        'santadomenica': 'domenica',
+        'santapaola': 'paola',
+        'santateresa': 'teresa',
+        'santaeufemia': 'eufemia',
+        'santabruna': 'bruna',
+        'santaelena': 'elena',
+        'santantonino': 'antonino',
+        'santadiocesi': 'diocesi',
+        'maddalena': 'magdalena',
+        'battista': 'batista',
+        'assunta': 'assumpta',
+        'assunzione': 'assumpcao',
+        'eucharistia': 'eucaristia',
+        # Correções regionais e províncias:
+        'treviso': 'treviso',
+        'venezia': 'venezia',
+        'veneza': 'venezia',
+        'padova': 'padova',
+        'podova': 'padova',
+        'verona': 'verona',
+        'vicenza': 'vicenza',
+        'rovigo': 'rovigo',
+        'belluno': 'belluno',
+        'mantova': 'mantova',
+        'mantua': 'mantova',
+        'mantoa': 'mantova',
+        'montova': 'mantova',
+        'mântua': 'mantova',
+        'brescia': 'brescia',
+        'massa-carrara': 'massa carrara',
+        'massa carrara': 'massa carrara',
+        'verbano-cusio-ossola': 'verbano cusio ossola',
+        'verbano-cusi': 'verbano cusio ossola',
+        'vibo-valentia': 'vibo valentia',
+        'pesaro-urbino': 'pesaro e urbino',
+        'chiete': 'chieti',
+        'biela': 'biella',
+        'lodi': 'lodi',
+        'novara': 'novara',
+        'varese': 'varese',
+        'pavia': 'pavia',
+        'vibo valentia': 'vibo valentia',
+        'caltanissetta': 'caltanissetta',
+        'agrigento': 'agrigento',
+        'crotone': 'crotone',
+        'sassari': 'sassari',
+        'enna': 'enna',
+        'avellino': 'avellino',
+        'toscana': 'toscana'
+    }
+    for original, substituicao in substituicoes.items():
+        normalized = normalized.str.replace(r'\b' + original + r'\b', substituicao, regex=True)
 
     # 5. Remover espaços extras
     normalized = normalized.str.strip()
@@ -213,15 +338,6 @@ def carregar_dados_comune(force_reload=False):
     else:
         df_items['COMUNE_ORIG'] = 'Não Especificado'; df_items['COMUNE_NORM'] = 'nao especificado'
         
-    # --- Imprimir Diagnóstico (opcional, pode comentar após análise) --- 
-    # try:
-    #     bitrix_unique_pairs = df_items[['PROVINCIA_NORM', 'COMUNE_NORM']].drop_duplicates().sort_values(by=['PROVINCIA_NORM', 'COMUNE_NORM']).values.tolist()
-    #     print("\n--- Nomes Únicos Normalizados no Bitrix (Após Limpeza Prévia) ---")
-    #     # ... (código de impressão) ...
-    # except Exception as e:
-    #     print(f"Erro diagnóstico Bitrix: {e}")
-    # ----
-
     # --- Juntar Datas CSV --- 
     df_datas_solicitacao = carregar_datas_solicitacao()
     if not df_datas_solicitacao.empty:
@@ -229,7 +345,7 @@ def carregar_dados_comune(force_reload=False):
         print(f"{df_items['DATA_SOLICITACAO_ORIGINAL'].notna().sum()}/{len(df_items)} registros com data.")
     else: df_items['DATA_SOLICITACAO_ORIGINAL'] = pd.NaT
     
-    # --- Juntar Coordenadas (JSON) - APENAS Fuzzy no Comune --- 
+    # --- Juntar Coordenadas (JSON) --- 
     df_coordenadas = carregar_coordenadas_mapa()
     
     df_items['latitude'] = pd.NA
@@ -237,76 +353,434 @@ def carregar_dados_comune(force_reload=False):
     df_items['COORD_SOURCE'] = pd.NA
 
     if not df_coordenadas.empty and process is not None and fuzz is not None:
-        print("\nIniciando busca de coordenadas via Fuzzy Match (Comune Only)...")
+        print("\nIniciando busca de coordenadas via correspondência múltipla...")
         # Lista de nomes de comunes únicos do JSON para comparar
         json_comunes_norm_list = df_coordenadas['COMUNE_MAPA_NORM'].unique().tolist()
         if 'nao especificado' in json_comunes_norm_list: 
             json_comunes_norm_list.remove('nao especificado')
 
-        if json_comunes_norm_list:
-            # Nomes únicos de comunes do Bitrix 
-            bitrix_comunes_to_match = df_items['COMUNE_NORM'].unique().tolist()
-            
-            fuzzy_matches_map = {}
-            match_threshold = 90 # Limite de similaridade
-            
-            print(f"Realizando fuzzy matching para {len(bitrix_comunes_to_match)} comunes únicos do Bitrix...")
-            matched_count_fuzzy = 0
-            for bitrix_comune in bitrix_comunes_to_match:
-                if bitrix_comune == 'nao especificado': continue 
+        json_provincias_norm_list = df_coordenadas['PROVINCIA_MAPA_NORM'].unique().tolist()
+        if 'nao especificado' in json_provincias_norm_list: 
+            json_provincias_norm_list.remove('nao especificado')
+
+        # Nova adição: Dicionário de correções manuais para casos específicos
+        correcoes_manuais = {
+            # Comune: (latitude, longitude, fonte)
+            "piavon": (45.7167, 12.4333, "Correção Manual"),
+            "vazzola": (45.8333, 12.3333, "Correção Manual"),
+            "oderzo": (45.7833, 12.4833, "Correção Manual"),
+            "valdobbiadene": (45.9000, 12.0333, "Correção Manual"),
+            "motta di livenza": (45.7833, 12.6167, "Correção Manual"),
+            "susegana": (45.8500, 12.2500, "Correção Manual"),
+            "vittorio veneto": (45.9833, 12.3000, "Correção Manual"),
+            "boara polesine": (45.0333, 11.7833, "Correção Manual"),
+            "mansuè": (45.8333, 12.5167, "Correção Manual"),
+            "san dona di piave": (45.6333, 12.5667, "Correção Manual"),
+            "godego": (45.7000, 11.8667, "Correção Manual"),
+            "castello di godego": (45.7000, 11.8667, "Correção Manual"),
+            "legnago": (45.1833, 11.3167, "Correção Manual"),
+            "stienta": (44.9500, 11.5500, "Correção Manual"),
+            "montebelluna": (45.7833, 12.0500, "Correção Manual"),
+            "vigasio": (45.3167, 10.9333, "Correção Manual"),
+            "villorba": (45.7333, 12.2333, "Correção Manual"),
+            "bondeno": (44.8833, 11.4167, "Correção Manual"),
+            "trevignano": (45.7333, 12.1000, "Correção Manual"),
+            "cavarzere": (45.1333, 12.0667, "Correção Manual"),
+            "arcade": (45.7333, 12.2000, "Correção Manual"),
+            "castelfranco veneto": (45.6667, 11.9333, "Correção Manual"),
+            "gaiarine": (45.9000, 12.4833, "Correção Manual"),
+            "borso del grappa": (45.8167, 11.8000, "Correção Manual"),
+            "cittadella": (45.6500, 11.7833, "Correção Manual"),
+            "albignasego": (45.3667, 11.8500, "Correção Manual"),
+            "zero branco": (45.6167, 12.1667, "Correção Manual"),
+            "sona": (45.4333, 10.8333, "Correção Manual"),
+            "lendinara": (45.0833, 11.5833, "Correção Manual"),
+            # Novas correções manuais
+            "annone veneto": (45.8000, 12.7000, "Correção Manual"),
+            "campagna lupia": (45.3667, 12.1000, "Correção Manual"),
+            "campolongo maggiore": (45.3000, 12.0500, "Correção Manual"),
+            "fossalta di portogruaro": (45.7833, 12.9000, "Correção Manual"),
+            "meolo": (45.6167, 12.4667, "Correção Manual"),
+            "marcon": (45.5500, 12.3000, "Correção Manual"),
+            "pramaggiore": (45.7833, 12.7500, "Correção Manual"),
+            "san stino di livenza": (45.7333, 12.6833, "Correção Manual"),
+            "spinea": (45.4833, 12.1667, "Correção Manual"),
+            "scorzè": (45.5833, 12.1000, "Correção Manual"),
+            "salgareda": (45.7167, 12.5000, "Correção Manual"),
+            "pravisdomini": (45.8167, 12.6333, "Correção Manual"),
+            "cinto caomaggiore": (45.8167, 12.8333, "Correção Manual"),
+            "ceggia": (45.6833, 12.6333, "Correção Manual"),
+            "casale sul sile": (45.5833, 12.3333, "Correção Manual"),
+            "mira": (45.4333, 12.1333, "Correção Manual"),
+            "mogliano veneto": (45.5833, 12.2333, "Correção Manual"),
+            "noale": (45.5500, 12.0667, "Correção Manual"),
+            "preganziol": (45.6000, 12.2667, "Correção Manual"),
+            "quarto d'altino": (45.5667, 12.3667, "Correção Manual"),
+            "lancenigo": (45.7000, 12.2500, "Correção Manual"),
+            "sanguinetto": (45.1833, 11.1500, "Correção Manual"),
+            "bovolone": (45.2500, 11.1167, "Correção Manual"),
+            "roncade": (45.6333, 12.3833, "Correção Manual"),
+            "casier": (45.6500, 12.3000, "Correção Manual"),
+            "paese": (45.7167, 12.1667, "Correção Manual"),
+            "castelfranco": (45.6667, 11.9333, "Correção Manual"),
+            "pederobba": (45.8500, 11.9833, "Correção Manual"),
+            "vedelago": (45.7000, 12.0333, "Correção Manual"),
+            "riese pio x": (45.7333, 11.9167, "Correção Manual"),
+            "altivole": (45.7833, 11.9333, "Correção Manual"),
+            "camposampiero": (45.5667, 11.9333, "Correção Manual"),
+            "trebaseleghe": (45.5667, 12.0333, "Correção Manual"),
+            "noventa padovana": (45.3833, 11.9500, "Correção Manual"),
+            "chioggia": (45.2167, 12.2833, "Correção Manual"),
+            "motta": (45.7833, 12.6167, "Correção Manual")
+        }
+
+        # Adicionar correções de províncias típicas italianas
+        provincias_manuais = {
+            "treviso": (45.6667, 12.2500, "Correção Província"),
+            "venezia": (45.4375, 12.3358, "Correção Província"),
+            "padova": (45.4167, 11.8667, "Correção Província"),
+            "verona": (45.4386, 10.9928, "Correção Província"),
+            "vicenza": (45.5500, 11.5500, "Correção Província"),
+            "rovigo": (45.0667, 11.7833, "Correção Província"),
+            "mantova": (45.1500, 10.7833, "Correção Província"),
+            "belluno": (46.1333, 12.2167, "Correção Província"),
+            "pordenone": (45.9667, 12.6500, "Correção Província"),
+            "udine": (46.0667, 13.2333, "Correção Província"),
+            "cremona": (45.1333, 10.0333, "Correção Província"),
+            "brescia": (45.5417, 10.2167, "Correção Província"),
+            "bergamo": (45.6950, 9.6700, "Correção Província"),
+            "milano": (45.4669, 9.1900, "Correção Província"),
+            "cosenza": (39.3000, 16.2500, "Correção Província"),
+            "salerno": (40.6806, 14.7594, "Correção Província"),
+            "caserta": (41.0667, 14.3333, "Correção Província"),
+            "napoli": (40.8333, 14.2500, "Correção Província"),
+            "potenza": (40.6333, 15.8000, "Correção Província"),
+            "ferrara": (44.8333, 11.6167, "Correção Província"),
+            "bologna": (44.4939, 11.3428, "Correção Província"),
+            "lucca": (43.8428, 10.5039, "Correção Província"),
+            "roma": (41.9000, 12.5000, "Correção Província"),
+            "benevento": (41.1333, 14.7833, "Correção Província"),
+            "campobasso": (41.5667, 14.6667, "Correção Província"),
+            "cagliari": (39.2278, 9.1111, "Correção Província"),
+            "messina": (38.1936, 15.5542, "Correção Província"),
+            "catanzaro": (38.9000, 16.6000, "Correção Província"),
+            "palermo": (38.1111, 13.3517, "Correção Província"),
+            # Novas adições
+            "trento": (46.0667, 11.1167, "Correção Província"),
+            "bolzano": (46.5000, 11.3500, "Correção Província"),
+            "gorizia": (45.9419, 13.6167, "Correção Província"),
+            "trieste": (45.6486, 13.7772, "Correção Província"),
+            "modena": (44.6458, 10.9256, "Correção Província"),
+            "parma": (44.8015, 10.3280, "Correção Província"),
+            "reggio emilia": (44.6979, 10.6312, "Correção Província"),
+            "piacenza": (45.0472, 9.6997, "Correção Província"),
+            "ravenna": (44.4167, 12.2000, "Correção Província"),
+            "forlì": (44.2225, 12.0408, "Correção Província"),
+            "rimini": (44.0592, 12.5683, "Correção Província"),
+            "ancona": (43.6167, 13.5167, "Correção Província"),
+            "pesaro": (43.9100, 12.9139, "Correção Província"),
+            "macerata": (43.3000, 13.4500, "Correção Província"),
+            "fermo": (43.1583, 13.7167, "Correção Província"),
+            "ascoli piceno": (42.8500, 13.5833, "Correção Província"),
+            "perugia": (43.1167, 12.3833, "Correção Província"),
+            "terni": (42.5667, 12.6500, "Correção Província"),
+            "firenze": (43.7714, 11.2542, "Correção Província"),
+            "prato": (43.8833, 11.1000, "Correção Província"),
+            "pistoia": (43.9333, 10.9167, "Correção Província"),
+            "massa": (44.0333, 10.1500, "Correção Província"),
+            "lucca": (43.8500, 10.5000, "Correção Província"),
+            "pisa": (43.7167, 10.3833, "Correção Província"),
+            "livorno": (43.5500, 10.3167, "Correção Província"),
+            "arezzo": (43.4667, 11.8833, "Correção Província"),
+            "siena": (43.3167, 11.3500, "Correção Província"),
+            "grosseto": (42.7667, 11.1167, "Correção Província"),
+            "viterbo": (42.4167, 12.1000, "Correção Província"),
+            "rieti": (42.4000, 12.8500, "Correção Província"),
+            "latina": (41.4667, 12.9000, "Correção Província"),
+            "frosinone": (41.6333, 13.3500, "Correção Província"),
+            "caserta": (41.0833, 14.3333, "Correção Província"),
+            "isernia": (41.6000, 14.2333, "Correção Província"),
+            "chieti": (42.3500, 14.1667, "Correção Província"),
+            "pescara": (42.4667, 14.2000, "Correção Província"),
+            "teramo": (42.6667, 13.7000, "Correção Província")
+        }
+
+        # Aplicar correções manuais primeiro
+        registros_atualizados = 0
+        
+        for idx, row in df_items.iterrows():
+            # Verificar nome do comune nas correções manuais
+            comune_norm = row['COMUNE_NORM']
+            if comune_norm in correcoes_manuais:
+                lat, lon, source = correcoes_manuais[comune_norm]
+                df_items.at[idx, 'latitude'] = lat
+                df_items.at[idx, 'longitude'] = lon
+                df_items.at[idx, 'COORD_SOURCE'] = source
+                registros_atualizados += 1
+                continue
                 
-                best_match = process.extractOne(
+            # Verificar província se o comune não foi encontrado
+            provincia_norm = row['PROVINCIA_NORM']
+            if pd.isna(row['latitude']) and provincia_norm in provincias_manuais:
+                lat, lon, source = provincias_manuais[provincia_norm]
+                df_items.at[idx, 'latitude'] = lat
+                df_items.at[idx, 'longitude'] = lon
+                df_items.at[idx, 'COORD_SOURCE'] = source
+                registros_atualizados += 1
+
+        # Continuar com o processamento normal para os itens restantes
+        if json_comunes_norm_list:
+            # Nomes únicos de comunes e províncias do Bitrix 
+            bitrix_comunes_to_match = df_items['COMUNE_NORM'].unique().tolist()
+            bitrix_provincias_to_match = df_items['PROVINCIA_NORM'].unique().tolist()
+            
+            # MELHORIA: Implementar múltiplos tipos de matching
+            # 1. Match exato (Comune + Província)
+            print("Aplicando correspondência exata (Comune + Província)...")
+            for idx, row in df_items.iterrows():
+                # Pular se já tem coordenadas
+                if pd.notna(row['latitude']) and pd.notna(row['longitude']):
+                    continue
+                    
+                comune_norm = row['COMUNE_NORM']
+                provincia_norm = row['PROVINCIA_NORM']
+                
+                if comune_norm == 'nao especificado' or provincia_norm == 'nao especificado':
+                    continue
+                
+                # Tentar match exato com comune e província    
+                exact_match = df_coordenadas[
+                    (df_coordenadas['COMUNE_MAPA_NORM'] == comune_norm) & 
+                    (df_coordenadas['PROVINCIA_MAPA_NORM'] == provincia_norm)
+                ]
+                
+                if not exact_match.empty:
+                    match_row = exact_match.iloc[0]
+                    df_items.at[idx, 'latitude'] = match_row['latitude']
+                    df_items.at[idx, 'longitude'] = match_row['longitude']
+                    df_items.at[idx, 'COORD_SOURCE'] = 'ExactMatch_ComuneProv'
+            
+            # Contagem de matches exatos
+            exact_matches = df_items[df_items['COORD_SOURCE'] == 'ExactMatch_ComuneProv'].shape[0]
+            print(f"Encontrados {exact_matches} correspondências exatas (Comune + Província)")
+            
+            # 2. Match exato (apenas Comune)
+            print("Aplicando correspondência exata (apenas Comune)...")
+            for idx, row in df_items.iterrows():
+                if pd.notna(row['latitude']) and pd.notna(row['longitude']):
+                    continue  # Pular se já tem coordenadas
+                
+                comune_norm = row['COMUNE_NORM']
+                if comune_norm == 'nao especificado':
+                    continue
+                
+                # Tentar match exato com comune
+                exact_comune_match = df_coordenadas[df_coordenadas['COMUNE_MAPA_NORM'] == comune_norm]
+                
+                if not exact_comune_match.empty:
+                    match_row = exact_comune_match.iloc[0]
+                    df_items.at[idx, 'latitude'] = match_row['latitude']
+                    df_items.at[idx, 'longitude'] = match_row['longitude']
+                    df_items.at[idx, 'COORD_SOURCE'] = 'ExactMatch_Comune'
+            
+            # Contagem de matches exatos por comune
+            comune_matches = df_items[df_items['COORD_SOURCE'] == 'ExactMatch_Comune'].shape[0]
+            print(f"Encontrados {comune_matches} correspondências exatas (apenas Comune)")
+            
+            # 3. Match Fuzzy (Comune)
+            print("Aplicando correspondência fuzzy...")
+            fuzzy_matches_map = {}
+            # MELHORIA: Usar threshold mais baixo para aumentar correspondências
+            match_threshold = 80  # Reduzindo para aumentar as correspondências (era 85)
+            
+            # MELHORIA: Usar todos os algoritmos de fuzzy matching disponiveis
+            for bitrix_comune in bitrix_comunes_to_match:
+                if bitrix_comune == 'nao especificado': 
+                    continue
+                
+                # 3.1 Token Sort Ratio - Melhor para palavras na ordem errada
+                token_sort_match = process.extractOne(
                     query=bitrix_comune,
                     choices=json_comunes_norm_list,
                     scorer=fuzz.token_sort_ratio, 
                     score_cutoff=match_threshold
                 )
                 
-                if best_match:
-                    fuzzy_matches_map[bitrix_comune] = best_match[0] 
-                    matched_count_fuzzy += 1
-
-            print(f"Fuzzy matching concluído. Encontrados {matched_count_fuzzy} mapeamentos potenciais acima de {match_threshold}%.")
-
-            if fuzzy_matches_map:
-                df_items['JSON_COMUNE_FUZZY_MATCH'] = df_items['COMUNE_NORM'].map(fuzzy_matches_map)
-
-                # Preparar coordenadas únicas por comune JSON para o merge
-                coords_c_fuzzy = df_coordenadas[['COMUNE_MAPA_NORM', 'latitude', 'longitude']]
-                coords_c_fuzzy = coords_c_fuzzy.drop_duplicates(subset=['COMUNE_MAPA_NORM'], keep='first')
-                coords_c_fuzzy = coords_c_fuzzy.rename(columns={'latitude':'lat_fuzzy', 'longitude':'lon_fuzzy'})
+                if token_sort_match:
+                    fuzzy_matches_map[bitrix_comune] = (token_sort_match[0], token_sort_match[1], "TokenSort")
+                    continue
                 
-                # Fazer merge com base no nome do comune JSON mapeado
-                df_items = pd.merge(
-                    df_items, 
-                    coords_c_fuzzy, 
-                    left_on='JSON_COMUNE_FUZZY_MATCH', 
-                    right_on='COMUNE_MAPA_NORM', 
-                    how='left',
-                    suffixes=('', '_fuzzy')
+                # 3.2 Token Set Ratio - Melhor para substrings/partials
+                token_set_match = process.extractOne(
+                    query=bitrix_comune,
+                    choices=json_comunes_norm_list,
+                    scorer=fuzz.token_set_ratio, 
+                    score_cutoff=match_threshold
                 )
-
-                # Preencher coordenadas onde houve match fuzzy
-                mask_fuzzy_update = df_items['lat_fuzzy'].notna()
-                # Sobrescrever latitude/longitude NA com os valores do fuzzy match
-                df_items.loc[mask_fuzzy_update, 'latitude'] = df_items.loc[mask_fuzzy_update, 'lat_fuzzy']
-                df_items.loc[mask_fuzzy_update, 'longitude'] = df_items.loc[mask_fuzzy_update, 'lon_fuzzy']
-                df_items.loc[mask_fuzzy_update, 'COORD_SOURCE'] = 'FuzzyMatch_Comune'
-                count_fuzzy_applied = mask_fuzzy_update.sum()
-                print(f"{count_fuzzy_applied} correspondências aplicadas (Fuzzy Comune Only).")
                 
-                # Limpar colunas temporárias
-                df_items.drop(columns=['JSON_COMUNE_FUZZY_MATCH', 'COMUNE_MAPA_NORM', 'lat_fuzzy', 'lon_fuzzy'], inplace=True, errors='ignore')
-        else:
-            print("Não há nomes de comunes válidos no arquivo JSON para realizar o fuzzy matching.")
-    elif not df_coordenadas.empty:
-         print("Fuzzy matching não executado pois a biblioteca 'thefuzz' não foi importada.")
-         st.warning("Instale 'thefuzz' e 'python-Levenshtein' para habilitar o fuzzy matching.")
-    else:
-        print("Arquivo de coordenadas vazio ou não carregado. Nenhuma coordenada adicionada.")
-        
-    # --- Finalização --- 
-    df_items.loc[:, 'NOME_SEGMENTO'] = "COMUNE BITRIX24"
+                if token_set_match:
+                    fuzzy_matches_map[bitrix_comune] = (token_set_match[0], token_set_match[1], "TokenSet")
+                    continue
+                
+                # 3.3 Partial Ratio - Melhor para casos específicos de substring
+                partial_match = process.extractOne(
+                    query=bitrix_comune,
+                    choices=json_comunes_norm_list,
+                    scorer=fuzz.partial_ratio, 
+                    score_cutoff=match_threshold
+                )
+                
+                if partial_match:
+                    fuzzy_matches_map[bitrix_comune] = (partial_match[0], partial_match[1], "Partial")
+                    continue
+                
+                # 3.4 Ratio padrão como última opção - com threshold mais baixo
+                if len(bitrix_comune) > 3:  # Evitar nomes muito curtos
+                    std_match = process.extractOne(
+                        query=bitrix_comune,
+                        choices=json_comunes_norm_list,
+                        scorer=fuzz.ratio, 
+                        score_cutoff=75  # Threshold mais baixo (era 80)
+                    )
+                    
+                    if std_match:
+                        fuzzy_matches_map[bitrix_comune] = (std_match[0], std_match[1], "Standard")
+                    else:
+                        # 3.5 NOVA ETAPA: Tentar correspondência de prefixo para nomes mais longos
+                        # Para encontrar casos onde o name do comune no Bitrix é apenas o início do nome real
+                        if len(bitrix_comune) >= 5:
+                            # Encontrar todos os comunes que começam com o bitrix_comune
+                            prefix_matches = [c for c in json_comunes_norm_list if c.startswith(bitrix_comune)]
+                            if prefix_matches:
+                                # Ordenar por comprimento para pegar o mais curto (mais próximo)
+                                best_prefix = sorted(prefix_matches, key=len)[0]
+                                fuzzy_matches_map[bitrix_comune] = (best_prefix, 90, "PrefixMatch")
+                
+            # 4. NOVO: Para casos muito difíceis, tente matching por token parcial
+            # (encontrar partes do nome em comum quando os nomes são muito diferentes)
+            if match_threshold > 60:  # Apenas se o threshold principal não for muito baixo
+                for bitrix_comune in bitrix_comunes_to_match:
+                    if bitrix_comune in fuzzy_matches_map or bitrix_comune == 'nao especificado' or len(bitrix_comune) < 4:
+                        continue
+                    
+                    # Dividir o nome em tokens
+                    tokens = bitrix_comune.split()
+                    if len(tokens) > 1:  # Apenas se houver múltiplos tokens
+                        for token in tokens:
+                            if len(token) >= 4:  # Token grande o suficiente para ser significativo
+                                token_matches = [c for c in json_comunes_norm_list if token in c.split()]
+                                if token_matches:
+                                    # Usar o primeiro match como base
+                                    fuzzy_matches_map[bitrix_comune] = (token_matches[0], 70, "TokenPartialMatch")
+                                    break
+
+            # Aplicar correspondências fuzzy ao DataFrame
+            for idx, row in df_items.iterrows():
+                # Pular se já tem coordenadas
+                if pd.notna(row['latitude']) and pd.notna(row['longitude']):
+                    continue
+                
+                comune_norm = row['COMUNE_NORM']
+                if comune_norm in fuzzy_matches_map:
+                    best_match, score, method = fuzzy_matches_map[comune_norm]
+                    
+                    # Encontrar as coordenadas do match
+                    match_rows = df_coordenadas[df_coordenadas['COMUNE_MAPA_NORM'] == best_match]
+                    if not match_rows.empty:
+                        match_row = match_rows.iloc[0]
+                        
+                        # Atualizar as coordenadas
+                        df_items.at[idx, 'latitude'] = match_row['latitude']
+                        df_items.at[idx, 'longitude'] = match_row['longitude']
+                        df_items.at[idx, 'COORD_SOURCE'] = f'FuzzyMatch_{method}_{score}'
+
+            # 5. NOVO: Para casos ainda sem correspondência, tentar pelo início do nome
+            # Isso ajuda em casos onde o nome está parcialmente digitado
+            print("Aplicando correspondência por início do nome para casos sem match...")
+            for idx, row in df_items.iterrows():
+                # Pular se já tem coordenadas
+                if pd.notna(row['latitude']) and pd.notna(row['longitude']):
+                    continue
+                
+                comune_norm = row['COMUNE_NORM']
+                if comune_norm == 'nao especificado' or len(comune_norm) < 4:
+                    continue
+                
+                # Encontrar comuns que começam com os primeiros n caracteres
+                prefix_len = min(len(comune_norm), 5)  # Usar até 5 caracteres iniciais
+                prefix = comune_norm[:prefix_len]
+                
+                prefix_matches = [c for c in json_comunes_norm_list if c.startswith(prefix)]
+                if prefix_matches:
+                    # Usar o mais curto (mais próximo do prefixo)
+                    best_match = sorted(prefix_matches, key=len)[0]
+                    match_rows = df_coordenadas[df_coordenadas['COMUNE_MAPA_NORM'] == best_match]
+                    
+                    if not match_rows.empty:
+                        match_row = match_rows.iloc[0]
+                        df_items.at[idx, 'latitude'] = match_row['latitude']
+                        df_items.at[idx, 'longitude'] = match_row['longitude']
+                        df_items.at[idx, 'COORD_SOURCE'] = f'PrefixMatch_{prefix}'
+
+            # 6. Último recurso: tentar match por província
+            # Após todas as tentativas, use a província como último recurso
+            print("Aplicando correspondência por província para casos sem match...")
+            for idx, row in df_items.iterrows():
+                # Pular se já tem coordenadas
+                if pd.notna(row['latitude']) and pd.notna(row['longitude']):
+                    continue
+                
+                provincia_norm = row['PROVINCIA_NORM']
+                if provincia_norm == 'nao especificado':
+                    continue
+                
+                # Primeiro tenta match exato por província
+                provincia_matches = df_coordenadas[df_coordenadas['PROVINCIA_MAPA_NORM'] == provincia_norm]
+                
+                if not provincia_matches.empty:
+                    # Usar o primeiro match (primeira cidade da província)
+                    match_row = provincia_matches.iloc[0]
+                    df_items.at[idx, 'latitude'] = match_row['latitude']
+                    df_items.at[idx, 'longitude'] = match_row['longitude']
+                    df_items.at[idx, 'COORD_SOURCE'] = 'ProvinciaMatch'
+                else:
+                    # Tentar fuzzy match por província se ainda não tiver correspondência
+                    if len(provincia_norm) >= 4 and provincia_norm not in ['roma', 'bari']:  # Evitar nomes muito curtos/genéricos
+                        provincia_fuzzy = process.extractOne(
+                            query=provincia_norm,
+                            choices=json_provincias_norm_list,
+                            scorer=fuzz.token_set_ratio,
+                            score_cutoff=75
+                        )
+                        
+                        if provincia_fuzzy:
+                            best_match_prov = provincia_fuzzy[0]
+                            prov_match_rows = df_coordenadas[df_coordenadas['PROVINCIA_MAPA_NORM'] == best_match_prov]
+                            
+                            if not prov_match_rows.empty:
+                                match_row = prov_match_rows.iloc[0]
+                                df_items.at[idx, 'latitude'] = match_row['latitude']
+                                df_items.at[idx, 'longitude'] = match_row['longitude']
+                                df_items.at[idx, 'COORD_SOURCE'] = f'ProvinciaFuzzy_{provincia_fuzzy[1]}'
+
+            # 7. Contagem final de matches
+            fuzzy_matches = df_items[df_items['COORD_SOURCE'].str.contains('Fuzzy', na=False)].shape[0] if 'COORD_SOURCE' in df_items.columns else 0
+            prefix_matches = df_items[df_items['COORD_SOURCE'].str.contains('Prefix', na=False)].shape[0] if 'COORD_SOURCE' in df_items.columns else 0
+            provincia_matches = df_items[df_items['COORD_SOURCE'].str.contains('Provincia', na=False)].shape[0] if 'COORD_SOURCE' in df_items.columns else 0
+            
+            print(f"Correspondências encontradas - Fuzzy: {fuzzy_matches}, Prefixo: {prefix_matches}, Província: {provincia_matches}")
+            
+            total_matches = df_items[pd.notna(df_items['latitude']) & pd.notna(df_items['longitude'])].shape[0]
+            match_rate = (total_matches / len(df_items)) * 100 if len(df_items) > 0 else 0
+            
+            print(f"Taxa de correspondência total: {match_rate:.1f}% ({total_matches}/{len(df_items)})")
+    
+    # Aplicar limpeza final e conversão de tipos
+    if 'latitude' in df_items.columns and 'longitude' in df_items.columns:
+        # Converter coordenadas para numérico
+        df_items['latitude'] = pd.to_numeric(df_items['latitude'], errors='coerce')
+        df_items['longitude'] = pd.to_numeric(df_items['longitude'], errors='coerce')
+    
     return df_items
 
 def carregar_dados_negocios(force_reload=False):

@@ -6,6 +6,8 @@ from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime
 import io
+import unicodedata
+import re
 
 def visualizar_comune_dados(df_comune):
     """
@@ -1566,17 +1568,147 @@ def visualizar_providencias(df_comune):
                 "zero branco": (45.6167, 12.1667, "Correção Manual"),
                 "sona": (45.4333, 10.8333, "Correção Manual"),
                 "lendinara": (45.0833, 11.5833, "Correção Manual"),
+                # Novas correções manuais
+                "annone veneto": (45.8000, 12.7000, "Correção Manual"),
+                "campagna lupia": (45.3667, 12.1000, "Correção Manual"),
+                "campolongo maggiore": (45.3000, 12.0500, "Correção Manual"),
+                "fossalta di portogruaro": (45.7833, 12.9000, "Correção Manual"),
+                "meolo": (45.6167, 12.4667, "Correção Manual"),
+                "marcon": (45.5500, 12.3000, "Correção Manual"),
+                "pramaggiore": (45.7833, 12.7500, "Correção Manual"),
+                "san stino di livenza": (45.7333, 12.6833, "Correção Manual"),
+                "spinea": (45.4833, 12.1667, "Correção Manual"),
+                "scorzè": (45.5833, 12.1000, "Correção Manual"),
+                "salgareda": (45.7167, 12.5000, "Correção Manual"),
+                "pravisdomini": (45.8167, 12.6333, "Correção Manual"),
+                "cinto caomaggiore": (45.8167, 12.8333, "Correção Manual"),
+                "ceggia": (45.6833, 12.6333, "Correção Manual"),
+                "casale sul sile": (45.5833, 12.3333, "Correção Manual"),
+                "mira": (45.4333, 12.1333, "Correção Manual"),
+                "mogliano veneto": (45.5833, 12.2333, "Correção Manual"),
+                "noale": (45.5500, 12.0667, "Correção Manual"),
+                "preganziol": (45.6000, 12.2667, "Correção Manual"),
+                "quarto d'altino": (45.5667, 12.3667, "Correção Manual"),
+                "lancenigo": (45.7000, 12.2500, "Correção Manual"),
+                "sanguinetto": (45.1833, 11.1500, "Correção Manual"),
+                "bovolone": (45.2500, 11.1167, "Correção Manual"),
+                "roncade": (45.6333, 12.3833, "Correção Manual"),
+                "casier": (45.6500, 12.3000, "Correção Manual"),
+                "paese": (45.7167, 12.1667, "Correção Manual"),
+                "castelfranco": (45.6667, 11.9333, "Correção Manual"),
+                "pederobba": (45.8500, 11.9833, "Correção Manual"),
+                "vedelago": (45.7000, 12.0333, "Correção Manual"),
+                "riese pio x": (45.7333, 11.9167, "Correção Manual"),
+                "altivole": (45.7833, 11.9333, "Correção Manual"),
+                "camposampiero": (45.5667, 11.9333, "Correção Manual"),
+                "trebaseleghe": (45.5667, 12.0333, "Correção Manual"),
+                "noventa padovana": (45.3833, 11.9500, "Correção Manual"),
+                "chioggia": (45.2167, 12.2833, "Correção Manual"),
+                "motta": (45.7833, 12.6167, "Correção Manual"),
+                "san fior": (45.9333, 12.3500, "Correção Manual"),
+                "san vendemiano": (45.8833, 12.3333, "Correção Manual"),
+                "santa lucia di piave": (45.8500, 12.2833, "Correção Manual"),
+                "san polo di piave": (45.8000, 12.3833, "Correção Manual"),
+                "oné di fonte": (45.8000, 11.9500, "Correção Manual"),
+                "pieve di soligo": (45.9000, 12.1667, "Correção Manual"),
+                "codogné": (45.8667, 12.4333, "Correção Manual"),
+                "asolo": (45.8000, 11.9167, "Correção Manual"),
+                "gorgo al monticano": (45.8000, 12.5833, "Correção Manual"),
+                "istrana": (45.6833, 12.1000, "Correção Manual"),
+                "loria": (45.7333, 11.8667, "Correção Manual"),
+                "monastier di treviso": (45.6333, 12.4500, "Correção Manual"),
+                "morgano": (45.6333, 12.1833, "Correção Manual"),
+                "ormelle": (45.8000, 12.4333, "Correção Manual"),
+                "ponzano veneto": (45.7167, 12.2333, "Correção Manual"),
+                "refrontolo": (45.9167, 12.2167, "Correção Manual"),
+                "revine lago": (45.9833, 12.2333, "Correção Manual"),
+                "roncadelle": (45.5167, 10.1833, "Correção Manual"),
+                "san biagio di callalta": (45.6833, 12.3833, "Correção Manual"),
+                "san pietro di feletto": (45.9333, 12.2667, "Correção Manual"),
+                "san zenone degli ezzelini": (45.7833, 11.8500, "Correção Manual"),
+                "sarmede": (46.0167, 12.3833, "Correção Manual"),
+                "segusino": (45.9500, 12.0000, "Correção Manual"),
+                "silea": (45.6500, 12.3000, "Correção Manual"),
+                "vidor": (45.8500, 12.0667, "Correção Manual"),
+                "zenson di piave": (45.7000, 12.5000, "Correção Manual"),
+                "possagno": (45.8667, 11.8667, "Correção Manual"),
+                "cimadolmo": (45.7667, 12.4167, "Correção Manual"),
+                "carbonera": (45.7000, 12.2833, "Correção Manual"),
+                "breda di piave": (45.7167, 12.3500, "Correção Manual"),
+                "caerano di san marco": (45.8000, 12.0000, "Correção Manual"),
+                "cappella maggiore": (45.9667, 12.4167, "Correção Manual"),
+                "cessalto": (45.7000, 12.6167, "Correção Manual"),
+                "chiarano": (45.7167, 12.6000, "Correção Manual"),
+                "cornuda": (45.8333, 12.0000, "Correção Manual"),
+                "crocetta del montello": (45.8167, 12.0500, "Correção Manual"),
+                "farra di soligo": (45.9000, 12.1333, "Correção Manual"),
+                "follina": (45.9500, 12.1167, "Correção Manual"),
+                "fontanelle": (45.8000, 12.5000, "Correção Manual"),
+                "fonte": (45.8000, 11.9500, "Correção Manual"),
+                "fregona": (46.0000, 12.3500, "Correção Manual"),
+                "giavera del montello": (45.8000, 12.1500, "Correção Manual"),
+                "mareno di piave": (45.8333, 12.3333, "Correção Manual"),
+                "maser": (45.8167, 11.9667, "Correção Manual"),
+                "miane": (45.9500, 12.1000, "Correção Manual"),
+                "moriago della battaglia": (45.8667, 12.1000, "Correção Manual"),
+                "nervesa della battaglia": (45.8333, 12.2167, "Correção Manual"),
+                "orsago": (45.9167, 12.4000, "Correção Manual"),
+                "paderno del grappa": (45.8667, 11.8000, "Correção Manual"),
+                "pieve del grappa": (45.8667, 11.8000, "Correção Manual"),
+                "portobuffolé": (45.8333, 12.5333, "Correção Manual"),
+                "resana": (45.6167, 11.9500, "Correção Manual"),
+                # Nomes alternativos das províncias problemáticas
+                "verbano": (46.1397, 8.2726, "Correção Manual"),
+                "verbania": (46.1397, 8.2726, "Correção Manual"),
+                "cusio": (46.1397, 8.2726, "Correção Manual"),
+                "ossola": (46.1397, 8.2726, "Correção Manual"),
+                "vibo": (38.6750, 16.1000, "Correção Manual"),
+                "valentia": (38.6750, 16.1000, "Correção Manual"),
+                "ennas": (37.5667, 14.2667, "Correção Manual"),
+                "caltanisetta": (37.4900, 14.0600, "Correção Manual"),
+                "massa": (44.0371, 10.1433, "Correção Manual"),
+                "carrara": (44.0371, 10.1433, "Correção Manual"),
+                "biela": (45.5667, 8.0500, "Correção Manual"),
+                "chiete": (42.3500, 14.1667, "Correção Manual"),
+                "pesaro": (43.9130, 12.9132, "Correção Manual"),
+                "urbino": (43.9130, 12.9132, "Correção Manual"),
+                "pesaro-urbino": (43.9130, 12.9132, "Correção Manual"),
+                "pesaro urbino": (43.9130, 12.9132, "Correção Manual"),
+                # Cidades específicas das províncias problemáticas
+                "lodi": (45.3097, 9.5030, "Correção Manual"), 
+                "novara": (45.4467, 8.6227, "Correção Manual"),
+                "varese": (45.8167, 8.8333, "Correção Manual"),
+                "pavia": (45.1847, 9.1582, "Correção Manual"),
+                "vibo valentia": (38.6750, 16.1000, "Correção Manual"),
+                "caltanissetta": (37.4900, 14.0600, "Correção Manual"),
+                "agrigento": (37.3100, 13.5764, "Correção Manual"),
+                "crotone": (39.0833, 17.1228, "Correção Manual"),
+                "sassari": (40.7275, 8.5553, "Correção Manual"),
+                "biella": (45.5667, 8.0500, "Correção Manual"),
+                "enna": (37.5667, 14.2667, "Correção Manual"),
+                "avellino": (40.9147, 14.7928, "Correção Manual"),
+                "toscana": (43.7711, 11.2486, "Correção Manual"),
+                "chieti": (42.3500, 14.1667, "Correção Manual"),
+                "montova": (45.1500, 10.7833, "Correção Manual"),
+                "mântua": (45.1500, 10.7833, "Correção Manual"),
+                "veneza": (45.4375, 12.3358, "Correção Manual"),
+                "podova": (45.4167, 11.8667, "Correção Manual")
             }
             
             # Adicionar correções de províncias típicas italianas
             provincias_manuais = {
                 "treviso": (45.6667, 12.2500, "Correção Província"),
                 "venezia": (45.4375, 12.3358, "Correção Província"),
+                "veneza": (45.4375, 12.3358, "Correção Província"),
                 "padova": (45.4167, 11.8667, "Correção Província"),
+                "podova": (45.4167, 11.8667, "Correção Província"),
                 "verona": (45.4386, 10.9928, "Correção Província"),
                 "vicenza": (45.5500, 11.5500, "Correção Província"),
                 "rovigo": (45.0667, 11.7833, "Correção Província"),
                 "mantova": (45.1500, 10.7833, "Correção Província"),
+                "mantua": (45.1500, 10.7833, "Correção Província"),
+                "montova": (45.1500, 10.7833, "Correção Província"),
+                "mântua": (45.1500, 10.7833, "Correção Província"),
                 "belluno": (46.1333, 12.2167, "Correção Província"),
                 "pordenone": (45.9667, 12.6500, "Correção Província"),
                 "udine": (46.0667, 13.2333, "Correção Província"),
@@ -1599,6 +1731,63 @@ def visualizar_providencias(df_comune):
                 "messina": (38.1936, 15.5542, "Correção Província"),
                 "catanzaro": (38.9000, 16.6000, "Correção Província"),
                 "palermo": (38.1111, 13.3517, "Correção Província"),
+                # Novas adições
+                "lodi": (45.3097, 9.5030, "Correção Província"),
+                "novara": (45.4467, 8.6227, "Correção Província"),
+                "varese": (45.8167, 8.8333, "Correção Província"),
+                "pavia": (45.1847, 9.1582, "Correção Província"),
+                "vibo valentia": (38.6750, 16.1000, "Correção Província"),
+                "caltanissetta": (37.4900, 14.0600, "Correção Província"),
+                "agrigento": (37.3100, 13.5764, "Correção Província"),
+                "crotone": (39.0833, 17.1228, "Correção Província"),
+                "massa carrara": (44.0371, 10.1433, "Correção Província"),
+                "massa-carrara": (44.0371, 10.1433, "Correção Província"),
+                "pesaro e urbino": (43.9130, 12.9132, "Correção Província"),
+                "chieti": (42.3500, 14.1667, "Correção Província"),
+                "chiete": (42.3500, 14.1667, "Correção Província"),
+                "sassari": (40.7275, 8.5553, "Correção Província"),
+                "biella": (45.5667, 8.0500, "Correção Província"),
+                "biela": (45.5667, 8.0500, "Correção Província"),
+                "enna": (37.5667, 14.2667, "Correção Província"),
+                "avellino": (40.9147, 14.7928, "Correção Província"),
+                "verbano-cusio-ossola": (46.1397, 8.2726, "Correção Província"),
+                "verbano cusio ossola": (46.1397, 8.2726, "Correção Província"),
+                "verbano-cusi": (46.1397, 8.2726, "Correção Província"),
+                "toscana": (43.7711, 11.2486, "Correção Região"),
+                "trento": (46.0667, 11.1167, "Correção Província"),
+                "bolzano": (46.5000, 11.3500, "Correção Província"),
+                "gorizia": (45.9419, 13.6167, "Correção Província"),
+                "trieste": (45.6486, 13.7772, "Correção Província"),
+                "modena": (44.6458, 10.9256, "Correção Província"),
+                "parma": (44.8015, 10.3280, "Correção Província"),
+                "reggio emilia": (44.6979, 10.6312, "Correção Província"),
+                "piacenza": (45.0472, 9.6997, "Correção Província"),
+                "ravenna": (44.4167, 12.2000, "Correção Província"),
+                "forlì": (44.2225, 12.0408, "Correção Província"),
+                "rimini": (44.0592, 12.5683, "Correção Província"),
+                "ancona": (43.6167, 13.5167, "Correção Província"),
+                "pesaro": (43.9100, 12.9139, "Correção Província"),
+                "macerata": (43.3000, 13.4500, "Correção Província"),
+                "fermo": (43.1583, 13.7167, "Correção Província"),
+                "ascoli piceno": (42.8500, 13.5833, "Correção Província"),
+                "perugia": (43.1167, 12.3833, "Correção Província"),
+                "terni": (42.5667, 12.6500, "Correção Província"),
+                "firenze": (43.7714, 11.2542, "Correção Província"),
+                "prato": (43.8833, 11.1000, "Correção Província"),
+                "pistoia": (43.9333, 10.9167, "Correção Província"),
+                "massa": (44.0333, 10.1500, "Correção Província"),
+                "pisa": (43.7167, 10.3833, "Correção Província"),
+                "livorno": (43.5500, 10.3167, "Correção Província"),
+                "arezzo": (43.4667, 11.8833, "Correção Província"),
+                "siena": (43.3167, 11.3500, "Correção Província"),
+                "grosseto": (42.7667, 11.1167, "Correção Província"),
+                "viterbo": (42.4167, 12.1000, "Correção Província"),
+                "rieti": (42.4000, 12.8500, "Correção Província"),
+                "latina": (41.4667, 12.9000, "Correção Província"),
+                "frosinone": (41.6333, 13.3500, "Correção Província"),
+                "isernia": (41.6000, 14.2333, "Correção Província"),
+                "pescara": (42.4667, 14.2000, "Correção Província"),
+                "teramo": (42.6667, 13.7000, "Correção Província")
             }
             
             df_mapa_ref = None
@@ -1687,7 +1876,19 @@ def visualizar_providencias(df_comune):
                             'comune di ', 'provincia di ', 'chiesa di ', 'chiesa parrocchiale di ',
                             'parrocchia di ', 'parrocchia ', 'paroquia ', 'diocesi di ', 'diocesi ',
                             'san ', 'santa ', 'santo ', 's ', 'ss ', 'st ', 'nativita ', 'santangelo ',
-                            'santambrogio ', 'frazione ', 'comune ', 'citta di ', 'beato ', 'beata '
+                            'santambrogio ', 'frazione ', 'comune ', 'citta di ', 'beato ', 'beata ',
+                            'archidiocesi di ', 'archidiocesi ', 'arcidiocesi di ', 'arcidiocesi ',
+                            'basilica di ', 'basilica ', 'cappella di ', 'cappella ',
+                            'cattedrale di ', 'cattedrale ', 'chiesa arcipretale di ', 'chiesa arcipretale ',
+                            'chiesa collegiata di ', 'chiesa collegiata ', 'chiesa matrice di ', 'chiesa matrice ',
+                            'convento di ', 'convento ', 'monastero di ', 'monastero ',
+                            'pieve di ', 'pieve ', 'santuario di ', 'santuario ',
+                            'parrocchiale di ', 'parrocchiale ', 'vicaria di ', 'vicaria ',
+                            'nascita di ', 'nascita ', 'matrimonio di ', 'matrimonio ',
+                            'natti ', 'matri ', 'nato a ', 'nata a ', 'chiese di ', 'municipio di ',
+                            'ufficio anagrafe di ', 'ufficio anagrafe ', 'ufficio di stato civile di ',
+                            'ufficio di stato civile ', 'ufficio dello stato civile di ', 'ufficio dello stato civile ',
+                            'paroquia de ', 'sant\'', 'sant '
                         ]
                         for prefixo in prefixos:
                             if nome.startswith(prefixo):
@@ -1704,7 +1905,10 @@ def visualizar_providencias(df_comune):
                             ' or', ' pc', ' pe', ' pg', ' pi', ' pn', ' po', ' pt', ' pu',
                             ' ra', ' rc', ' re', ' ri', ' rn', ' si', ' so', ' sp', ' sr',
                             ' ss', ' sv', ' te', ' tn', ' tp', ' ts', ' va', ' vb', ' vc',
-                            ' vs', ' vt'
+                            ' vs', ' vt', ' emilia romagna', ' friuli', ' lombardia', ' toscana',
+                            ' lazio', ' piemonte', ' campania', ' puglia', ' sicilia', ' sardegna',
+                            ' marche', ' abruzzo', ' molise', ' basilicata', ' calabria', ' liguria',
+                            ' trentino', ' umbria', ' valle d\'aosta'
                         ]
                         for sufixo in sufixos:
                             if nome.endswith(sufixo):
@@ -1730,6 +1934,51 @@ def visualizar_providencias(df_comune):
                             'deltagliament': 'del tagliamento',
                             'apostol': 'apostolo',
                             'vergine mari': 'vergine maria',
+                            'sanbartolomeo': 'san bartolomeo',
+                            'ssantissima': 'santissima',
+                            'santmaria': 'santa maria',
+                            'santachiara': 'santa chiara',
+                            'santacaterina': 'santa caterina',
+                            'santandrea': 'sant andrea',
+                            'santagnese': 'sant agnese',
+                            'santarita': 'santa rita',
+                            'santabarbara': 'santa barbara',
+                            'santadomenica': 'santa domenica',
+                            'santapaola': 'santa paola',
+                            'santateresa': 'santa teresa',
+                            'santaeufemia': 'santa eufemia',
+                            'santabruna': 'santa bruna',
+                            'santaelena': 'santa elena',
+                            'santantonino': 'sant antonino',
+                            'santadiocesi': 'diocesi',
+                            'maddalena': 'magdalena',
+                            'battista': 'batista',
+                            'assunta': 'assumpta',
+                            'assunzione': 'assumpcao',
+                            'eucharistia': 'eucaristia',
+                            # Correções regionais específicas:
+                            'treviso': 'treviso',
+                            'venezia': 'venezia',
+                            'veneza': 'venezia',
+                            'padova': 'padova',
+                            'podova': 'padova',
+                            'verona': 'verona',
+                            'vicenza': 'vicenza',
+                            'rovigo': 'rovigo',
+                            'belluno': 'belluno',
+                            'mantova': 'mantova',
+                            'mantua': 'mantova',
+                            'mantoa': 'mantova',
+                            'montova': 'mantova',
+                            'mântua': 'mantova',
+                            'massa-carrara': 'massa carrara',
+                            'massa carrara': 'massa carrara',
+                            'verbano-cusio-ossola': 'verbano cusio ossola',
+                            'verbano-cusi': 'verbano cusio ossola',
+                            'vibo-valentia': 'vibo valentia',
+                            'pesaro-urbino': 'pesaro e urbino',
+                            'chiete': 'chieti',
+                            'biela': 'biella',
                             ' ve': '',
                             ' tv': '',
                             ' pd': '',
@@ -1749,7 +1998,15 @@ def visualizar_providencias(df_comune):
                             'chiesa', 'parrocchia', 'parrocchiale', 'paroquia', 'comune', 'provincia',
                             'diocesi', 'frazione', 'nativita', 'annunciazione', 'assunzione', 'abate',
                             'apostolo', 'dottore', 'martire', 'sacerdote', 'vescovo', 'beata', 'beato',
-                            'vergine', 'evangelista', 'maria', 'santissima', 'ssma', 'padre', 'madre'
+                            'vergine', 'evangelista', 'maria', 'santissima', 'ssma', 'padre', 'madre',
+                            'della', 'dello', 'delle', 'degli', 'dei', 'del', 'di', 'da', 'dal', 'e', 'ed', 
+                            'in', 'con', 'su', 'sul', 'sulla', 'sulle', 'sui', 'sugli', 'per', 'tra', 'fra', 
+                            'a', 'al', 'alla', 'alle', 'ai', 'agli', 'il', 'lo', 'la', 'le', 'i', 'gli', 'un', 
+                            'uno', 'una', 'nello', 'nella', 'nelle', 'negli', 'nei', 'all', 'dall', 'dall',
+                            'presso', 'vicino', 'sopra', 'sotto', 'davanti', 'dietro', 'accanto', 'oltre',
+                            'verso', 'senza', 'secondo', 'lungo', 'durante', 'dentro', 'fuori', 'prima', 'dopo',
+                            'contro', 'attraverso', 'circa', 'intorno', 'grazie', 'mediante', 'oltre', 'malgrado',
+                            'nonostante', 'salvo', 'eccetto', 'fino', 'verso'
                         ]
                         
                         nome_partes = nome.split()
@@ -1808,6 +2065,26 @@ def visualizar_providencias(df_comune):
                             row[col_lat] = match_row['lat']
                             row[col_lon] = match_row['lng']
                             row[col_coord_source] = 'ExactMatch_ComuneProv'
+                            return row
+                            
+                        # Tentar correspondência exata apenas por Comune se falhou acima
+                        mask_comune = df_mapa_exact['comune_norm'] == row['comune_match']
+                        if mask_comune.any():
+                            match_row = df_mapa_exact[mask_comune].iloc[0]
+                            row[col_lat] = match_row['lat']
+                            row[col_lon] = match_row['lng']
+                            row[col_coord_source] = 'ExactMatch_Comune'
+                            return row
+                            
+                        # Tentar correspondência exata apenas por Província como último recurso
+                        mask_provincia = df_mapa_exact['provincia_norm'] == row['provincia_match']
+                        if mask_provincia.any() and row['provincia_match'] != 'nao especificado':
+                            match_row = df_mapa_exact[mask_provincia].iloc[0]
+                            row[col_lat] = match_row['lat']
+                            row[col_lon] = match_row['lng']
+                            row[col_coord_source] = 'ExactMatch_Provincia'
+                            return row
+                            
                         return row
                     
                     # Aplicar correspondência exata
@@ -1845,7 +2122,7 @@ def visualizar_providencias(df_comune):
                             comune, 
                             ref_comunes,
                             scorer=fuzz.token_sort_ratio,
-                            score_cutoff=70,  # Threshold mais baixo para aumentar matches
+                            score_cutoff=65,  # Threshold reduzido (era 70)
                             limit=3
                         )
                         if token_sort_matches:
@@ -1856,7 +2133,7 @@ def visualizar_providencias(df_comune):
                             comune, 
                             ref_comunes,
                             scorer=fuzz.token_set_ratio,
-                            score_cutoff=75,
+                            score_cutoff=70,  # Threshold reduzido (era 75)
                             limit=3
                         )
                         if token_set_matches:
@@ -1867,7 +2144,7 @@ def visualizar_providencias(df_comune):
                             comune, 
                             ref_comunes,
                             scorer=fuzz.partial_ratio,
-                            score_cutoff=80,
+                            score_cutoff=75,  # Threshold reduzido (era 80)
                             limit=3
                         )
                         if partial_matches:
@@ -1878,7 +2155,7 @@ def visualizar_providencias(df_comune):
                             comune, 
                             ref_comunes,
                             scorer=fuzz.ratio,
-                            score_cutoff=75,
+                            score_cutoff=70,  # Threshold reduzido (era 75)
                             limit=3
                         )
                         if ratio_matches:
@@ -1890,25 +2167,49 @@ def visualizar_providencias(df_comune):
                                 comune, 
                                 ref_comunes,
                                 scorer=fuzz.ratio,
-                                score_cutoff=65,  # Threshold ainda mais baixo para nomes curtos
+                                score_cutoff=60,  # Threshold reduzido (era 65)
                                 limit=2
                             )
                             if special_matches:
                                 best_matches.extend(special_matches)
+                                
+                        # 5. NOVO: Tentar correspondência por token parcial
+                        # Útil para nomes compostos onde apenas um fragmento tem correspondência
+                        if not best_matches and ' ' in comune:
+                            tokens = comune.split()
+                            for token in tokens:
+                                if len(token) >= 4:  # Token grande o suficiente para ser significativo
+                                    token_partial_matches = [c for c in ref_comunes if token in c.split()]
+                                    if token_partial_matches:
+                                        # Calcular scores para todos os matches de token
+                                        token_scores = [(c, fuzz.partial_ratio(token, c)) for c in token_partial_matches]
+                                        # Ordenar por score, mais alto primeiro
+                                        token_scores.sort(key=lambda x: x[1], reverse=True)
+                                        # Adicionar os melhores (até 2)
+                                        best_token_matches = token_scores[:2]
+                                        best_matches.extend(best_token_matches)
                             
-                        # Consolidar e escolher o melhor match
-                        if best_matches:
-                            # Agrupar por nome do match
-                            match_scores = {}
-                            for match, score in best_matches:
-                                if match in match_scores:
-                                    match_scores[match] = max(match_scores[match], score)
-                                else:
-                                    match_scores[match] = score
-                            
-                            # Obter o melhor match
-                            best_match = max(match_scores.items(), key=lambda x: x[1])
-                            matches_fuzzy[comune] = (best_match[0], best_match[1])
+                        # 6. NOVO: Para nomes mais longos, testar se é um prefixo de algum comune
+                        if not best_matches and len(comune) >= 4:
+                            prefix_matches = [(c, len(comune)/len(c)*100) for c in ref_comunes if c.startswith(comune)]
+                            if prefix_matches:
+                                # Ordenar por score (comprimento relativo), mais alto primeiro
+                                prefix_matches.sort(key=lambda x: x[1], reverse=True)
+                                best_matches.extend(prefix_matches[:1])
+                    
+                    # Consolidar e escolher o melhor match
+                    if best_matches:
+                        # Agrupar por nome do match
+                        match_scores = {}
+                        for match, score in best_matches:
+                            if match in match_scores:
+                                match_scores[match] = max(match_scores[match], score)
+                            else:
+                                match_scores[match] = score
+                        
+                        # Obter o melhor match
+                        best_match = max(match_scores.items(), key=lambda x: x[1])
+                        matches_fuzzy[comune] = (best_match[0], best_match[1])
                     
                     # Aplicar os matches fuzzy encontrados
                     for idx, row in df_sem_coord_apos_exato.iterrows():
@@ -1954,7 +2255,7 @@ def visualizar_providencias(df_comune):
                                 matches.sort(key=lambda x: x[1], reverse=True)
                                 best_match, score = matches[0]
                                 
-                                if score >= 85:  # Usar threshold alto para fragmentos
+                                if score >= 80:  # Usar threshold alto para fragmentos (era 85)
                                     match_row = df_mapa_ref[df_mapa_ref['comune_norm'] == best_match].iloc[0]
                                     
                                     # Atualizar as coordenadas
@@ -1984,7 +2285,27 @@ def visualizar_providencias(df_comune):
                         ('bergamo', 45.6950, 9.6700),
                         ('siena', 43.3178, 11.3317),
                         ('lecce', 40.3500, 18.1700),
-                        ('parma', 44.8015, 10.3280)
+                        ('parma', 44.8015, 10.3280),
+                        # Novas localidades populares
+                        ('treviso', 45.6667, 12.2500),
+                        ('vicenza', 45.5500, 11.5500),
+                        ('brescia', 45.5417, 10.2167),
+                        ('modena', 44.6458, 10.9256),
+                        ('pisa', 43.7167, 10.3833),
+                        ('trento', 46.0667, 11.1167),
+                        ('catania', 37.5000, 15.0833),
+                        ('rimini', 44.0592, 12.5683),
+                        ('ferrara', 44.8333, 11.6167),
+                        ('foggia', 41.4500, 15.5500),
+                        ('salerno', 40.6806, 14.7594),
+                        ('pescara', 42.4667, 14.2000),
+                        ('monza', 45.5833, 9.2667),
+                        ('ancona', 43.6167, 13.5167),
+                        ('perugia', 43.1167, 12.3833),
+                        ('livorno', 43.5500, 10.3167),
+                        ('cagliari', 39.2278, 9.1111),
+                        ('bolzano', 46.5000, 11.3500),
+                        ('reggio calabria', 38.1000, 15.6500)
                     ]
                     
                     for idx, row in df_sem_coord_apos_fragmentos.iterrows():
@@ -1998,6 +2319,47 @@ def visualizar_providencias(df_comune):
                                 df_filtrado.at[idx, col_lon] = lon
                                 df_filtrado.at[idx, col_coord_source] = f'TextMatch_{localidade}'
                                 break
+                    
+                    # 5. NOVO: Tentar match pela província se ainda não encontrou correspondência
+                    df_sem_coord_apos_termos = df_filtrado[df_filtrado[col_lat].isna() | df_filtrado[col_lon].isna()].copy()
+                    
+                    # Obter províncias únicas sem correspondência
+                    provincias_sem_match = df_sem_coord_apos_termos['provincia_match'].dropna().unique()
+                    ref_provincias = df_mapa_ref['provincia_norm'].unique().tolist()
+                    
+                    # Aplicar matching fuzzy para províncias
+                    matches_provincia = {}
+                    for provincia in provincias_sem_match:
+                        if not provincia or provincia == 'nao especificado' or len(provincia) < 3:
+                            continue
+                            
+                        # Tentar todos os algoritmos
+                        prov_matches = process.extractBests(
+                            provincia,
+                            ref_provincias,
+                            scorer=fuzz.token_set_ratio,
+                            score_cutoff=75,
+                            limit=1
+                        )
+                        
+                        if prov_matches:
+                            matches_provincia[provincia] = (prov_matches[0][0], prov_matches[0][1])
+                    
+                    # Aplicar os matches de província
+                    for idx, row in df_sem_coord_apos_termos.iterrows():
+                        provincia_match = row['provincia_match']
+                        if provincia_match in matches_provincia:
+                            best_match, score = matches_provincia[provincia_match]
+                            
+                            # Encontrar as coordenadas do match
+                            match_rows = df_mapa_ref[df_mapa_ref['provincia_norm'] == best_match]
+                            if not match_rows.empty:
+                                match_row = match_rows.iloc[0]
+                                
+                                # Atualizar as coordenadas
+                                df_filtrado.at[idx, col_lat] = match_row['lat']
+                                df_filtrado.at[idx, col_lon] = match_row['lng']
+                                df_filtrado.at[idx, col_coord_source] = f'ProvinciaMatch_{score}'
                     
                     # Remover colunas temporárias
                     df_filtrado.drop(['comune_match', 'provincia_match'], axis=1, errors='ignore', inplace=True)
@@ -2482,46 +2844,6 @@ def visualizar_providencias(df_comune):
     else:
         st.warning(f"Não foi possível gerar a tabela por comune/paróquia. Colunas necessárias: {col_comune_norm}, {col_id}")
 
-    # Nova seção: Instruções para melhoria contínua
-    st.markdown("---")
-    st.subheader("💡 Recomendações para Melhorar a Correspondência Geográfica")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        **Padronização de Dados:**
-        - Padronizar a entrada de dados no Bitrix24
-        - Separar claramente Comune e Província
-        - Usar nomes oficiais das localidades
-        - Evitar abreviações e variações de nomes
-        """)
-        
-        st.markdown("""
-        **Enriquecimento de Dados:**
-        - Atualizar regularmente a base geográfica de referência
-        - Adicionar variações comuns de nomes à base
-        - Incluir códigos postais e outras referências
-        - Manter um dicionário de correções manuais atualizado
-        """)
-    
-    with col2:
-        st.markdown("""
-        **Melhoria de Processo:**
-        - Verificar e corrigir manualmente casos sem correspondência
-        - Criar uma lista de equivalências para casos problemáticos
-        - Documentar padrões de nomenclatura para referência futura
-        - Implementar um sistema de feedback para correções
-        """)
-        
-        st.markdown("""
-        **Configuração do Sistema:**
-        - Reduzir o threshold de similaridade para casos específicos
-        - Utilizar a API de Geocodificação Google para casos difíceis
-        - Implementar um sistema de cache para correspondências já encontradas
-        - Considerar usar aprendizado de máquina para casos complexos
-        """)
-
     # Nova seção: Registros não mapeados
     st.markdown("---") # Divisor
     st.markdown("#### 🔍 Registros Não Mapeados")
@@ -2637,45 +2959,215 @@ def visualizar_providencias(df_comune):
     else:
         st.success("🎉 Parabéns! Todos os registros possuem coordenadas geográficas mapeadas.")
 
-    # Nova seção: Instruções para melhoria contínua
+
+    # NOVA IMPLEMENTAÇÃO: Adicionar barra de busca por título
     st.markdown("---")
-    st.subheader("💡 Recomendações para Melhorar a Correspondência Geográfica")
+    st.subheader("🔍 Busca por Família")
     
-    col1, col2 = st.columns(2)
+    # Campo de busca
+    busca_titulo = st.text_input(
+        "Buscar por Título/Nome da Família:",
+        placeholder="Digite para filtrar famílias no mapa...",
+        help="Filtre processos pelo título ou nome da família para localizar no mapa"
+    )
     
-    with col1:
-        st.markdown("""
-        **Padronização de Dados:**
-        - Padronizar a entrada de dados no Bitrix24
-        - Separar claramente Comune e Província
-        - Usar nomes oficiais das localidades
-        - Evitar abreviações e variações de nomes
-        """)
-        
-        st.markdown("""
-        **Enriquecimento de Dados:**
-        - Atualizar regularmente a base geográfica de referência
-        - Adicionar variações comuns de nomes à base
-        - Incluir códigos postais e outras referências
-        - Manter um dicionário de correções manuais atualizado
-        """)
-    
-    with col2:
-        st.markdown("""
-        **Melhoria de Processo:**
-        - Verificar e corrigir manualmente casos sem correspondência
-        - Criar uma lista de equivalências para casos problemáticos
-        - Documentar padrões de nomenclatura para referência futura
-        - Implementar um sistema de feedback para correções
-        """)
-        
-        st.markdown("""
-        **Configuração do Sistema:**
-        - Reduzir o threshold de similaridade para casos específicos
-        - Utilizar a API de Geocodificação Google para casos difíceis
-        - Implementar um sistema de cache para correspondências já encontradas
-        - Considerar usar aprendizado de máquina para casos complexos
-        """)
+    # Aplicar filtro de busca se houver texto digitado
+    df_mapa_filtrado = df_mapa.copy()
+    if busca_titulo:
+        if 'TITLE' in df_mapa_filtrado.columns:
+            mask_titulo = df_mapa_filtrado['TITLE'].astype(str).str.contains(busca_titulo, case=False, na=False)
+            df_mapa_filtrado = df_mapa_filtrado[mask_titulo]
+            st.success(f"Mostrando {len(df_mapa_filtrado)} famílias que correspondem à busca '{busca_titulo}'")
+            
+            # Exibir tabela com resultados encontrados
+            if not df_mapa_filtrado.empty:
+                colunas_exibir = ['ID', 'TITLE', col_comune_orig, col_provincia_orig, 'STAGE_NAME']
+                colunas_disponiveis = [col for col in colunas_exibir if col in df_mapa_filtrado.columns]
+                st.dataframe(df_mapa_filtrado[colunas_disponiveis])
+            else:
+                st.warning("Nenhuma família encontrada com esse critério de busca.")
+    else:
+        st.info("Digite um texto para filtrar famílias específicas no mapa.")
+
+    # Exibir Mapa aprimorado com Folium (se disponível)
+    if not df_mapa.empty:
+        try:
+            import folium
+            from streamlit_folium import folium_static
+            from folium.plugins import MarkerCluster
+            
+            # Criar um mapa interativo centrado na Itália
+            m = folium.Map(location=[42.5, 12.5], zoom_start=6)
+            
+            # Adicionar um cluster de marcadores para melhor visualização com muitos pontos
+            marker_cluster = MarkerCluster().add_to(m)
+            
+            # Definir cores para cada tipo de correspondência
+            cores = {
+                'ExactMatch': 'green',
+                'FuzzyMatch': 'orange',
+                'PartialMatch': 'blue',
+                'TextMatch': 'cadetblue',
+                'Correção Manual': 'purple',
+                'Correção Província': 'red',
+                'default': 'gray'
+            }
+            
+            # Usar o DataFrame filtrado pela busca se houver busca, senão usar o original
+            df_para_mapa = df_mapa_filtrado if busca_titulo else df_mapa
+            
+            # Adicionar marcadores para cada ponto com cores diferentes por tipo de match
+            for idx, row in df_para_mapa[df_para_mapa[col_lat].notna() & df_para_mapa[col_lon].notna()].iterrows():
+                # Determinar a cor do marcador com base no tipo de match
+                color = 'default'  # padrão
+                if col_coord_source in row and pd.notna(row[col_coord_source]):
+                    for key in cores.keys():
+                        if key in str(row[col_coord_source]):
+                            color = cores[key]
+                            break
+                
+                # Função para formatar coordenadas com segurança
+                def format_coord(val):
+                    try:
+                        if pd.notna(val):
+                            return f"{float(val):.4f}"
+                        return "N/A"
+                    except (ValueError, TypeError):
+                        return str(val)
+                
+                # Criar popup com informações detalhadas
+                lat_formatted = format_coord(row[col_lat])
+                lon_formatted = format_coord(row[col_lon])
+                
+                popup_html = f"""
+                <div style="font-family: Arial; width: 250px">
+                    <h4 style="color: #1A237E; margin-bottom: 5px">{row.get('TITLE', 'Processo')}</h4>
+                    <p><strong>ID:</strong> {row.get(col_id, 'N/A')}</p>
+                    <p><strong>Comune:</strong> {row.get(col_comune_orig, 'N/A')}</p>
+                    <p><strong>Província:</strong> {row.get(col_provincia_orig, 'N/A')}</p>
+                    <p><strong>Estágio:</strong> {row.get('STAGE_NAME', 'N/A')}</p>
+                    <p><strong>Tipo de Match:</strong> {row.get(col_coord_source, 'N/A')}</p>
+                    <p><strong>Coordenadas:</strong> [{lat_formatted}, {lon_formatted}]</p>
+                </div>
+                """
+                
+                # Adicionar marcador ao cluster
+                try:
+                    # Garantir que as coordenadas são numéricas
+                    lat_num = float(row[col_lat])
+                    lon_num = float(row[col_lon])
+                    
+                    folium.Marker(
+                        location=[lat_num, lon_num],
+                        popup=folium.Popup(popup_html, max_width=300),
+                        tooltip=row.get(col_comune_orig, 'Localidade'),
+                        icon=folium.Icon(color=cores.get(color, 'gray'))
+                    ).add_to(marker_cluster)
+                except (ValueError, TypeError) as e:
+                    # Registrar erro de conversão (opcionalmente)
+                    print(f"Erro ao converter coordenadas para o registro {row.get(col_id, 'ID?')}: {e}")
+            
+            # Adicionar legenda ao mapa
+            legend_html = '''
+            <div style="position: fixed; bottom: 50px; right: 50px; z-index: 1000; 
+                        background-color: white; padding: 10px; border: 2px solid grey; border-radius: 5px">
+                <p><strong>Legenda</strong></p>
+                <p><i class="fa fa-circle" style="color:green"></i> Match Exato</p>
+                <p><i class="fa fa-circle" style="color:orange"></i> Match Fuzzy</p>
+                <p><i class="fa fa-circle" style="color:blue"></i> Match Parcial</p>
+                <p><i class="fa fa-circle" style="color:cadetblue"></i> Match por Texto</p>
+                <p><i class="fa fa-circle" style="color:purple"></i> Correção Manual</p>
+                <p><i class="fa fa-circle" style="color:red"></i> Correção Província</p>
+            </div>
+            '''
+            m.get_root().html.add_child(folium.Element(legend_html))
+            
+            # Exibir o mapa
+            st.subheader("Mapa Interativo de Processos")
+            
+            # Adicionar CSS para que o mapa ocupe toda a largura da tela e remova margens laterais
+            st.markdown("""
+            <style>
+            /* Estilo para o container do Streamlit - remove margens laterais */
+            [data-testid="stAppViewContainer"] > .main {
+                max-width: 100vw !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+            }
+            
+            /* Estilo específico para a seção do mapa */
+            .mapa-container {
+                margin-left: -4rem !important;
+                margin-right: -4rem !important;
+                width: 100vw !important;
+            }
+            
+            /* Estilos para o mapa */
+            .folium-map {
+                width: 100% !important;
+                height: 500px !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            iframe {
+                width: 100% !important;
+                height: 600px !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # Usar um container HTML com a classe especial para o mapa
+            st.markdown('<div class="mapa-container">', unsafe_allow_html=True)
+            folium_static(m, width=None, height=600)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Adicionar explicação abaixo do mapa
+            st.info("""
+            **Informações do Mapa:**
+            - **Marcadores verdes:** Correspondência exata (Comune+Província)
+            - **Marcadores laranjas:** Correspondência fuzzy (apenas Comune)
+            - **Marcadores azuis:** Correspondência parcial (fragmentos do nome)
+            - **Marcadores azul claro:** Correspondência por texto
+            - **Marcadores roxos:** Correção manual
+            - **Marcadores vermelhos:** Correção por província
+            
+            Clique nos marcadores para ver informações detalhadas de cada processo.
+            """)
+        except ImportError:
+            # Fallback para o mapa padrão do Streamlit
+            st.markdown("""
+            <style>
+            /* Estilo para o container do Streamlit - remove margens laterais */
+            [data-testid="stAppViewContainer"] > .main {
+                max-width: 100vw !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+            }
+            
+            /* Estilo específico para o mapa do Streamlit */
+            .mapa-container {
+                margin-left: -4rem !important;
+                margin-right: -4rem !important;
+                width: 100vw !important;
+            }
+            
+            /* Estilos para o mapa do Streamlit */
+            .element-container:has([data-testid="stDecoration"]) {
+                width: 100% !important;
+                max-width: 100vw !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            st.markdown('<div class="mapa-container">', unsafe_allow_html=True)
+            st.map(df_mapa, latitude=col_lat, longitude=col_lon, size=10, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            st.info("Para uma visualização mais detalhada, instale as bibliotecas folium e streamlit-folium.")
+    else:
+        st.warning("Nenhum processo com coordenadas válidas encontrado para exibir no mapa.")
 
 # Funções auxiliares para formatação de tempo
 def formatar_tempo_meses(meses):
