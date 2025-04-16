@@ -546,4 +546,95 @@ def criar_metricas_tempo_dias(df_comune):
             'tempo_medio': round(tempo_medio, 1)
         }
     
-    return metricas_tempo 
+    return metricas_tempo
+
+def calcular_tempo_solicitacao_providencia(df_comune):
+    """
+    Calcula o tempo de solicitação cruzado com dados de província/comune.
+    Retorna um DataFrame com tempo médio de solicitação por local.
+    
+    Args:
+        df_comune: DataFrame com os dados de COMUNE
+        
+    Returns:
+        DataFrame com o tempo médio de solicitação por provincia/comune
+    """
+    if df_comune.empty:
+        return pd.DataFrame()
+    
+    # Verificar se as colunas necessárias existem
+    colunas_necessarias = ['MOVED_TIME', 'PROVINCIA_ORIG', 'COMUNE_ORIG']
+    
+    # Se as colunas de província e comune não existirem com esses nomes, tentar outros nomes comuns
+    provincia_cols = ['PROVINCIA_ORIG', 'UF_CRM_12_1743018869', 'PROVINCIA_NORM']
+    comune_cols = ['COMUNE_ORIG', 'UF_CRM_12_1722881735827', 'COMUNE_NORM']
+    
+    provincia_col = next((col for col in provincia_cols if col in df_comune.columns), None)
+    comune_col = next((col for col in comune_cols if col in df_comune.columns), None)
+    
+    if not provincia_col or not comune_col or 'MOVED_TIME' not in df_comune.columns:
+        colunas_faltantes = [col for col in ['MOVED_TIME', 'província', 'comune'] 
+                           if (col == 'MOVED_TIME' and col not in df_comune.columns) or
+                              (col == 'província' and not provincia_col) or
+                              (col == 'comune' and not comune_col)]
+        print(f"Colunas ausentes: {colunas_faltantes}")
+        return pd.DataFrame()
+    
+    # Copiar o dataframe para não modificar o original
+    df_calculo = df_comune.copy()
+    
+    # Converter as colunas de data/hora para datetime
+    df_calculo['MOVED_TIME'] = pd.to_datetime(df_calculo['MOVED_TIME'], errors='coerce')
+    
+    # Filtrar apenas registros que possuem valores válidos para as colunas necessárias
+    df_valido = df_calculo.dropna(subset=['MOVED_TIME'])
+    df_valido = df_valido[df_valido[provincia_col].notna() | df_valido[comune_col].notna()]
+    
+    # Verificar se há dados válidos após filtro
+    if df_valido.empty:
+        return pd.DataFrame()
+    
+    # Calcular o tempo de solicitação
+    df_valido['TEMPO_ATUAL'] = pd.Timestamp.now()
+    df_valido['TEMPO_SOLICITACAO'] = df_valido['TEMPO_ATUAL'] - df_valido['MOVED_TIME']
+    
+    # Converter para horas e dias
+    df_valido['TEMPO_SOLICITACAO_HORAS'] = df_valido['TEMPO_SOLICITACAO'].dt.total_seconds() / 3600
+    df_valido['TEMPO_SOLICITACAO_DIAS'] = df_valido['TEMPO_SOLICITACAO_HORAS'] / 24
+    
+    # Agrupar por província
+    resultado_provincia = df_valido.groupby(provincia_col).agg(
+        TEMPO_SOLICITACAO_DIAS=('TEMPO_SOLICITACAO_DIAS', 'mean'),
+        TEMPO_SOLICITACAO_HORAS=('TEMPO_SOLICITACAO_HORAS', 'mean'),
+        QUANTIDADE=('TEMPO_SOLICITACAO_HORAS', 'count'),
+        LATITUDE=('latitude', lambda x: x.dropna().mean() if 'latitude' in df_valido.columns else None),
+        LONGITUDE=('longitude', lambda x: x.dropna().mean() if 'longitude' in df_valido.columns else None)
+    ).reset_index()
+    
+    # Agrupar por comune
+    resultado_comune = df_valido.groupby(comune_col).agg(
+        TEMPO_SOLICITACAO_DIAS=('TEMPO_SOLICITACAO_DIAS', 'mean'),
+        TEMPO_SOLICITACAO_HORAS=('TEMPO_SOLICITACAO_HORAS', 'mean'),
+        QUANTIDADE=('TEMPO_SOLICITACAO_HORAS', 'count'),
+        LATITUDE=('latitude', lambda x: x.dropna().mean() if 'latitude' in df_valido.columns else None),
+        LONGITUDE=('longitude', lambda x: x.dropna().mean() if 'longitude' in df_valido.columns else None)
+    ).reset_index()
+    
+    # Renomear colunas para clareza
+    resultado_provincia = resultado_provincia.rename(columns={provincia_col: 'LOCAL', 'LATITUDE': 'lat', 'LONGITUDE': 'lng'})
+    resultado_provincia['TIPO'] = 'Província'
+    
+    resultado_comune = resultado_comune.rename(columns={comune_col: 'LOCAL', 'LATITUDE': 'lat', 'LONGITUDE': 'lng'})
+    resultado_comune['TIPO'] = 'Comune'
+    
+    # Juntar os dois DataFrames
+    resultado = pd.concat([resultado_provincia, resultado_comune], ignore_index=True)
+    
+    # Arredondar para 2 casas decimais
+    resultado['TEMPO_SOLICITACAO_DIAS'] = resultado['TEMPO_SOLICITACAO_DIAS'].round(1)
+    resultado['TEMPO_SOLICITACAO_HORAS'] = resultado['TEMPO_SOLICITACAO_HORAS'].round(1)
+    
+    # Ordenar do maior tempo para o menor
+    resultado = resultado.sort_values('TEMPO_SOLICITACAO_DIAS', ascending=False)
+    
+    return resultado 

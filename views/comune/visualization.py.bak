@@ -3182,6 +3182,7 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
         return
     
     # Verificar se temos uma variável df_comune na sessão do Streamlit
+    # Isso é mais seguro que tentar importar novamente
     try:
         # Tentar obter o df_comune da sessão
         import streamlit as st
@@ -3415,14 +3416,23 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
     df_tabela_detalhada['Tempo (dias)'] = df_tabela_detalhada['TEMPO_SOLICITACAO_DIAS'].round(1)
     df_tabela_detalhada['Tempo (meses)'] = (df_tabela_detalhada['TEMPO_SOLICITACAO_DIAS'] / 30).round(2)
     
-    # Associar títulos dos cards com base na localidade
+    # 1. Obter os títulos dos cards de todo o DataFrame df_comune que contém os dados do Bitrix
     if tem_dados_bitrix and df_comune is not None:
-        # Verificar se temos as colunas necessárias para associar títulos
+        # Adicionar flag para depuração
+        st.warning("ETAPA 1: Associando títulos dos cards com base na localidade...")
+        
+        # Verificar se temos as colunas necessárias para associar
+        # Assumindo que df_comune tem título em TITLE e localidade em uma das colunas como PROVINCIA_ORIG ou COMUNE_ORIG
+        # Verificar se as colunas de província e comune existem
         provincia_cols = ['PROVINCIA_ORIG', 'UF_CRM_12_1743018869', 'PROVINCIA_NORM']
         comune_cols = ['COMUNE_ORIG', 'UF_CRM_12_1722881735827', 'COMUNE_NORM']
         
         provincia_col = next((col for col in provincia_cols if col in df_comune.columns), None)
         comune_col = next((col for col in comune_cols if col in df_comune.columns), None)
+        
+        # Exibir informações sobre colunas disponíveis para debug
+        st.write(f"Colunas de província disponíveis: {[col for col in provincia_cols if col in df_comune.columns]}")
+        st.write(f"Colunas de comune disponíveis: {[col for col in comune_cols if col in df_comune.columns]}")
         
         # Verificar se TITLE existe em df_comune
         if 'TITLE' in df_comune.columns:
@@ -3448,7 +3458,8 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
                         if titulos:
                             titulos_por_comune[str(local).lower().strip()] = titulos[0]
             
-            # Associar títulos à nossa tabela detalhada
+            # Agora associar títulos à nossa tabela detalhada
+            # Criar a coluna de Título do Card
             df_tabela_detalhada['Título do Card'] = df_tabela_detalhada['LOCAL']
             
             # Iterar pelas linhas e tentar encontrar um título
@@ -3465,6 +3476,8 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
     else:
         # Se não tivermos df_comune, apenas usar LOCAL como título
         df_tabela_detalhada['Título do Card'] = df_tabela_detalhada['LOCAL']
+        if not tem_dados_bitrix:
+            st.warning("Dados do Bitrix24 não disponíveis. Usando nomes de localidade como títulos.")
     
     # Renomear colunas para melhor visualização
     df_tabela_detalhada = df_tabela_detalhada.rename(columns={

@@ -1,7 +1,7 @@
 import streamlit as st
 from .data_loader import carregar_dados_comune, carregar_dados_negocios, carregar_estagios_bitrix
-from .analysis import criar_visao_geral_comune, criar_visao_macro, cruzar_comune_deal, analisar_distribuicao_deals, analisar_registros_sem_correspondencia, calcular_tempo_solicitacao, criar_metricas_certidoes, criar_metricas_tempo_dias
-from .visualization import visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro, visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia, visualizar_tempo_solicitacao, visualizar_metricas_certidoes, visualizar_metricas_tempo_dias, visualizar_analise_evidencia, visualizar_providencias
+from .analysis import criar_visao_geral_comune, criar_visao_macro, cruzar_comune_deal, analisar_distribuicao_deals, analisar_registros_sem_correspondencia, calcular_tempo_solicitacao, criar_metricas_certidoes, criar_metricas_tempo_dias, calcular_tempo_solicitacao_providencia
+from .visualization import visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro, visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia, visualizar_tempo_solicitacao, visualizar_metricas_certidoes, visualizar_metricas_tempo_dias, visualizar_analise_evidencia, visualizar_providencias, visualizar_tempo_solicitacao_providencia
 import pandas as pd
 import io
 from datetime import datetime
@@ -99,6 +99,9 @@ def show_comune():
     with st.spinner("Carregando dados..."):
         df_comune = carregar_dados_comune(force_reload=force_reload)
         df_deal, df_deal_uf = carregar_dados_negocios(force_reload=force_reload)
+        
+        # Salvar o df_comune na sessão para uso em outras funções
+        st.session_state['df_comune'] = df_comune
     
     if df_comune.empty:
         st.warning("Não foi possível carregar os dados de COMUNE. Verifique a conexão com o Bitrix24.")
@@ -137,7 +140,7 @@ def show_comune():
     # Mostrar todas as informações relevantes em abas
     if not df_comune.empty:
         # Criar abas para organizar o conteúdo
-        tab1, tab2, tab3, tab4, tab_metricas, tab_tempo_dias, tab_tempo_solicitacao, tab_evidencia, tab_providencia = st.tabs([
+        tab1, tab2, tab3, tab4, tab_metricas, tab_tempo_dias, tab_tempo_solicitacao, tab_evidencia, tab_providencia, tab_tempo_providencia = st.tabs([
             "Distribuição por Estágio", 
             "Dados Detalhados", 
             "Funil Detalhado", 
@@ -146,7 +149,8 @@ def show_comune():
             "⏳ Tempo em Dias",
             "⏱️ Tempo de Solicitação",
             "📄 Evidencia Comprovante",
-            "🇮🇹 Providencia"
+            "🇮🇹 Providencia",
+            "🗺️ Tempo x Providência"
         ])
         
         # Aba 1: Visão Macro
@@ -487,6 +491,14 @@ def show_comune():
         with tab_providencia:
             # Chamar a função de visualização por providência
             visualizar_providencias(df_comune)
+            
+        # --- NOVA ABA Tempo de Solicitação por Providência ---
+        with tab_tempo_providencia:
+            # Calcular o tempo de solicitação por providência
+            df_tempo_providencia = calcular_tempo_solicitacao_providencia(df_comune)
+            
+            # Visualizar o cruzamento entre tempo de solicitação e providência
+            visualizar_tempo_solicitacao_providencia(df_tempo_providencia)
     
     # Adicionar download dos dados
     if not df_comune.empty:
