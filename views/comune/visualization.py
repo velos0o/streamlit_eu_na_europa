@@ -3456,6 +3456,31 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
                     'provincia_norm': 'Província'
                 })
                 
+                # Adicionar tempo médio de solicitação por província
+                # Criar um dicionário mapeando cada província para seu tempo médio de solicitação
+                tempo_medio_por_provincia = {}
+                for idx, row in df_filtrado.iterrows():
+                    provincia_norm = normalizar_provincia(row['LOCAL'])
+                    tempo_medio_por_provincia[provincia_norm] = row['TEMPO_SOLICITACAO_DIAS']
+                
+                # Adicionar coluna de tempo médio ao dataframe agrupado
+                df_agrupado['Tempo Médio (dias)'] = df_agrupado['Província'].apply(
+                    lambda x: tempo_medio_por_provincia.get(x, 0)
+                )
+                
+                # Adicionar coluna de tempo formatado em texto
+                def formatar_tempo_texto(dias):
+                    if dias < 1:
+                        horas = dias * 24
+                        return f"{int(horas)} horas"
+                    elif dias < 30:
+                        return f"{int(dias)} dias"
+                    else:
+                        meses = dias / 30
+                        return f"{meses:.1f} meses"
+                
+                df_agrupado['Tempo Médio'] = df_agrupado['Tempo Médio (dias)'].apply(formatar_tempo_texto)
+                
                 # Ordenar por quantidade (decrescente)
                 df_agrupado = df_agrupado.sort_values(['Quantidade'], ascending=[False])
                 
@@ -3464,7 +3489,13 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
                     df_agrupado,
                     use_container_width=True,
                     hide_index=True,
-                    height=400
+                    height=400,
+                    column_config={
+                        "Província": st.column_config.TextColumn("Província", width="large"),
+                        "Quantidade": st.column_config.NumberColumn("Quantidade de Processos", width="medium"),
+                        "Tempo Médio (dias)": st.column_config.NumberColumn("Tempo Médio (dias)", format="%.1f", width="medium"),
+                        "Tempo Médio": st.column_config.TextColumn("Tempo Médio", width="medium")
+                    }
                 )
                 
                 # Opção para download
