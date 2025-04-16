@@ -5,5 +5,13 @@ secondaryBackgroundColor = "#F5F5F5"
 textColor = "#212121"
 font = "sans-serif"
 
+# Configuração de tema alternativo (escuro)
+# Será usado automaticamente quando o usuário selecionar o tema escuro no navegador
+[theme.dark]
+primaryColor = "#60A5FA"
+backgroundColor = "#111827"
+secondaryBackgroundColor = "#1F2937"
+textColor = "#F9FAFB"
+
 [browser]
 gatherUsageStats = false 

@@ -46,6 +46,19 @@ def show_guide_sidebar():
         st.markdown("- Consultas específicas por período/tipo")
         st.markdown("- Exportação para Excel/CSV")
         
+        st.markdown("#### 🎫 Tickets")
+        st.markdown("- Visão geral dos tickets de suporte")
+        st.markdown("- Estatísticas por departamento")
+        st.markdown("- Tempo médio de resolução")
+        st.markdown("- Histórico completo de tickets")
+        
+        st.markdown("#### ⚠️ Reclamações")
+        st.markdown("- Gestão completa de reclamações")
+        st.markdown("- Estatísticas por origem e departamento")
+        st.markdown("- Tendências temporais de reclamações")
+        st.markdown("- Filtros avançados por status e responsável")
+        st.markdown("- **Modo escuro exclusivo** para análise noturna")
+        
         # Adicionando uma seção específica para buscas comuns
         st.markdown("### Buscas frequentes")
         st.markdown("👉 [Certidões entregues](#) - Ver em Cartório")
@@ -216,6 +229,63 @@ def show_page_guide(pagina):
             **Como usar**: Defina claramente os filtros antes de exportar para obter exatamente os dados necessários.
             
             **Dica**: Utilize os modelos de relatório para análises recorrentes, economizando tempo de configuração.
+            """)
+            
+        elif pagina == "Tickets":
+            st.markdown("""
+            ### Guia da Página: Tickets de Suporte
+            
+            Acompanhe e analise os tickets de suporte:
+            
+            - **Visão Geral**: 
+              - Total de tickets abertos e fechados
+              - Distribuição por tipo e prioridade
+              - Taxa de resolução e tempo médio
+              
+            - **Análise Temporal**: 
+              - Evolução de tickets ao longo do tempo
+              - Comparativo entre períodos
+              - Identificação de picos de demanda
+              
+            - **Detalhamento**: 
+              - Lista completa de tickets com filtros
+              - Informações detalhadas por ticket
+              - Histórico de interações
+            
+            **Como usar**: Utilize os filtros para focar em períodos específicos ou tipos de tickets.
+            
+            **Dica**: Compare diferentes períodos para identificar padrões e tendências na demanda de suporte.
+            """)
+
+        elif pagina == "Reclamações":
+            st.markdown("""
+            ### Guia da Página: Gestão de Reclamações
+            
+            Monitore e analise as reclamações de clientes com interface adaptativa:
+            
+            - **Visão Geral**: 
+              - Total de reclamações recebidas
+              - Distribuição por status (Novas, Em análise, Respondidas, etc.)
+              - Taxa de resolução e estatísticas gerais
+              
+            - **Análises Visuais**: 
+              - Gráficos de distribuição por origem e departamento
+              - Tendências temporais de reclamações
+              - Comparativo por responsável
+              
+            - **Detalhamento e Filtros**: 
+              - Filtros avançados por status, departamento e origem
+              - Lista detalhada com informações completas
+              - Visualização individual de cada reclamação
+            
+            - **Modo Escuro**: 
+              - Interface adaptativa com modo escuro exclusivo
+              - Ideal para análise noturna e redução de fadiga visual
+              - Ative com o botão de alternância no topo da página
+            
+            **Como usar**: Alterne entre os modos claro e escuro usando o botão no topo da página. Utilize os filtros para análises específicas por departamento ou status.
+            
+            **Dica**: Observe as tendências temporais para identificar padrões e picos de reclamações que possam indicar problemas sistemáticos.
             """)
             
         elif pagina == "Apresentação Conclusões":

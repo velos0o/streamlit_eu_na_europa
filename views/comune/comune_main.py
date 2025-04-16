@@ -2,6 +2,14 @@ import streamlit as st
 from .data_loader import carregar_dados_comune, carregar_dados_negocios, carregar_estagios_bitrix
 from .analysis import criar_visao_geral_comune, criar_visao_macro, cruzar_comune_deal, analisar_distribuicao_deals, analisar_registros_sem_correspondencia, calcular_tempo_solicitacao, criar_metricas_certidoes, criar_metricas_tempo_dias, calcular_tempo_solicitacao_providencia
 from .visualization import visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro, visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia, visualizar_tempo_solicitacao, visualizar_metricas_certidoes, visualizar_metricas_tempo_dias, visualizar_analise_evidencia, visualizar_providencias, visualizar_tempo_solicitacao_providencia
+
+# Forçar recarregamento do módulo de visualização
+import importlib
+import views.comune.visualization
+importlib.reload(views.comune.visualization)
+# Reimportar a função após o reload do módulo
+from views.comune.visualization import visualizar_tempo_solicitacao_providencia
+
 import pandas as pd
 import io
 from datetime import datetime
@@ -149,8 +157,8 @@ def show_comune():
             "⏳ Tempo em Dias",
             "⏱️ Tempo de Solicitação",
             "📄 Evidencia Comprovante",
-            "🇮🇹 Providencia",
-            "🗺️ Tempo x Providência"
+            "🇮🇹 PROVÍNCIA",
+            "🗺️ Tempo x Província"
         ])
         
         # Aba 1: Visão Macro
@@ -487,7 +495,7 @@ def show_comune():
             # Chamar a função de visualização da análise de evidência
             visualizar_analise_evidencia(df_comune)
             
-        # --- NOVA ABA Providencia ---
+        # --- NOVA ABA PROVÍNCIA ---
         with tab_providencia:
             # Chamar a função de visualização por providência
             visualizar_providencias(df_comune)

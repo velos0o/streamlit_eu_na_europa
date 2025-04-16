@@ -3169,8 +3169,8 @@ def visualizar_providencias(df_comune):
 
 def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
     """
-    Visualiza o cruzamento entre tempo de solicitação e providência,
-    incluindo mapa colorido por tempo de solicitação e cards por localidade.
+    Visualiza o cruzamento entre tempo de solicitação e província,
+    incluindo mapa colorido por tempo de solicitação e tabela de estágios por província.
     
     Args:
         df_tempo_providencia: DataFrame com o tempo médio de solicitação por local,
@@ -3178,7 +3178,7 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
                               TEMPO_SOLICITACAO_HORAS, QUANTIDADE, lat, lng
     """
     if df_tempo_providencia.empty:
-        st.warning("Não há dados disponíveis para visualização do tempo de solicitação por providência.")
+        st.warning("Não há dados disponíveis para visualização do tempo de solicitação por província.")
         return
     
     # Verificar se temos uma variável df_comune na sessão do Streamlit
@@ -3199,9 +3199,9 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
     st.markdown("""
     <h3 style="font-size: 26px; font-weight: 800; color: #1A237E; margin: 30px 0 15px 0; 
     padding-bottom: 8px; border-bottom: 2px solid #E0E0E0; font-family: Arial, Helvetica, sans-serif;">
-    TEMPO DE SOLICITAÇÃO POR LOCALIDADE</h3>
+    TEMPO DE SOLICITAÇÃO POR PROVÍNCIA</h3>
     <p style='text-align: center; font-size: 16px; color: #555; margin-bottom: 20px; font-family: Arial, Helvetica, sans-serif;'>
-    Análise do tempo médio de solicitação por Comune e Província</p>
+    Análise do tempo médio de solicitação por província e estágios relacionados</p>
     """, unsafe_allow_html=True)
     
     # Adicionar descrição
@@ -3214,57 +3214,58 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
                 font-family: Arial, Helvetica, sans-serif;">
         <p style="font-size: 16px; margin: 0; color: #333; font-weight: 500;">
             Esta análise apresenta o tempo médio de solicitação calculado a partir do momento 
-            em que o registro entrou no sistema até o momento atual, agrupado por localidade.
-            O mapa permite visualizar geograficamente a distribuição dos tempos de solicitação.
+            em que o registro entrou no sistema até o momento atual, agrupado por província.
+            O mapa permite visualizar geograficamente a distribuição dos tempos de solicitação,
+            e a tabela mostra os estágios agrupados por província.
         </p>
     </div>
     """, unsafe_allow_html=True)
     
+    # Filtrar apenas províncias
+    df_provincias = df_tempo_providencia[df_tempo_providencia['TIPO'] == 'Província'].copy()
+    
+    if df_provincias.empty:
+        st.warning("Não há dados de províncias disponíveis para visualização.")
+        return
+    
     # Configurar filtros
     st.subheader("Filtros de Análise")
     
-    col1, col2 = st.columns(2)
+    # Slider para filtrar por tempo
+    tempo_min = int(df_provincias['TEMPO_SOLICITACAO_DIAS'].min())
+    tempo_max = int(df_provincias['TEMPO_SOLICITACAO_DIAS'].max()) + 1
     
-    with col1:
-        tipo_local = st.radio(
-            "Tipo de localidade:",
-            options=["Todos", "Comune", "Província"],
-            index=0,
-            horizontal=True
-        )
-    
-    with col2:
-        tempo_min = int(df_tempo_providencia['TEMPO_SOLICITACAO_DIAS'].min())
-        tempo_max = int(df_tempo_providencia['TEMPO_SOLICITACAO_DIAS'].max()) + 1
-        
-        faixa_tempo = st.slider(
-            "Faixa de tempo (dias):",
-            min_value=tempo_min,
-            max_value=tempo_max,
-            value=(tempo_min, tempo_max),
-            step=1
-        )
+    faixa_tempo = st.slider(
+        "Faixa de tempo (dias):",
+        min_value=tempo_min,
+        max_value=tempo_max,
+        value=(tempo_min, tempo_max),
+        step=1
+    )
     
     # Filtrar dados com base nos filtros selecionados
-    df_filtrado = df_tempo_providencia.copy()
-    
-    if tipo_local != "Todos":
-        df_filtrado = df_filtrado[df_filtrado['TIPO'] == tipo_local]
-    
-    df_filtrado = df_filtrado[(df_filtrado['TEMPO_SOLICITACAO_DIAS'] >= faixa_tempo[0]) & 
-                             (df_filtrado['TEMPO_SOLICITACAO_DIAS'] <= faixa_tempo[1])]
+    df_filtrado = df_provincias[(df_provincias['TEMPO_SOLICITACAO_DIAS'] >= faixa_tempo[0]) & 
+                         (df_provincias['TEMPO_SOLICITACAO_DIAS'] <= faixa_tempo[1])].copy()
     
     # Mostrar contagem de registros filtrados
-    st.info(f"Exibindo {len(df_filtrado)} localidades que atendem aos critérios de filtro.")
+    st.info(f"Exibindo {len(df_filtrado)} províncias que atendem aos critérios de tempo: {faixa_tempo[0]}-{faixa_tempo[1]} dias.")
     
-    # Criar o mapa de tempo de solicitação
-    st.subheader("Mapa de Tempo de Solicitação")
+    # Título do mapa
+    st.subheader("Mapa de Tempo de Solicitação por Província")
     
-    # Configurar layout para o mapa ocupar mais espaço
+    # Configurar layout para o mapa ocupar toda a largura disponível
     st.markdown("""
     <style>
-    /* Expandir o mapa para ocupar toda a largura disponível */
-    [data-testid="stAppViewContainer"] .main .block-container {
+    /* Expandir o mapa para ocupar a largura máxima disponível */
+    .main .block-container {
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+    
+    /* Garantir que o conteúdo se expanda na largura */
+    .css-1d391kg, .css-1a32fsj, .css-18e3th9, .css-1r6slb0 {
+        width: 100% !important;
         max-width: 100% !important;
         padding-left: 0 !important;
         padding-right: 0 !important;
@@ -3272,17 +3273,34 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
     
     /* Estilo para a seção do mapa */
     .fullwidth-map {
-        width: 100% !important;
-        margin-left: -20px !important;
-        margin-right: -20px !important;
-        padding: 0 !important;
+        width: 100vw !important;
+        position: relative !important;
+        left: 50% !important;
+        right: 50% !important;
+        margin-left: -50vw !important;
+        margin-right: -50vw !important;
     }
     
     /* Ajustar iframe do mapa */
     iframe {
         width: 100% !important;
-        min-height: 800px !important;
+        min-height: 650px !important;
         border: none !important;
+    }
+    
+    /* Estilos adicionais para garantir largura total */
+    [data-testid="stVerticalBlock"] {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    
+    /* Remover padding dos containers */
+    .stApp {
+        max-width: 100vw !important;
+    }
+    
+    .main {
+        max-width: 100% !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -3325,7 +3343,7 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
             # Adicionar um cluster de marcadores
             marker_cluster = MarkerCluster().add_to(m)
             
-            # Adicionar marcadores para cada localidade
+            # Adicionar marcadores para cada província
             for idx, row in df_com_coord.iterrows():
                 # Obter cor com base no tempo
                 cor = get_color(row['TEMPO_SOLICITACAO_DIAS'])
@@ -3384,7 +3402,7 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
             
             # Exibir o mapa
             st.markdown('<div class="fullwidth-map">', unsafe_allow_html=True)
-            folium_static(m, width=2000, height=800)
+            folium_static(m, width=None, height=600)
             st.markdown('</div>', unsafe_allow_html=True)
         except ImportError:
             st.warning("Para visualização aprimorada de mapas, instale: pip install folium streamlit-folium")
@@ -3393,18 +3411,86 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
             st.dataframe(df_com_coord[['LOCAL', 'TIPO', 'TEMPO_SOLICITACAO_DIAS', 'QUANTIDADE', 'lat', 'lng']])
     else:
         if tem_coordenadas:
-            st.warning("Nenhuma localidade com coordenadas encontrada para os filtros selecionados.")
+            st.warning("Nenhuma província com coordenadas encontrada para os filtros selecionados.")
         else:
             st.error("Não foi possível encontrar coordenadas geográficas nos dados.")
+    
+    # Tabela de estágios por província
+    st.subheader("Estágios por Província")
+    
+    # Verificar se temos df_comune disponível para analisar estágios
+    if tem_dados_bitrix and df_comune is not None:
+        # Verificar quais colunas estão disponíveis para associar estágios
+        provincia_cols = ['PROVINCIA_ORIG', 'UF_CRM_12_1743018869', 'PROVINCIA_NORM']
+        
+        # Encontrar a primeira coluna de província que existe no df_comune
+        provincia_col = next((col for col in provincia_cols if col in df_comune.columns), None)
+        
+        if provincia_col and 'STAGE_NAME' in df_comune.columns:
+            # Criar uma função para normalizar nomes de províncias para matching
+            def normalizar_provincia(prov):
+                if pd.isna(prov):
+                    return "não especificado"
+                prov_str = str(prov).lower().strip()
+                # Remover acentos
+                prov_norm = unicodedata.normalize('NFKD', prov_str).encode('ASCII', 'ignore').decode('utf-8')
+                return prov_norm
+            
+            # Aplicar normalização às províncias no df_comune
+            df_comune['provincia_norm'] = df_comune[provincia_col].apply(normalizar_provincia)
+            
+            # Filtrar apenas províncias que estão na faixa de tempo selecionada
+            provincias_filtradas = [
+                normalizar_provincia(prov) for prov in df_filtrado['LOCAL'].unique()
+            ]
+            
+            # Filtrar df_comune para incluir apenas as províncias selecionadas
+            df_providencias = df_comune[df_comune['provincia_norm'].isin(provincias_filtradas)].copy()
+            
+            if not df_providencias.empty:
+                # Agrupar SOMENTE por província, removendo a coluna STAGE_NAME do agrupamento
+                df_agrupado = df_providencias.groupby(['provincia_norm']).size().reset_index(name='Quantidade')
+                
+                # Renomear colunas para exibição
+                df_agrupado = df_agrupado.rename(columns={
+                    'provincia_norm': 'Província'
+                })
+                
+                # Ordenar por quantidade (decrescente)
+                df_agrupado = df_agrupado.sort_values(['Quantidade'], ascending=[False])
+                
+                # Exibir tabela agrupada
+                st.dataframe(
+                    df_agrupado,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=400
+                )
+                
+                # Opção para download
+                csv = df_agrupado.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Exportar quantidades por província",
+                    data=csv,
+                    file_name=f"quantidades_por_provincia_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv",
+                    key="download-estagios-csv"
+                )
+            else:
+                st.warning("Não há dados de estágios para as províncias selecionadas.")
+        else:
+            st.warning("Colunas necessárias para análise de estágios não encontradas nos dados.")
+    else:
+        st.warning("Dados do Bitrix24 não disponíveis para análise de estágios.")
     
     # Criar tabela detalhada
     st.markdown("""
     <h3 style="font-size: 24px; font-weight: 800; color: #1A237E; margin: 30px 0 20px 0; 
                padding-bottom: 8px; border-bottom: 2px solid #E0E0E0;">
-    Tempo de Processamento por Localidade
+    Tempo de Processamento por Província
     </h3>
     <p style="font-size: 16px; color: #555; margin-bottom: 20px;">
-    Visualização detalhada do tempo de solicitação por localidade, ordenado do maior para o menor tempo.
+    Visualização detalhada do tempo de solicitação por província, ordenado do maior para o menor tempo.
     </p>
     """, unsafe_allow_html=True)
     
@@ -3415,71 +3501,41 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
     df_tabela_detalhada['Tempo (dias)'] = df_tabela_detalhada['TEMPO_SOLICITACAO_DIAS'].round(1)
     df_tabela_detalhada['Tempo (meses)'] = (df_tabela_detalhada['TEMPO_SOLICITACAO_DIAS'] / 30).round(2)
     
-    # Associar títulos dos cards com base na localidade
-    if tem_dados_bitrix and df_comune is not None:
-        # Verificar se temos as colunas necessárias para associar títulos
-        provincia_cols = ['PROVINCIA_ORIG', 'UF_CRM_12_1743018869', 'PROVINCIA_NORM']
-        comune_cols = ['COMUNE_ORIG', 'UF_CRM_12_1722881735827', 'COMUNE_NORM']
+    # Associar títulos dos cards com base na província
+    if tem_dados_bitrix and df_comune is not None and 'TITLE' in df_comune.columns and provincia_col:
+        # Criar dicionário de título por província
+        titulos_por_provincia = {}
         
-        provincia_col = next((col for col in provincia_cols if col in df_comune.columns), None)
-        comune_col = next((col for col in comune_cols if col in df_comune.columns), None)
+        for local, group in df_comune.groupby(provincia_col):
+            # Para cada província, pegar um título representativo
+            if not pd.isna(local) and local:
+                titulos = group['TITLE'].dropna().unique().tolist()
+                if titulos:
+                    titulos_por_provincia[str(local).lower().strip()] = titulos[0]
         
-        # Verificar se TITLE existe em df_comune
-        if 'TITLE' in df_comune.columns:
-            # Criar dicionários de título por localidade
-            titulos_por_provincia = {}
-            titulos_por_comune = {}
+        # Associar títulos à tabela detalhada
+        df_tabela_detalhada['Título do Card'] = df_tabela_detalhada['LOCAL']
+        
+        # Iterar pelas linhas e tentar encontrar um título
+        for idx, row in df_tabela_detalhada.iterrows():
+            local = str(row['LOCAL']).lower().strip() if not pd.isna(row['LOCAL']) else ""
             
-            # Se temos coluna de província, criar mapeamento
-            if provincia_col:
-                for local, group in df_comune.groupby(provincia_col):
-                    # Para cada província, pegar um título representativo (primeiro ou mais comum)
-                    if not pd.isna(local) and local:
-                        titulos = group['TITLE'].dropna().unique().tolist()
-                        if titulos:
-                            titulos_por_provincia[str(local).lower().strip()] = titulos[0]
-            
-            # Se temos coluna de comune, criar mapeamento
-            if comune_col:
-                for local, group in df_comune.groupby(comune_col):
-                    # Para cada comune, pegar um título representativo
-                    if not pd.isna(local) and local:
-                        titulos = group['TITLE'].dropna().unique().tolist()
-                        if titulos:
-                            titulos_por_comune[str(local).lower().strip()] = titulos[0]
-            
-            # Associar títulos à nossa tabela detalhada
-            df_tabela_detalhada['Título do Card'] = df_tabela_detalhada['LOCAL']
-            
-            # Iterar pelas linhas e tentar encontrar um título
-            for idx, row in df_tabela_detalhada.iterrows():
-                local = str(row['LOCAL']).lower().strip() if not pd.isna(row['LOCAL']) else ""
-                tipo = row['TIPO']
-                
-                if tipo == 'Província' and local in titulos_por_provincia:
-                    df_tabela_detalhada.at[idx, 'Título do Card'] = titulos_por_provincia[local]
-                elif tipo == 'Comune' and local in titulos_por_comune:
-                    df_tabela_detalhada.at[idx, 'Título do Card'] = titulos_por_comune[local]
-        else:
-            df_tabela_detalhada['Título do Card'] = df_tabela_detalhada['LOCAL']
+            if local in titulos_por_provincia:
+                df_tabela_detalhada.at[idx, 'Título do Card'] = titulos_por_provincia[local]
     else:
-        # Se não tivermos df_comune, apenas usar LOCAL como título
+        # Se não tivermos df_comune ou as colunas necessárias, apenas usar LOCAL como título
         df_tabela_detalhada['Título do Card'] = df_tabela_detalhada['LOCAL']
     
     # Renomear colunas para melhor visualização
     df_tabela_detalhada = df_tabela_detalhada.rename(columns={
-        'LOCAL': 'Nome da Localidade',
-        'TIPO': 'Tipo de Localidade',
+        'LOCAL': 'Nome da Província',
         'QUANTIDADE': 'Quantidade'
     })
-
-    # Usar o tipo de localidade (Comune/Província) como coluna "Providência"
-    df_tabela_detalhada['Providência'] = df_tabela_detalhada['Tipo de Localidade']
     
     # Adicionar controle de ordenação
     ordenacao = st.selectbox(
         "Ordenar por:",
-        options=["Tempo (maior para menor)", "Tempo (menor para maior)", "Providência", "Nome da Localidade", "Título do Card"],
+        options=["Tempo (maior para menor)", "Tempo (menor para maior)", "Nome da Província", "Título do Card"],
         index=0
     )
     
@@ -3488,15 +3544,13 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
         df_tabela_detalhada = df_tabela_detalhada.sort_values('Tempo (dias)', ascending=False)
     elif ordenacao == "Tempo (menor para maior)":
         df_tabela_detalhada = df_tabela_detalhada.sort_values('Tempo (dias)', ascending=True)
-    elif ordenacao == "Providência":
-        df_tabela_detalhada = df_tabela_detalhada.sort_values(['Providência', 'Nome da Localidade'])
     elif ordenacao == "Título do Card":
         df_tabela_detalhada = df_tabela_detalhada.sort_values('Título do Card')
-    else:  # Nome da Localidade
-        df_tabela_detalhada = df_tabela_detalhada.sort_values('Nome da Localidade')
+    else:  # Nome da Província
+        df_tabela_detalhada = df_tabela_detalhada.sort_values('Nome da Província')
     
-    # Selecionar colunas para exibição (colocando Título do Card como primeira coluna)
-    colunas_exibir = ['Título do Card', 'Nome da Localidade', 'Providência', 'Tempo (dias)', 'Tempo (meses)', 'Quantidade']
+    # Selecionar colunas para exibição
+    colunas_exibir = ['Título do Card', 'Nome da Província', 'Tempo (dias)', 'Tempo (meses)', 'Quantidade']
     
     # Exibir tabela com formatação condicional
     st.dataframe(
@@ -3505,8 +3559,7 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
         hide_index=True,
         column_config={
             "Título do Card": st.column_config.TextColumn("Título do Card no Bitrix24", width="large"),
-            "Nome da Localidade": st.column_config.TextColumn("Nome da Localidade", width="large"),
-            "Providência": st.column_config.TextColumn("Tipo de Localidade", width="medium"),
+            "Nome da Província": st.column_config.TextColumn("Nome da Província", width="large"),
             "Tempo (dias)": st.column_config.NumberColumn("Tempo de Solicitação (dias)", format="%.1f", width="medium"),
             "Tempo (meses)": st.column_config.NumberColumn("Tempo de Solicitação (meses)", format="%.2f", width="medium"),
             "Quantidade": st.column_config.NumberColumn("Quantidade de Processos", width="medium")
@@ -3518,7 +3571,7 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
     st.download_button(
         label="📥 Exportar tabela completa (CSV)",
         data=csv,
-        file_name=f"tempo_solicitacao_por_localidade_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        file_name=f"tempo_solicitacao_por_provincia_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv",
-        key="download-tempo-localidade-csv"
+        key="download-tempo-provincia-csv"
     )

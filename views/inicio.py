@@ -115,7 +115,7 @@ def show_inicio():
     except Exception as e:
         st.error(f"Erro ao carregar dados: {str(e)}")
         if st.button("Tentar novamente"):
-            st.experimental_rerun()
+            st.rerun()
     
     # Resumo do projeto
     st.markdown("""
@@ -131,7 +131,7 @@ def show_inicio():
     # Botão para recarregar dados manualmente
     if st.button("Atualizar Dados"):
         st.session_state['force_reload'] = True
-        st.experimental_rerun()
+        st.rerun()
     
     # Exibir as informações se houver dados
     if 'home_data' in st.session_state and not st.session_state['home_data'].empty:

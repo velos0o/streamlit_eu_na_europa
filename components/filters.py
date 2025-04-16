@@ -151,6 +151,6 @@ def create_filter_section(df, include_date=True, include_responsible=True, inclu
                 
         # Botão para aplicar os filtros
         if st.button("Aplicar Filtros", use_container_width=True):
-            st.experimental_rerun()
+            st.rerun()
     
     return filters 
