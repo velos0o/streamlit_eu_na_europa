@@ -26,7 +26,7 @@ openpyxl==3.1.2          # Manipulação avançada de arquivos Excel
 
 # Biblioteca opcional para animações de carregamento
 streamlit-lottie==0.0.5  # Animações Lottie no Streamlit
-treamlit-theme-editor==0.0.2 
+streamlit-theme-editor==0.0.2 
 # Bibliotecas para mapas interativos
 folium==0.19.5           # Criação de mapas interativos
 streamlit-folium==0.24.0 # Integração Folium com Streamlit
