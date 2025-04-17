@@ -28,8 +28,8 @@ from views.apresentacao import show_apresentacao
 from views.comune.comune_main import show_comune
 # Importar nova página de Tickets
 from views.tickets import show_tickets
-# Importar nova página de Reclamações
-from views.reclamacoes import show_reclamacoes
+# Importar nova página de Reclamações (caminho atualizado)
+from views.reclamacoes.reclamacoes_main import show_reclamacoes
 
 # Importar os novos componentes do guia de relatório
 from components.report_guide import show_guide_sidebar, show_page_guide, show_contextual_help
@@ -282,14 +282,14 @@ try:
         show_tickets()
         
     elif pagina == "Reclamações":
-        # Definir as seções para o sumário da página
+        # Definir as seções para o sumário da página (atualizado)
         sections = [
-            {"label": "Visão Geral", "anchor": "visao_geral", "icon": "📊"},
+            {"label": "Visão Geral", "anchor": "visao_geral", "icon": "📊"}, # O anchor pode ser o próprio subheader se não houver um explícito
             {"label": "Tendência", "anchor": "tendencia", "icon": "📈"},
-            {"label": "Detalhes", "anchor": "detalhes", "icon": "🔍"}
+            {"label": "Detalhes", "anchor": "detalhes_das_reclamacoes", "icon": "🔍"} # Usar o anchor do subheader em details.py
         ]
         render_toc(sections, "Navegação Rápida", horizontal=True)
-        show_reclamacoes()
+        show_reclamacoes() # Função importada do novo local
         
     elif pagina == "Apresentação Conclusões":
         # Verificar se há parâmetro 'slide' na URL
