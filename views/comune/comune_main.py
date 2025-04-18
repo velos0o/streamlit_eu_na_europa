@@ -1,14 +1,24 @@
 import streamlit as st
 from .data_loader import carregar_dados_comune, carregar_dados_negocios, carregar_estagios_bitrix
 from .analysis import criar_visao_geral_comune, criar_visao_macro, cruzar_comune_deal, analisar_distribuicao_deals, analisar_registros_sem_correspondencia, calcular_tempo_solicitacao, criar_metricas_certidoes, criar_metricas_tempo_dias, calcular_tempo_solicitacao_providencia
-from .visualization import visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro, visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia, visualizar_tempo_solicitacao, visualizar_metricas_certidoes, visualizar_metricas_tempo_dias, visualizar_analise_evidencia, visualizar_providencias, visualizar_tempo_solicitacao_providencia
+from .visualization import (
+    visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro,
+    visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia,
+    visualizar_tempo_solicitacao, visualizar_metricas_certidoes,
+    visualizar_metricas_tempo_dias, visualizar_analise_evidencia,
+    visualizar_providencias, visualizar_tempo_solicitacao_providencia,
+    visualizar_tempo_solicitacao_individual
+)
 
 # Forçar recarregamento do módulo de visualização
 import importlib
 import views.comune.visualization
 importlib.reload(views.comune.visualization)
 # Reimportar a função após o reload do módulo
-from views.comune.visualization import visualizar_tempo_solicitacao_providencia
+from views.comune.visualization import (
+    visualizar_tempo_solicitacao_providencia,
+    visualizar_tempo_solicitacao_individual
+)
 
 import pandas as pd
 import io
@@ -148,21 +158,25 @@ def show_comune():
     # Mostrar todas as informações relevantes em abas
     if not df_comune.empty:
         # Criar abas para organizar o conteúdo
-        tab1, tab2, tab3, tab4, tab_metricas, tab_tempo_dias, tab_tempo_solicitacao, tab_evidencia, tab_providencia, tab_tempo_providencia = st.tabs([
-            "Distribuição por Estágio", 
-            "Dados Detalhados", 
-            "Funil Detalhado", 
+        tab_nomes = [
+            "Distribuição por Estágio",
+            "Dados Detalhados",
+            "Funil Detalhado",
             "Cruzamento CRM_DEAL",
             "📊 Métricas de Certidões",
             "⏳ Tempo em Dias",
-            "⏱️ Tempo de Solicitação",
+            "⏱️ Tempo Individual",
+            "🗺️ Tempo x Província",
             "📄 Evidencia Comprovante",
             "🇮🇹 PROVÍNCIA",
-            "🗺️ Tempo x Província"
-        ])
-        
-        # Aba 1: Visão Macro
-        with tab1:
+        ]
+        tabs = st.tabs(tab_nomes)
+
+        # Mapear nomes para índices para facilitar acesso
+        tab_map = {name: i for i, name in enumerate(tab_nomes)}
+
+        # Aba 1: Distribuição por Estágio
+        with tabs[tab_map["Distribuição por Estágio"]]:
             # Criar visão macro
             visao_macro = criar_visao_macro(df_comune)
             
@@ -199,12 +213,12 @@ def show_comune():
                 st.info("Não foi possível criar a visão macro. Verifique se os dados estão corretos.")
         
         # Aba 2: Dados Detalhados
-        with tab2:
+        with tabs[tab_map["Dados Detalhados"]]:
             # Exibir tabela com os dados
             visualizar_comune_dados(df_comune)
         
         # Aba 3: Funil Detalhado
-        with tab3:
+        with tabs[tab_map["Funil Detalhado"]]:
             # Criar visão geral
             visao_geral = criar_visao_geral_comune(df_comune)
             
@@ -219,7 +233,7 @@ def show_comune():
                 st.info("Não foi possível criar a visão geral. Verifique se os dados estão corretos.")
         
         # Aba 4: Cruzamento com CRM_DEAL
-        with tab4:
+        with tabs[tab_map["Cruzamento CRM_DEAL"]]:
             # Adicionar informações sobre o cruzamento
             st.markdown("""
             <div style="background-color: #f0f2f6; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
@@ -459,54 +473,48 @@ def show_comune():
                     st.success(f"Encontrados {len(df_deal_uf)} registros em CRM_DEAL_UF")
         
         # Aba: Métricas de Certidões
-        with tab_metricas:
+        with tabs[tab_map["📊 Métricas de Certidões"]]:
             # Criar métricas de certidões
             metricas_certidoes = criar_metricas_certidoes(df_comune)
             
             # Exibir métricas de certidões
             visualizar_metricas_certidoes(metricas_certidoes)
         
-        # Nova Aba: Tempo em Dias
-        with tab_tempo_dias:
+        # Aba: Tempo em Dias
+        with tabs[tab_map["⏳ Tempo em Dias"]]:
             # Criar métricas de tempo em dias
             metricas_tempo_dias = criar_metricas_tempo_dias(df_comune)
             
             # Exibir métricas de tempo em dias
             visualizar_metricas_tempo_dias(metricas_tempo_dias)
         
-        # Aba: Tempo de Solicitação
-        with tab_tempo_solicitacao:
-            # Adicionar descrição da análise
+        # Aba: Tempo Individual
+        with tabs[tab_map["⏱️ Tempo Individual"]]:
             st.markdown("""
-            <p style='font-size: 16px; color: #444; margin-bottom: 20px;'>
-            Esta análise apresenta o tempo médio de solicitação calculado a partir do momento em que o registro entrou no estágio inicial (DT1052_22:NEW) até o momento atual,
-            agrupado pelo campo UF_CRM_12_1723552666.
-            </p>
+            ### Análise Individual de Tempo de Solicitação
+            Esta seção permite visualizar o tempo decorrido para cada solicitação individualmente,
+            calculado a partir da data original da solicitação.
             """, unsafe_allow_html=True)
-            
-            # Calcular o tempo de solicitação
-            df_tempo_solicitacao = calcular_tempo_solicitacao(df_comune)
-            
-            # Visualizar os resultados
-            visualizar_tempo_solicitacao(df_tempo_solicitacao)
-            
-        # --- NOVA ABA Evidencia ---
-        with tab_evidencia:
-            # Chamar a função de visualização da análise de evidência
-            visualizar_analise_evidencia(df_comune)
-            
-        # --- NOVA ABA PROVÍNCIA ---
-        with tab_providencia:
-            # Chamar a função de visualização por providência
-            visualizar_providencias(df_comune)
-            
-        # --- NOVA ABA Tempo de Solicitação por Providência ---
-        with tab_tempo_providencia:
-            # Calcular o tempo de solicitação por providência
-            df_tempo_providencia = calcular_tempo_solicitacao_providencia(df_comune)
-            
+            # Chamar a nova função de visualização passando o df_comune completo
+            visualizar_tempo_solicitacao_individual(df_comune)
+        
+        # Aba: Tempo x Província
+        with tabs[tab_map["🗺️ Tempo x Província"]]:
+            # Calcular o tempo de solicitação por providência (AGREGADO)
+            # Chamar a função SEM o parâmetro extra ou com ele False
+            df_tempo_providencia = calcular_tempo_solicitacao_providencia(df_comune, retornar_dados_individuais=False)
             # Visualizar o cruzamento entre tempo de solicitação e providência
             visualizar_tempo_solicitacao_providencia(df_tempo_providencia)
+        
+        # Aba Evidencia
+        with tabs[tab_map["📄 Evidencia Comprovante"]]:
+            # Chamar a função de visualização da análise de evidência
+            visualizar_analise_evidencia(df_comune)
+        
+        # Aba PROVÍNCIA
+        with tabs[tab_map["🇮🇹 PROVÍNCIA"]]:
+            # Chamar a função de visualização por providência
+            visualizar_providencias(df_comune)
     
     # Adicionar download dos dados
     if not df_comune.empty:

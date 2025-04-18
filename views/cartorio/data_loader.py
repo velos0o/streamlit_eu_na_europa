@@ -9,7 +9,8 @@ load_dotenv()
 
 def load_data():
     """
-    Carrega dados do cartório
+    Carrega dados do cartório com filtros rigorosos para garantir que apenas
+    registros válidos dos cartórios Casa Verde (16) e Tatuapé (34) sejam incluídos.
     """
     # Obter token do Bitrix24
     BITRIX_TOKEN, BITRIX_URL = get_credentials()
@@ -25,14 +26,69 @@ def load_data():
         st.error("Não foi possível carregar os dados dos cartórios. Verifique a conexão com o Bitrix24.")
         return pd.DataFrame()
     
-    # Filtrar apenas os cartórios Casa Verde (16) e Tatuápe (34)
-    df_filtrado = df_items[df_items['CATEGORY_ID'].isin([16, 34])].copy()  # Usar .copy() para evitar SettingWithCopyWarning
+    # Verificar contagem inicial
+    print(f"[DEBUG] Total de registros brutos: {len(df_items)}")
+    
+    # Criar cópia antes de modificar para evitar warnings
+    df_items = df_items.copy()
+    
+    # Verificar se a coluna CATEGORY_ID existe
+    if 'CATEGORY_ID' not in df_items.columns:
+        st.error("Coluna CATEGORY_ID não encontrada nos dados carregados.")
+        print(f"[DEBUG] Colunas disponíveis: {df_items.columns.tolist()}")
+        return pd.DataFrame()
+    
+    # Converter CATEGORY_ID para numérico e garantir valores corretos
+    try:
+        # Converter para numérico, tratando valores não numéricos como NaN
+        df_items['CATEGORY_ID'] = pd.to_numeric(df_items['CATEGORY_ID'], errors='coerce')
+        
+        # Remover NaN
+        df_items = df_items.dropna(subset=['CATEGORY_ID'])
+        
+        # Verificar tipos antes de conversão para inteiro
+        print(f"[DEBUG] Tipo de CATEGORY_ID: {df_items['CATEGORY_ID'].dtype}")
+        
+        # Converter para inteiro para garantir comparações precisas
+        df_items['CATEGORY_ID'] = df_items['CATEGORY_ID'].astype('int64')
+    except Exception as e:
+        print(f"[DEBUG] Erro ao processar CATEGORY_ID: {str(e)}")
+        return pd.DataFrame()
+    
+    # Verificar valores únicos na coluna CATEGORY_ID
+    categorias_unicas = df_items['CATEGORY_ID'].unique()
+    print(f"[DEBUG] Valores únicos em CATEGORY_ID: {categorias_unicas}")
+    
+    # PASSO CRUCIAL: Filtrar rigidamente apenas os registros com CATEGORY_ID exatamente 16 ou 34
+    df_filtrado_casa_verde = df_items[df_items['CATEGORY_ID'] == 16].copy()
+    df_filtrado_tatuape = df_items[df_items['CATEGORY_ID'] == 34].copy()
+    
+    # Concatenar os DataFrames filtrados
+    df_filtrado = pd.concat([df_filtrado_casa_verde, df_filtrado_tatuape], ignore_index=True)
+    
+    # Verificar a contagem por categoria após a filtragem
+    print(f"[DEBUG] Total após filtragem por categoria: {len(df_filtrado)}")
+    print(f"[DEBUG] - Casa Verde (16): {len(df_filtrado_casa_verde)}")
+    print(f"[DEBUG] - Tatuapé (34): {len(df_filtrado_tatuape)}")
+    
+    # Verificar se temos registros duplicados por ID
+    if 'ID' in df_filtrado.columns:
+        duplicados = df_filtrado.duplicated(subset=['ID'])
+        n_duplicados = duplicados.sum()
+        
+        if n_duplicados > 0:
+            print(f"[DEBUG] Encontrados {n_duplicados} registros duplicados por ID. Removendo duplicados...")
+            df_filtrado = df_filtrado.drop_duplicates(subset=['ID'], keep='first')
     
     # Adicionar o nome do cartório para melhor visualização
-    df_filtrado.loc[:, 'NOME_CARTORIO'] = df_filtrado['CATEGORY_ID'].map({
+    df_filtrado['NOME_CARTORIO'] = df_filtrado['CATEGORY_ID'].map({
         16: 'CARTÓRIO CASA VERDE',
         34: 'CARTÓRIO TATUÁPE'
     })
+    
+    # print(f"[DEBUG] Total final após todo processamento: {len(df_filtrado)}")                 # Log comentado
+    # print(f"[DEBUG] - Casa Verde (16): {(df_filtrado['CATEGORY_ID'] == 16).sum()}")       # Log comentado
+    # print(f"[DEBUG] - Tatuapé (34): {(df_filtrado['CATEGORY_ID'] == 34).sum()}")           # Log comentado
     
     return df_filtrado
 
@@ -223,12 +279,89 @@ def carregar_dados_crm_deal_com_uf():
 
 def carregar_dados_cartorio():
     """
-    Função específica para o modo apresentação que garante 
-    compatibilidade com a chamada em apresentacao_conclusoes.py
+    Carrega os dados dos cartórios Casa Verde (16) e Tatuápe (34) garantindo
+    a correta filtragem e contagem dos registros.
+    
+    Returns:
+        pandas.DataFrame: DataFrame com os dados dos cartórios filtrados.
     """
     try:
+        # Carregar dados brutos
         df = load_data()
-        print(f"Dados do cartório carregados com sucesso: {len(df)} registros")
+        
+        if df.empty:
+            print("Nenhum dado de cartório carregado.")
+            return pd.DataFrame()
+
+        # GARANTIR dados EXATAMENTE conforme esperado
+        # 1. Verificar e converter CATEGORY_ID para numérico, se necessário
+        if df['CATEGORY_ID'].dtype != 'int64':
+            df['CATEGORY_ID'] = pd.to_numeric(df['CATEGORY_ID'], errors='coerce')
+            df = df.dropna(subset=['CATEGORY_ID'])
+            
+        # 2. Verificar se há duplicações baseado no ID (aplicando novamente para garantia)
+        duplicados = df.duplicated(subset=['ID'], keep=False)
+        if duplicados.any():
+            # Registrar no log a presença de duplicações
+            n_duplicados = duplicados.sum()
+            print(f"ATENÇÃO: Encontrados {n_duplicados} registros duplicados por ID. Mantendo apenas a primeira ocorrência.")
+            
+            # Manter apenas a primeira ocorrência de cada ID
+            df = df.drop_duplicates(subset=['ID'], keep='first')
+        
+        # 3. Garantir filtragem ESTRITA por categoria 16 e 34
+        # Aplicar filtro rigoroso para manter apenas registros das categorias 16 e 34
+        df = df[df['CATEGORY_ID'].isin([16, 34])].copy()
+        
+        # 4. Verificar e remover registros que não pertencem às categorias 16 e 34 (redundante, mas para garantia)
+        registros_invalidos = ~df['CATEGORY_ID'].isin([16, 34])
+        if registros_invalidos.any():
+            n_invalidos = registros_invalidos.sum()
+            print(f"ATENÇÃO: Removidos {n_invalidos} registros com categorias diferentes de 16 e 34.")
+            
+            # Aplicar filtro novamente para garantir
+            df = df[df['CATEGORY_ID'].isin([16, 34])]
+        
+        # 5. Verificar se há valores nulos em CATEGORY_ID
+        nulos = df['CATEGORY_ID'].isna()
+        if nulos.any():
+            n_nulos = nulos.sum()
+            print(f"ATENÇÃO: Removidos {n_nulos} registros com CATEGORY_ID nulo.")
+            df = df.dropna(subset=['CATEGORY_ID'])
+        
+        # 6. Garantir mapeamento dos nomes de cartório - FORÇAR valores corretos
+        df['NOME_CARTORIO'] = df['CATEGORY_ID'].map({
+            16: 'CARTÓRIO CASA VERDE',
+            34: 'CARTÓRIO TATUÁPE'
+        })
+        
+        # 7. Força verificação final para garantir dados íntegros
+        # Confirmar que os valores de CATEGORY_ID são apenas 16 e 34
+        categorias_unicas = df['CATEGORY_ID'].unique()
+        # print(f"Categorias presentes após filtragem: {categorias_unicas}")                      # Log comentado
+        
+        # 8. Confirmar total de registros e contagem por categoria  
+        count_cat_16 = (df['CATEGORY_ID'] == 16).sum()
+        count_cat_34 = (df['CATEGORY_ID'] == 34).sum()
+        total_registros = len(df)
+        
+        # 9. Verificação final - garantir que números batem
+        if count_cat_16 + count_cat_34 != total_registros:
+            print(f"ERRO GRAVE: Ainda há inconsistência nas contagens! Total: {total_registros}, Soma categorias: {count_cat_16 + count_cat_34}")
+            # Última tentativa de correção
+            df = df[df['CATEGORY_ID'].isin([16, 34])].copy()
+            count_cat_16 = (df['CATEGORY_ID'] == 16).sum()
+            count_cat_34 = (df['CATEGORY_ID'] == 34).sum()
+            total_registros = len(df)
+        
+        # print(f"Dados do cartório carregados com sucesso: {total_registros} registros")        # Log comentado
+        # print(f"- Cartório Casa Verde (16): {count_cat_16} registros")                     # Log comentado
+        # print(f"- Cartório Tatuapé (34): {count_cat_34} registros")                      # Log comentado
+        
+        # 10. Verificação FINAL absoluta - se ainda houver inconsistência, mostrar aviso CRÍTICO
+        if count_cat_16 + count_cat_34 != total_registros:
+            print("❌ ERRO CRÍTICO: Após todas as tentativas, ainda há inconsistência nas contagens.")
+            
         return df
     except Exception as e:
         import traceback

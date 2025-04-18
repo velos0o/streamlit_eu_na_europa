@@ -8,6 +8,8 @@ from datetime import datetime
 import io
 import unicodedata
 import re
+# Importar a função de análise necessária
+from .analysis import calcular_tempo_solicitacao_providencia
 
 def visualizar_comune_dados(df_comune):
     """
@@ -3606,3 +3608,146 @@ def visualizar_tempo_solicitacao_providencia(df_tempo_providencia):
         mime="text/csv",
         key="download-tempo-provincia-csv"
     )
+
+def visualizar_tempo_solicitacao_individual(df_comune_completo):
+    """
+    Exibe uma tabela com o tempo de solicitação individual de cada card,
+    com um slider para filtrar por tempo em dias e um botão para exportar.
+    """
+    if df_comune_completo.empty:
+        st.warning("Nenhum dado de Comune disponível para calcular o tempo de solicitação.")
+        return
+
+    st.subheader("Análise Individual de Tempo de Solicitação")
+    st.markdown("Use o slider abaixo para filtrar os cards por tempo decorrido desde a solicitação original.")
+
+    # Calcular dados individuais de tempo
+    df_individual = calcular_tempo_solicitacao_providencia(df_comune_completo, retornar_dados_individuais=True)
+
+    if df_individual.empty:
+        st.warning("Não foi possível calcular o tempo de solicitação individual para os registros.")
+        return
+
+    if 'TEMPO_SOLICITACAO_DIAS' not in df_individual.columns:
+        st.error("Coluna 'TEMPO_SOLICITACAO_DIAS' não encontrada após o cálculo.")
+        return
+
+    # --- Slider para filtro de tempo ---
+    min_dias = 0
+    max_dias_calc = df_individual['TEMPO_SOLICITACAO_DIAS'].max()
+    if pd.isna(max_dias_calc):
+        max_dias = 365
+    else:
+         max_dias = int(np.ceil(max_dias_calc))
+
+    slider_max = max(max_dias, 365)
+
+    tempo_selecionado = st.slider(
+        'Selecione a faixa de tempo de solicitação (dias):',
+        min_value=min_dias,
+        max_value=slider_max,
+        value=(min_dias, max_dias),
+        step=1,
+        key="slider_tempo_individual" # Adicionar chave única para o slider
+    )
+
+    # Filtrar o DataFrame com base no slider
+    min_selecionado, max_selecionado = tempo_selecionado
+    df_filtrado = df_individual[
+        (df_individual['TEMPO_SOLICITACAO_DIAS'] >= min_selecionado) &
+        (df_individual['TEMPO_SOLICITACAO_DIAS'] <= max_selecionado)
+    ].copy() # Usar .copy() para evitar SettingWithCopyWarning ao adicionar/renomear colunas depois
+
+    # --- Exibição da Tabela Filtrada ---
+    if df_filtrado.empty:
+        st.info(f"Nenhum card encontrado na faixa de {min_selecionado} a {max_selecionado} dias.")
+    else:
+        st.write(f"Exibindo {len(df_filtrado)} de {len(df_individual)} cards ({min_selecionado}-{max_selecionado} dias):")
+
+        # Selecionar e renomear colunas para exibição na TELA
+        colunas_para_mostrar_tela = {
+            'ID': 'ID',
+            'TITLE': 'Nome do Card',
+            'STAGE_NAME': 'Estágio Atual',
+            'ASSIGNED_BY_NAME': 'Responsável',
+            'DATA_SOLICITACAO_ORIGINAL': 'Data Solicitação',
+            'TEMPO_SOLICITACAO_DIAS': 'Tempo (Dias)',
+        }
+        colunas_existentes_tela = {k: v for k, v in colunas_para_mostrar_tela.items() if k in df_filtrado.columns}
+        df_display = df_filtrado[list(colunas_existentes_tela.keys())].rename(columns=colunas_existentes_tela)
+
+        # Configurar formato das colunas
+        column_config = {
+            "ID": st.column_config.TextColumn("ID", width="small"),
+            "Nome do Card": st.column_config.TextColumn("Nome do Card", width="large"),
+            # ... (outras configurações de coluna existentes) ...
+             "Data Solicitação": st.column_config.DateColumn(
+                "Data Solicitação",
+                format="DD/MM/YYYY",
+            ),
+            "Tempo (Dias)": st.column_config.NumberColumn(
+                "Tempo (Dias)",
+                format="%.1f",
+                help="Tempo decorrido desde a data de solicitação original"
+            ),
+        }
+        config_final = {k: v for k, v in column_config.items() if k in df_display.columns}
+
+        st.dataframe(
+            df_display.sort_values(by="Tempo (Dias)", ascending=False),
+            use_container_width=True,
+            column_config=config_final,
+            hide_index=True
+        )
+
+        # --- Botão de Download ---
+        st.markdown("---") # Divisor visual
+
+        # Verificar se a coluna de província existe para exportação
+        col_provincia_export = 'PROVINCIA_ORIG' # Usar a coluna original da província
+        if col_provincia_export not in df_filtrado.columns:
+             # Tentar coluna normalizada como fallback se a original não existir
+             col_provincia_export = 'PROVINCIA_NORM'
+             if col_provincia_export not in df_filtrado.columns:
+                  col_provincia_export = None # Não exportar província se nenhuma coluna for encontrada
+
+        # Colunas para o CSV
+        colunas_export = ['ID']
+        if col_provincia_export:
+             colunas_export.append(col_provincia_export)
+        colunas_export.append('TEMPO_SOLICITACAO_DIAS')
+
+        # Filtrar colunas que existem no df_filtrado antes de tentar selecionar
+        colunas_export_existentes = [col for col in colunas_export if col in df_filtrado.columns]
+
+        if not colunas_export_existentes:
+             st.warning("Colunas necessárias para exportação (ID, Tempo) não encontradas.")
+        else:
+            # Selecionar e renomear colunas para o CSV
+            df_export = df_filtrado[colunas_export_existentes].copy()
+            rename_map_export = {'TEMPO_SOLICITACAO_DIAS': 'Tempo (Dias)'}
+            if col_provincia_export and col_provincia_export in df_export.columns:
+                rename_map_export[col_provincia_export] = 'Província'
+
+            df_export.rename(columns=rename_map_export, inplace=True)
+
+            # Garantir ordem correta no CSV final
+            ordem_csv = ['ID', 'Província', 'Tempo (Dias)']
+            ordem_final_csv = [col for col in ordem_csv if col in df_export.columns]
+            df_export = df_export[ordem_final_csv]
+
+
+            # Converter para CSV
+            csv_data = df_export.to_csv(index=False).encode('utf-8')
+
+            # Criar nome do arquivo dinâmico
+            nome_arquivo = f"extracao_tempo_individual_{min_selecionado}_a_{max_selecionado}_dias.csv"
+
+            st.download_button(
+                label="📥 Baixar Extrato Filtrado (CSV)",
+                data=csv_data,
+                file_name=nome_arquivo,
+                mime='text/csv',
+                key='download_tempo_individual_csv', # Chave única para o botão
+                help=f"Exporta os {len(df_export)} registros filtrados entre {min_selecionado} e {max_selecionado} dias."
+            )

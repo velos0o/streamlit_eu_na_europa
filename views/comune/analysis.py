@@ -483,158 +483,267 @@ def criar_metricas_certidoes(df_comune):
 
 def criar_metricas_tempo_dias(df_comune):
     """
-    Cria métricas de tempo em dias, agrupadas por faixas de tempo
+    Cria métricas de tempo em dias, agrupadas por faixas de tempo,
+    utilizando a DATA_SOLICITACAO_ORIGINAL.
     """
     if df_comune.empty:
         return {}
-    
-    # Verificar se as colunas necessárias existem
-    if 'MOVED_TIME' not in df_comune.columns:
-        print("Coluna MOVED_TIME não encontrada no DataFrame")
-        return {}
-    
+
+    # Verificar se a coluna DATA_SOLICITACAO_ORIGINAL existe
+    coluna_data = 'DATA_SOLICITACAO_ORIGINAL'
+    if coluna_data not in df_comune.columns:
+        # Fallback para MOVED_TIME se a coluna original não existir
+        coluna_data = 'MOVED_TIME'
+        if coluna_data not in df_comune.columns:
+            print(f"Colunas {coluna_data} e DATA_SOLICITACAO_ORIGINAL não encontradas.")
+            return {}
+        else:
+            print(f"Aviso: Coluna DATA_SOLICITACAO_ORIGINAL não encontrada. Usando {coluna_data} como fallback.")
+
     # Copiar o dataframe para não modificar o original
     df_tempo = df_comune.copy()
-    
+
     # Converter a coluna de data/hora para datetime
-    df_tempo['MOVED_TIME'] = pd.to_datetime(df_tempo['MOVED_TIME'], errors='coerce')
-    
-    # Filtrar apenas registros que possuem valores válidos para MOVED_TIME
-    df_tempo = df_tempo.dropna(subset=['MOVED_TIME'])
-    
-    # Adicionar nomes legíveis dos estágios
-    mapa_estagios = mapear_estagios_comune()
-    df_tempo['STAGE_NAME'] = df_tempo['STAGE_ID'].map(mapa_estagios)
-    
-    # Calcular o tempo em dias
-    df_tempo['TEMPO_ATUAL'] = pd.Timestamp.now()
-    df_tempo['TEMPO_DIAS'] = (df_tempo['TEMPO_ATUAL'] - df_tempo['MOVED_TIME']).dt.total_seconds() / (24 * 3600)
-    
-    # Definir as categorias por faixas de tempo em dias
+    df_tempo[coluna_data] = pd.to_datetime(df_tempo[coluna_data], errors='coerce')
+
+    # Filtrar apenas registros que possuem valores válidos para a data
+    df_tempo = df_tempo.dropna(subset=[coluna_data])
+
+    if df_tempo.empty:
+         print(f"Nenhum registro com data válida na coluna {coluna_data}.")
+         return {}
+
+    # Adicionar nomes legíveis dos estágios (se a coluna existir)
+    if 'STAGE_ID' in df_tempo.columns:
+        mapa_estagios = mapear_estagios_comune()
+        df_tempo['STAGE_NAME'] = df_tempo['STAGE_ID'].map(mapa_estagios)
+    else:
+        # Se não houver STAGE_ID, criar uma coluna padrão para evitar erros no groupby
+        df_tempo['STAGE_NAME'] = 'Desconhecido'
+
+
+    # Calcular o tempo em dias desde a data de solicitação original
+    df_tempo['TEMPO_ATUAL'] = pd.Timestamp.now(tz='UTC') # Usar timezone consistente
+    # Garantir que a coluna de data também seja timezone-aware ou naive consistente
+    if df_tempo[coluna_data].dt.tz is None:
+        df_tempo[coluna_data] = df_tempo[coluna_data].dt.tz_localize('UTC')
+    elif df_tempo[coluna_data].dt.tz != df_tempo['TEMPO_ATUAL'].dt.tz:
+         df_tempo[coluna_data] = df_tempo[coluna_data].dt.tz_convert('UTC')
+
+
+    df_tempo['TEMPO_DIAS'] = (df_tempo['TEMPO_ATUAL'] - df_tempo[coluna_data]).dt.total_seconds() / (24 * 3600)
+
+    # Definir as categorias por faixas de tempo em dias - AJUSTADO
     categorias_tempo = {
         "Até 7 dias": (0, 7),
         "8 a 15 dias": (7, 15),
         "16 a 30 dias": (15, 30),
         "31 a 60 dias": (30, 60),
-        "Mais de 60 dias": (60, float('inf'))
+        "61 a 160 dias": (60, 160),         # Faixa intermediária
+        "Mais de 160 dias": (160, float('inf')) # Nova faixa > 160 dias
     }
-    
+
     # Inicializar dicionário para armazenar as métricas
     metricas_tempo = {}
-    
+
     # Computar as métricas para cada categoria de tempo
     for categoria, (min_dias, max_dias) in categorias_tempo.items():
         # Filtrar o dataframe pela faixa de dias
+        # Corrigido: inclui o limite inferior (>) e superior (<=)
         df_faixa = df_tempo[(df_tempo['TEMPO_DIAS'] > min_dias) & (df_tempo['TEMPO_DIAS'] <= max_dias)]
-        
+
         # Agrupar por estágio e contar
         contagem = df_faixa.groupby('STAGE_NAME').size().reset_index(name='Certidões')
-        
+
         # Adicionar total
         total = contagem['Certidões'].sum()
-        
+
         # Ordenar por contagem (decrescente)
         contagem = contagem.sort_values('Certidões', ascending=False)
-        
+
         # Calcular tempo médio da categoria
         tempo_medio = df_faixa['TEMPO_DIAS'].mean() if not df_faixa.empty else 0
-        
+
         # Armazenar métricas
         metricas_tempo[categoria] = {
             'dados': contagem,
             'total': total,
             'tempo_medio': round(tempo_medio, 1)
         }
-    
+
     return metricas_tempo
 
-def calcular_tempo_solicitacao_providencia(df_comune):
+def calcular_tempo_solicitacao_providencia(df_comune, retornar_dados_individuais=False):
     """
-    Calcula o tempo de solicitação cruzado com dados de província/comune.
-    Retorna um DataFrame com tempo médio de solicitação por local.
-    
+    Calcula o tempo de solicitação (baseado na DATA_SOLICITACAO_ORIGINAL)
+    cruzado com dados de província/comune.
+    Retorna um DataFrame com tempo médio de solicitação por local OU
+    o DataFrame com os dados individuais e o tempo calculado.
+
     Args:
         df_comune: DataFrame com os dados de COMUNE
-        
+        retornar_dados_individuais (bool): Se True, retorna o DataFrame com
+                                            cálculos individuais antes da agregação.
+
     Returns:
-        DataFrame com o tempo médio de solicitação por provincia/comune
+        DataFrame: Agregado por local (default) ou individual.
     """
     if df_comune.empty:
         return pd.DataFrame()
-    
-    # Verificar se as colunas necessárias existem
-    colunas_necessarias = ['MOVED_TIME', 'PROVINCIA_ORIG', 'COMUNE_ORIG']
-    
-    # Se as colunas de província e comune não existirem com esses nomes, tentar outros nomes comuns
-    provincia_cols = ['PROVINCIA_ORIG', 'UF_CRM_12_1743018869', 'PROVINCIA_NORM']
-    comune_cols = ['COMUNE_ORIG', 'UF_CRM_12_1722881735827', 'COMUNE_NORM']
-    
+
+    # Verificar coluna de data - Priorizar DATA_SOLICITACAO_ORIGINAL
+    coluna_data = 'DATA_SOLICITACAO_ORIGINAL'
+    if coluna_data not in df_comune.columns:
+        coluna_data = 'MOVED_TIME' # Fallback
+        if coluna_data not in df_comune.columns:
+             print(f"Colunas {coluna_data} e DATA_SOLICITACAO_ORIGINAL não encontradas.")
+             return pd.DataFrame()
+        else:
+            print(f"Aviso: Coluna DATA_SOLICITACAO_ORIGINAL não encontrada. Usando {coluna_data} como fallback.")
+
+
+    # Verificar se as colunas de localização necessárias existem
+    provincia_cols = ['PROVINCIA_ORIG', 'UF_CRM_12_1743015702671', 'PROVINCIA_NORM'] # Adicionado ID da provincia do data_loader
+    comune_cols = ['COMUNE_ORIG', 'UF_CRM_12_1722881735827', 'COMUNE_NORM'] # Adicionado ID do comune do data_loader
+
     provincia_col = next((col for col in provincia_cols if col in df_comune.columns), None)
     comune_col = next((col for col in comune_cols if col in df_comune.columns), None)
-    
-    if not provincia_col or not comune_col or 'MOVED_TIME' not in df_comune.columns:
-        colunas_faltantes = [col for col in ['MOVED_TIME', 'província', 'comune'] 
-                           if (col == 'MOVED_TIME' and col not in df_comune.columns) or
-                              (col == 'província' and not provincia_col) or
-                              (col == 'comune' and not comune_col)]
-        print(f"Colunas ausentes: {colunas_faltantes}")
-        return pd.DataFrame()
-    
+
     # Copiar o dataframe para não modificar o original
     df_calculo = df_comune.copy()
-    
-    # Converter as colunas de data/hora para datetime
-    df_calculo['MOVED_TIME'] = pd.to_datetime(df_calculo['MOVED_TIME'], errors='coerce')
-    
-    # Filtrar apenas registros que possuem valores válidos para as colunas necessárias
-    df_valido = df_calculo.dropna(subset=['MOVED_TIME'])
-    df_valido = df_valido[df_valido[provincia_col].notna() | df_valido[comune_col].notna()]
-    
-    # Verificar se há dados válidos após filtro
-    if df_valido.empty:
-        return pd.DataFrame()
-    
-    # Calcular o tempo de solicitação
-    df_valido['TEMPO_ATUAL'] = pd.Timestamp.now()
-    df_valido['TEMPO_SOLICITACAO'] = df_valido['TEMPO_ATUAL'] - df_valido['MOVED_TIME']
-    
+
+    # Converter a coluna de data para datetime
+    df_calculo[coluna_data] = pd.to_datetime(df_calculo[coluna_data], errors='coerce')
+
+    # Filtrar apenas registros que possuem valores válidos para a data
+    df_valido = df_calculo.dropna(subset=[coluna_data])
+
+    # Calcular o tempo de solicitação usando a coluna_data selecionada
+    df_valido['TEMPO_ATUAL'] = pd.Timestamp.now(tz='UTC') # Usar timezone consistente
+    # Garantir consistência de timezone
+    if df_valido[coluna_data].dt.tz is None:
+        # Tentativa de localizar com 'UTC', mas tratar erros caso hajam offsets inválidos
+        try:
+            df_valido[coluna_data] = df_valido[coluna_data].dt.tz_localize('UTC', ambiguous='infer', nonexistent='NaT')
+        except Exception as e:
+             print(f"Erro ao localizar timezone para {coluna_data}: {e}. Tentando converter para UTC sem localizar.")
+             # Como alternativa, apenas garantir que não há timezone para comparar com now() localizado
+             try:
+                 df_valido[coluna_data] = df_valido[coluna_data].dt.tz_convert(None)
+                 df_valido['TEMPO_ATUAL'] = df_valido['TEMPO_ATUAL'].dt.tz_convert(None)
+             except Exception as inner_e:
+                  print(f"Erro ao remover timezone: {inner_e}. Calculo de tempo pode ser impreciso.")
+                  # Deixar como está e permitir a subtração (pode gerar aviso ou erro)
+                  pass
+    elif df_valido[coluna_data].dt.tz != df_valido['TEMPO_ATUAL'].tz:
+         try:
+             df_valido[coluna_data] = df_valido[coluna_data].dt.tz_convert('UTC')
+         except Exception as e:
+             print(f"Erro ao converter timezone para {coluna_data}: {e}. Calculo de tempo pode ser impreciso.")
+             pass # Continuar mesmo assim
+
+    # Calcular diferença, tratando erros na subtração
+    try:
+        df_valido['TEMPO_SOLICITACAO'] = df_valido['TEMPO_ATUAL'] - df_valido[coluna_data]
+    except TypeError as e:
+        print(f"Erro de tipo ao calcular TEMPO_SOLICITACAO (provavelmente TZs mistos): {e}")
+        # Tentar forçar a remoção de TZs como último recurso
+        try:
+            df_valido[coluna_data] = df_valido[coluna_data].dt.tz_convert(None)
+            df_valido['TEMPO_ATUAL'] = df_valido['TEMPO_ATUAL'].dt.tz_convert(None)
+            df_valido['TEMPO_SOLICITACAO'] = df_valido['TEMPO_ATUAL'] - df_valido[coluna_data]
+            print("Timezones removidos para permitir cálculo.")
+        except Exception as final_e:
+             print(f"Falha final ao calcular tempo: {final_e}. Retornando NaT.")
+             df_valido['TEMPO_SOLICITACAO'] = pd.NaT
+
     # Converter para horas e dias
     df_valido['TEMPO_SOLICITACAO_HORAS'] = df_valido['TEMPO_SOLICITACAO'].dt.total_seconds() / 3600
     df_valido['TEMPO_SOLICITACAO_DIAS'] = df_valido['TEMPO_SOLICITACAO_HORAS'] / 24
-    
-    # Agrupar por província
-    resultado_provincia = df_valido.groupby(provincia_col).agg(
-        TEMPO_SOLICITACAO_DIAS=('TEMPO_SOLICITACAO_DIAS', 'mean'),
-        TEMPO_SOLICITACAO_HORAS=('TEMPO_SOLICITACAO_HORAS', 'mean'),
-        QUANTIDADE=('TEMPO_SOLICITACAO_HORAS', 'count'),
-        LATITUDE=('latitude', lambda x: x.dropna().mean() if 'latitude' in df_valido.columns else None),
-        LONGITUDE=('longitude', lambda x: x.dropna().mean() if 'longitude' in df_valido.columns else None)
-    ).reset_index()
-    
-    # Agrupar por comune
-    resultado_comune = df_valido.groupby(comune_col).agg(
-        TEMPO_SOLICITACAO_DIAS=('TEMPO_SOLICITACAO_DIAS', 'mean'),
-        TEMPO_SOLICITACAO_HORAS=('TEMPO_SOLICITACAO_HORAS', 'mean'),
-        QUANTIDADE=('TEMPO_SOLICITACAO_HORAS', 'count'),
-        LATITUDE=('latitude', lambda x: x.dropna().mean() if 'latitude' in df_valido.columns else None),
-        LONGITUDE=('longitude', lambda x: x.dropna().mean() if 'longitude' in df_valido.columns else None)
-    ).reset_index()
-    
-    # Renomear colunas para clareza
-    resultado_provincia = resultado_provincia.rename(columns={provincia_col: 'LOCAL', 'LATITUDE': 'lat', 'LONGITUDE': 'lng'})
-    resultado_provincia['TIPO'] = 'Província'
-    
-    resultado_comune = resultado_comune.rename(columns={comune_col: 'LOCAL', 'LATITUDE': 'lat', 'LONGITUDE': 'lng'})
-    resultado_comune['TIPO'] = 'Comune'
-    
-    # Juntar os dois DataFrames
-    resultado = pd.concat([resultado_provincia, resultado_comune], ignore_index=True)
-    
-    # Arredondar para 2 casas decimais
-    resultado['TEMPO_SOLICITACAO_DIAS'] = resultado['TEMPO_SOLICITACAO_DIAS'].round(1)
-    resultado['TEMPO_SOLICITACAO_HORAS'] = resultado['TEMPO_SOLICITACAO_HORAS'].round(1)
-    
+
+    # Remover linhas onde o cálculo falhou (resultou em NaT)
+    df_valido.dropna(subset=['TEMPO_SOLICITACAO_DIAS'], inplace=True)
+
+    # Arredondar dias para melhor visualização e filtragem
+    df_valido['TEMPO_SOLICITACAO_DIAS'] = df_valido['TEMPO_SOLICITACAO_DIAS'].round(1)
+
+    # ------------------------------------------------------------------
+    # Decidir o que retornar baseado no parâmetro
+    # ------------------------------------------------------------------
+    if retornar_dados_individuais:
+        print(f"Retornando {len(df_valido)} registros individuais com tempo calculado.")
+        # Selecionar colunas relevantes para a visualização individual
+        colunas_retorno = ['ID', 'TITLE', 'STAGE_ID', 'STAGE_NAME', 'ASSIGNED_BY_NAME',
+                           coluna_data, 'TEMPO_SOLICITACAO_DIAS', 'TEMPO_SOLICITACAO_HORAS',
+                           provincia_col, comune_col, 'latitude', 'longitude']
+        # Filtrar colunas que realmente existem no df_valido
+        colunas_existentes = [col for col in colunas_retorno if col in df_valido.columns]
+        return df_valido[colunas_existentes]
+    # ------------------------------------------------------------------
+
+    # Continuar com a agregação se retornar_dados_individuais for False
+
+    # Filtrar também por locais que não são nulos (pelo menos um deve existir)
+    # Mover esta filtragem para DEPOIS do cálculo do tempo, mas ANTES da agregação
+    if provincia_col and comune_col:
+         df_agregacao = df_valido[df_valido[provincia_col].notna() | df_valido[comune_col].notna()].copy()
+    elif provincia_col:
+         df_agregacao = df_valido[df_valido[provincia_col].notna()].copy()
+    elif comune_col:
+         df_agregacao = df_valido[df_valido[comune_col].notna()].copy()
+    else: # Se nenhuma coluna de local foi encontrada, retorna vazio
+        print("Nenhuma coluna de localização válida encontrada para agregação.")
+        return pd.DataFrame()
+
+    # Verificar se há dados válidos após filtro de localização
+    if df_agregacao.empty:
+         print(f"Nenhum registro com localização válida ({provincia_col} ou {comune_col}) para agregação.")
+         return pd.DataFrame()
+
+    # --- Agregação por Localização ---
+    resultados = []
+
+    # Agrupar por província (se a coluna existir)
+    if provincia_col:
+        resultado_provincia = df_agregacao.groupby(provincia_col).agg(
+            TEMPO_SOLICITACAO_DIAS=('TEMPO_SOLICITACAO_DIAS', 'mean'),
+            TEMPO_SOLICITACAO_HORAS=('TEMPO_SOLICITACAO_HORAS', 'mean'),
+            QUANTIDADE=('ID', 'count'), # Usar ID ou outra coluna não nula para contagem
+            LATITUDE=('latitude', lambda x: x.dropna().mean() if 'latitude' in df_agregacao.columns and x.dropna().any() else None),
+            LONGITUDE=('longitude', lambda x: x.dropna().mean() if 'longitude' in df_agregacao.columns and x.dropna().any() else None)
+        ).reset_index()
+        resultado_provincia = resultado_provincia.rename(columns={provincia_col: 'LOCAL', 'LATITUDE': 'lat', 'LONGITUDE': 'lng'})
+        resultado_provincia['TIPO'] = 'Província'
+        resultados.append(resultado_provincia)
+
+    # Agrupar por comune (se a coluna existir)
+    if comune_col:
+        resultado_comune = df_agregacao.groupby(comune_col).agg(
+            TEMPO_SOLICITACAO_DIAS=('TEMPO_SOLICITACAO_DIAS', 'mean'),
+            TEMPO_SOLICITACAO_HORAS=('TEMPO_SOLICITACAO_HORAS', 'mean'),
+            QUANTIDADE=('ID', 'count'), # Usar ID ou outra coluna não nula
+            LATITUDE=('latitude', lambda x: x.dropna().mean() if 'latitude' in df_agregacao.columns and x.dropna().any() else None),
+            LONGITUDE=('longitude', lambda x: x.dropna().mean() if 'longitude' in df_agregacao.columns and x.dropna().any() else None)
+        ).reset_index()
+        resultado_comune = resultado_comune.rename(columns={comune_col: 'LOCAL', 'LATITUDE': 'lat', 'LONGITUDE': 'lng'})
+        resultado_comune['TIPO'] = 'Comune'
+        resultados.append(resultado_comune)
+
+    # Juntar os DataFrames (se houver algum)
+    if not resultados:
+        print("Não foi possível agregar por Província ou Comune.")
+        return pd.DataFrame()
+
+    resultado_final = pd.concat(resultados, ignore_index=True)
+
+    # Arredondar para 1 casa decimal
+    resultado_final['TEMPO_SOLICITACAO_DIAS'] = resultado_final['TEMPO_SOLICITACAO_DIAS'].round(1)
+    resultado_final['TEMPO_SOLICITACAO_HORAS'] = resultado_final['TEMPO_SOLICITACAO_HORAS'].round(1)
+
     # Ordenar do maior tempo para o menor
-    resultado = resultado.sort_values('TEMPO_SOLICITACAO_DIAS', ascending=False)
-    
-    return resultado 
+    resultado_final = resultado_final.sort_values('TEMPO_SOLICITACAO_DIAS', ascending=False)
+
+    # Garantir que QUANTIDADE seja inteiro
+    resultado_final['QUANTIDADE'] = resultado_final['QUANTIDADE'].astype(int)
+
+    return resultado_final 

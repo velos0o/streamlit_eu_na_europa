@@ -8,6 +8,69 @@ import numpy as np
 # Importar funções necessárias do arquivo original
 from views.cartorio.produtividade import formatar_nome_etapa, obter_mapeamento_campos
 
+# --- INÍCIO DA ADIÇÃO: Mapeamento STAGE_ID -> NOME_ESTAGIO ---
+def obter_nomes_estagios_local():
+    """
+    Retorna um dicionário mapeando STAGE_IDs técnicos para nomes legíveis.
+    Este mapeamento é crucial para a exibição correta das métricas.
+    Se múltiplos IDs são mapeados para o mesmo nome, suas contagens serão somadas.
+    """
+    # Mapeamento baseado na tabela fornecida e nomes comuns
+    # IMPORTANTE: Este mapeamento deve ser mantido atualizado com os estágios do Bitrix24
+    mapeamento = {
+        # SUCESSO
+        'C1052:WON': 'Certidão Entregue',  # Assumindo que WON = Entregue/Success final
+        'C1052:SUCCESS': 'Certidão Entregue', # Agrupa com WON
+        'DT1052_16:SUCCESS': 'Certidão Entregue', # Agrupa com WON
+        'DT1052_34:SUCCESS': 'Certidão Entregue', # Agrupa com WON
+        'DT1052_16:CLIENT': 'Certidão Entregue', # Agrupa com WON
+        'DT1052_34:CLIENT': 'Certidão Entregue', # Agrupa com WON
+        'CLIENT': 'Certidão Entregue', # Agrupa com WON
+        # 'UF_CRM_DATA_CERTIDAO_FISICA_ENTREGUE': 'Certidão Física Entregue', # Verificar se existe ID correspondente
+        'UF_CRM_DATA_CERTIDAO_FISICA_ENVIADA': 'Certidão Física Enviada', # Mapear ID correto se houver
+        'UF_CRM_DATA_CERTIDAO_EMITIDA': 'Certidão Emitida', # Mapear ID correto se houver
+        # IDs de sucesso genéricos podem precisar ser mapeados se usados
+        'DT1052_16:UC_JRGCW3': 'Certidão Pronta', # Exemplo
+        'DT1052_34:UC_84B1S2': 'Certidão Pronta', # Exemplo
+
+        # EM ANDAMENTO
+        'C1052:UC_LNHG7G': 'Apenas Ass. Req. Cliente P/ Montagem', # Exemplo, verificar ID correto
+        'C1052:PREPARATION': 'Aguardando Certidão', # Exemplo, verificar ID correto
+        'C1052:FINAL_INVOICE': 'Devolutiva Busca', # Mapeamento conhecido
+        'C1052:UC_3LJ0KG': 'NÃO TRABALHAR(DESPRIORIZADA)', # Mapeamento fornecido
+        'C1052:UC_52V88J': 'Solicitar Cart. Origem', # Exemplo, verificar ID correto
+        'C1052:EXECUTING': 'Aguard. Cart. Origem', # Exemplo, verificar ID correto
+        'C1052:UC_RJC2DD': 'PRIO2 - FAZER BUSCA CRC', # Mapeamento fornecido
+        'C1052:UC_XM32IE': 'SEM DADOS SUFICIENTES PARA BUSCA', # Mapeamento fornecido
+        'C1052:UC_6T0J0A': 'Busca CRC', # Exemplo, verificar ID correto
+        'C1052:UC_T71A6N': 'Montagem Requerimento Cartório', # Exemplo, verificar ID correto
+        'C1052:UC_K85YX7': 'PRIO2 - FAZER BUSCA CRC', # Mapeamento fornecido (Agrupa com UC_RJC2DD)
+        # 'UF_CRM_DATA_SOLICITAR_CARTORIO_ORIGEM_PRIORIDADE': 'Cart. Origem Prioridade', # Mapear ID correto se houver
+
+        # FALHA
+        'C1052:LOSE': 'Devolução ADM', # Assumindo LOSE principal = Devolução ADM
+        'C1052:APOLOGY': 'Dev. ADM Verificado', # Exemplo, verificar ID correto
+        'C1052:UC_O1L97N': 'Solicitação Duplicada', # Exemplo, verificar ID correto
+        'C1052:UC_Q448V8': 'Devolvido Requerimento', # Exemplo, verificar ID correto
+        'C1052:UC_7L6CGJ': 'CANCELADO' # Mapeamento fornecido
+        # Adicionar outros IDs de falha se existirem
+    }
+    # Adicionar prefixo C1052: se estiver faltando em algum ID (pode variar)
+    # Esta parte pode precisar de ajuste dependendo do formato exato dos IDs nos dados
+    mapeamento_final = {}
+    for key, value in mapeamento.items():
+        if not key.startswith('C1052:') and not key.startswith('DT'):
+             # Tenta adicionar prefixo padrão se parecer um ID sem ele
+             # Pode ser necessário ajustar 'C1052:' para o prefixo correto se variar
+             # Ou remover esta lógica se os IDs no dict já estiverem corretos
+             # mapeamento_final[f'C1052:{key}'] = value
+             mapeamento_final[key] = value # Mantem como está por enquanto
+        else:
+            mapeamento_final[key] = value
+
+    return mapeamento_final
+# --- FIM DA ADIÇÃO ---
+
 def definir_parametros_sla():
     """Permite personalizar os tempos de referência para análise de SLA"""
     
@@ -872,8 +935,72 @@ def analisar_desempenho_responsaveis(df, campos_data, mapeamento_campos, paramet
                         """, unsafe_allow_html=True)
 
 def mostrar_dashboard_tempo_crm(df):
-    """Função principal para exibir a análise de tempo do CRM"""
-    
+    """Exibe um dashboard focado na análise de tempo do processo CRM"""
+
+    if df.empty:
+        st.warning("Não há dados disponíveis para esta análise.")
+        return
+
+    # --- INÍCIO DA MODIFICAÇÃO: Usar Mapeamento Local ---
+    # Verificar se a coluna STAGE_ID existe
+    if 'STAGE_ID' in df.columns:
+        try:
+            # Obter mapeamento local de IDs para nomes
+            mapping_nomes = obter_nomes_estagios_local()
+
+            # Função para aplicar o mapeamento (retorna nome ou ID original se não mapeado)
+            def map_nome(stage_id):
+                return mapping_nomes.get(str(stage_id).strip(), str(stage_id).strip()) # Garante que ID é string
+
+            # Cria coluna com nomes mapeados ou IDs originais
+            df['NOME_ESTAGIO'] = df['STAGE_ID'].apply(map_nome)
+            st.info("Mapeamento de Nomes de Estágio aplicado. IDs não encontrados no mapeamento serão exibidos como estão.")
+
+        except Exception as e:
+            st.warning(f"Não foi possível aplicar o mapeamento de nomes de estágios: {e}. Usando IDs técnicos.")
+            df['NOME_ESTAGIO'] = df['STAGE_ID'] # Usa o ID se o mapeamento falhar
+    else:
+        st.warning("Coluna 'STAGE_ID' não encontrada. Não é possível exibir métricas por estágio.")
+        return # Não podemos continuar sem STAGE_ID
+
+    # Garantir que 'NOME_ESTAGIO' existe antes de continuar
+    if 'NOME_ESTAGIO' not in df.columns:
+         st.error("Falha ao criar a coluna 'NOME_ESTAGIO'. Análise por estágio interrompida.")
+         return
+    # --- FIM DA MODIFICAÇÃO ---
+
+    # Agrupar por nome do estágio e contar
+    contagem_estagios = df.groupby('NOME_ESTAGIO').size().reset_index(name='Quantidade')
+    contagem_estagios = contagem_estagios.sort_values('Quantidade', ascending=False)
+
+    # --- INÍCIO DA MODIFICAÇÃO: Ajustar Classificação ---
+    # Classificar estágios (exemplo de lógica de classificação)
+    def classificar_estagio(nome_estagio):
+        # Garantir que é string para evitar erros com tipos numéricos ou outros
+        nome_lower = str(nome_estagio).lower()
+
+        # Palavras-chave para SUCESSO
+        success_keywords = ['success', 'entregue', 'emitida', 'física', 'pronta', 'won']
+        # Palavras-chave para FALHA
+        fail_keywords = ['fail', 'falha', 'devol', 'duplicada', 'lose', 'cancelado', 'perca', 'sem dados']
+
+        if any(keyword in nome_lower for keyword in success_keywords):
+             return '✅ SUCESSO'
+        elif any(keyword in nome_lower for keyword in fail_keywords):
+             return '❌ FALHA'
+        # Considerar despriorizada como falha ou categoria separada? Por enquanto FALHA.
+        elif 'despriorizada' in nome_lower:
+             return '❌ FALHA' # Ou talvez uma categoria 'PAUSADO'?
+        else:
+             # Todos os outros são EM ANDAMENTO
+             return '⏳ EM ANDAMENTO'
+
+    contagem_estagios['Categoria'] = contagem_estagios['NOME_ESTAGIO'].apply(classificar_estagio)
+    # --- FIM DA MODIFICAÇÃO ---
+
+    # Obter parâmetros de SLA (movido para depois da verificação de dados)
+    parametros_sla = definir_parametros_sla()
+
     st.title("⏱️ Análise de Tempo do Processo CRM")
     
     # Mensagem de manutenção

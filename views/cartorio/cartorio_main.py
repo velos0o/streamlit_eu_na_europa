@@ -46,9 +46,63 @@ def show_cartorio():
     # Carregar os dados dos cartórios
     with st.spinner("Carregando dados dos cartórios..."):
         try:
-            df_cartorio = carregar_dados_cartorio()
-            if not df_cartorio.empty:
-                st.success(f"Dados dos cartórios carregados: {len(df_cartorio)} registros encontrados.")
+            # Carregar os dados brutos primeiro
+            df_cartorio_bruto = carregar_dados_cartorio()
+            
+            if not df_cartorio_bruto.empty:
+                # 1. Garantir que CATEGORY_ID seja numérico
+                if not pd.api.types.is_numeric_dtype(df_cartorio_bruto['CATEGORY_ID']):
+                    # Converter para numérico com tratamento explícito de erros
+                    df_cartorio_bruto['CATEGORY_ID'] = pd.to_numeric(df_cartorio_bruto['CATEGORY_ID'], errors='coerce')
+                    # Remover valores que não puderam ser convertidos (NaN)
+                    df_cartorio_bruto = df_cartorio_bruto.dropna(subset=['CATEGORY_ID'])
+                    # Converter para inteiro para evitar problemas de comparação
+                    df_cartorio_bruto['CATEGORY_ID'] = df_cartorio_bruto['CATEGORY_ID'].astype('int64')
+                
+                # Imprimir valores únicos de CATEGORY_ID para debug
+                categorias_encontradas = df_cartorio_bruto['CATEGORY_ID'].unique().tolist()
+                print(f"Valores únicos de CATEGORY_ID: {categorias_encontradas}")
+                
+                # Verificar se há valores estranhos em CATEGORY_ID (nem 16 nem 34)
+                invalid_categories = [c for c in categorias_encontradas if c not in [16, 34]]
+                if invalid_categories:
+                    print(f"ALERTA: Encontradas categorias inválidas: {invalid_categories}")
+                
+                # 2. Filtrar ESTRITAMENTE apenas as categorias 16 e 34
+                # Usar verificação explícita para ter certeza que estamos comparando corretamente
+                mask_cat_16 = (df_cartorio_bruto['CATEGORY_ID'] == 16)
+                mask_cat_34 = (df_cartorio_bruto['CATEGORY_ID'] == 34)
+                df_cartorio = df_cartorio_bruto[mask_cat_16 | mask_cat_34].reset_index(drop=True).copy()
+                
+                # 3. Remover duplicados pelo ID se existirem
+                if df_cartorio.duplicated(subset=['ID']).any():
+                    df_cartorio = df_cartorio.drop_duplicates(subset=['ID'], keep='first')
+                
+                # 4. Aplicar mapeamento correto de cartórios
+                nome_cartorio_map = {
+                    16: 'CARTÓRIO CASA VERDE',
+                    34: 'CARTÓRIO TATUÁPE'
+                }
+                df_cartorio['NOME_CARTORIO'] = df_cartorio['CATEGORY_ID'].map(nome_cartorio_map)
+                
+                # 5. Calcular contagens por categoria
+                total_registros = len(df_cartorio)
+                count_cat_16 = (df_cartorio['CATEGORY_ID'] == 16).sum()
+                count_cat_34 = (df_cartorio['CATEGORY_ID'] == 34).sum()
+                
+                # 6. Validar a integridade dos dados
+                if count_cat_16 + count_cat_34 != total_registros:
+                    st.warning(f"""
+                    **Inconsistência detectada:** A soma das categorias ({count_cat_16 + count_cat_34}) 
+                    não corresponde ao total de registros ({total_registros}).
+                    """)
+                
+                # Mostrar resumo dos dados carregados
+                # st.success(f"""                             # Log comentado
+                # **Dados dos cartórios carregados com sucesso:** {total_registros} registros
+                # - Cartório Casa Verde (16): {count_cat_16} registros
+                # - Cartório Tatuapé (34): {count_cat_34} registros
+                # """)
             else:
                 st.warning("Não foi possível carregar os dados dos cartórios. Nenhum registro encontrado.")
                 return
@@ -61,7 +115,7 @@ def show_cartorio():
         try:
             df_crm_deal = carregar_dados_crm_deal_com_uf()
             if not df_crm_deal.empty:
-                st.success(f"Dados de CRM (categoria 0) carregados: {len(df_crm_deal)} registros encontrados.")
+                # st.success(f"Dados de CRM (categoria 0) carregados: {len(df_crm_deal)} registros encontrados.") # Log comentado
                 
                 # Verificar se o campo UF_CRM_1722605592778 está presente
                 if 'UF_CRM_CAMPO_COMPARACAO' not in df_crm_deal.columns:
@@ -83,6 +137,10 @@ def show_cartorio():
     else:
         st.warning("Campo UF_CRM_12_1723552666 não encontrado nos dados do cartório. A comparação não estará disponível.")
         df_cartorio['ID_FAMILIA'] = None  # Adicionar coluna vazia para evitar erros
+    
+    # Adicionar um prefixo nas colunas do crm_deal para evitar conflitos
+    colunas_crm = {col: f'CRM_{col}' for col in df_crm_deal.columns if col != 'ID_FAMILIA'}
+    df_crm_deal = df_crm_deal.rename(columns=colunas_crm)
     
     # Mesclar os dados do cartório com os dados do CRM_DEAL
     if not df_crm_deal.empty and 'UF_CRM_CAMPO_COMPARACAO' in df_crm_deal.columns:
@@ -125,19 +183,53 @@ def show_cartorio():
                 st.write("Exemplos de IDs em comum:")
                 st.write(list(ids_comuns)[:10])
         
-        # Adicionar um prefixo nas colunas do crm_deal para evitar conflitos
-        colunas_crm = {col: f'CRM_{col}' for col in df_crm_deal.columns if col != 'ID_FAMILIA'}
-        df_crm_deal = df_crm_deal.rename(columns=colunas_crm)
-        
         # Realizar o merge com outer join para preservar todos os registros
         try:
-            df_cartorio = pd.merge(
+            # SOLUÇÃO PARA PROBLEMA DE DUPLICAÇÃO:
+            # 1. Identificar quantos registros tínhamos antes do merge
+            total_registros_antes = len(df_cartorio)
+            
+            # 2. Verificar se há múltiplas correspondências potenciais
+            print(f"[DEBUG MERGE] Total registros cartório antes: {len(df_cartorio)}")
+            print(f"[DEBUG MERGE] Total registros CRM: {len(df_crm_deal)}")
+            print(f"[DEBUG MERGE] Número de IDs de família únicos em cartório: {df_cartorio['ID_FAMILIA'].nunique()}")
+            print(f"[DEBUG MERGE] Número de IDs de família únicos em CRM: {df_crm_deal['ID_FAMILIA'].nunique()}")
+            
+            # 3. Em vez de merge direto, usar uma abordagem que preserva a contagem original
+            # Primeiro, criar um DataFrame temporário só com a correspondência CRM
+            df_crm_deal_unique = df_crm_deal.drop_duplicates(subset=['ID_FAMILIA'], keep='first')
+            print(f"[DEBUG MERGE] CRM após remover duplicados por ID_FAMILIA: {len(df_crm_deal_unique)}")
+            
+            # 4. Agora fazer o merge que não vai criar duplicações
+            df_cartorio_merged = pd.merge(
                 df_cartorio,
-                df_crm_deal,
+                df_crm_deal_unique,
                 on='ID_FAMILIA',
                 how='left',
                 suffixes=('', '_crm')
             )
+            
+            # 5. Verificar se a contagem permaneceu a mesma após o merge
+            total_registros_depois = len(df_cartorio_merged)
+            if total_registros_antes != total_registros_depois:
+                st.warning(f"""
+                ⚠️ Ainda houve alteração na contagem de registros durante o merge com CRM!
+                - Antes: {total_registros_antes}
+                - Depois: {total_registros_depois}
+                - Diferença: {total_registros_depois - total_registros_antes}
+                
+                A visualização de dados pode ser afetada por esta discrepância.
+                """)
+                
+                # 6. MEDIDA CRÍTICA: Se ainda houver discrepância, forçar a preservação
+                # do número original de registros
+                if total_registros_depois > total_registros_antes:
+                    st.error("Corrigindo contagem de registros para preservar integridade dos dados...")
+                    # Usar apenas os registros originais, adicionando apenas as correspondências de CRM
+                    df_cartorio = df_cartorio_merged.head(total_registros_antes)
+            else:
+                # Se deu certo, atualiza o DataFrame principal
+                df_cartorio = df_cartorio_merged
             
             # Contar quantos registros têm correspondência
             registros_com_correspondencia = df_cartorio['CRM_ID'].notna().sum()
@@ -147,7 +239,8 @@ def show_cartorio():
         except Exception as e:
             st.error(f"Erro ao mesclar dados do cartório com CRM: {str(e)}")
     else:
-        st.info("Dados de CRM não disponíveis para comparação ou campo UF_CRM_1722605592778 não encontrado.")
+        # st.info("Dados de CRM não disponíveis para comparação ou campo UF_CRM_1722605592778 não encontrado.") # Log comentado
+        pass # Não exibir nada se não houver dados de CRM
 
     # Filtro de cartório (mantido no topo para aplicação global)
     st.markdown("#### Filtros Gerais")

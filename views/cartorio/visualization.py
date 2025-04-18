@@ -27,7 +27,7 @@ def visualizar_cartorio_dados(df):
     colunas_faltantes = [col for col in colunas_necessarias if col not in df.columns]
     if colunas_faltantes:
         st.error(f"Colunas necessárias não encontradas: {', '.join(colunas_faltantes)}")
-        st.write("Colunas disponíveis:", df.columns.tolist())
+        # st.write("Colunas disponíveis:", df.columns.tolist()) # Log comentado
         return
     
     # Obter estágios
@@ -61,6 +61,30 @@ def visualizar_cartorio_dados(df):
     if df.empty:
         st.warning("Não há dados disponíveis para exibição com os filtros selecionados.")
     else:
+        # NÃO FILTRAR NOVAMENTE - usar apenas os dados já filtrados
+        # Como os dados já foram filtrados na etapa de carregamento em cartorio_main.py,
+        # não devemos aplicar filtros adicionais aqui para não causar inconsistências.
+        
+        # Apenas validar que os dados estão corretos
+        if 'CATEGORY_ID' in df.columns:
+            # Contar registros por categoria para exibição nas métricas
+            total_registros = len(df)
+            count_cat_16 = (df['CATEGORY_ID'] == 16).sum()
+            count_cat_34 = (df['CATEGORY_ID'] == 34).sum()
+            
+            # Validar se os dados correspondem ao esperado
+            if count_cat_16 + count_cat_34 != total_registros:
+                st.warning(f"""
+                **Atenção:** Inconsistência nos dados das métricas.
+                Total: {total_registros}, Categorias: {count_cat_16 + count_cat_34}
+                Isso pode afetar os resultados exibidos.
+                """)
+        else:
+            # Se não temos a coluna, não podemos validar
+            count_cat_16 = 0
+            count_cat_34 = 0
+            total_registros = len(df)
+        
         # Contar total de processos na etapa SUCCESS
         success_count = 0
         
@@ -117,21 +141,28 @@ def visualizar_cartorio_dados(df):
         # Calcular taxa de conclusão
         taxa_conclusao = round((success_count / len(df) * 100), 1) if len(df) > 0 else 0
         
-        # Card 1 - Total de Cartórios
+        # Card 1 - Total de Cartórios e registros por cartório
         with col1:
             st.markdown(f"""
             <div class="metric-card cartorios">
                 <div class="metric-value">{len(df['NOME_CARTORIO'].unique())}</div>
                 <div class="metric-title">Cartórios</div>
+                <div class="metric-subtitle">
+                    <span style="white-space: nowrap; font-size: 0.85rem;">Casa Verde: {count_cat_16}</span><br>
+                    <span style="white-space: nowrap; font-size: 0.85rem;">Tatuapé: {count_cat_34}</span>
+                </div>
             </div>
             """, unsafe_allow_html=True)
         
-        # Card 2 - Total de Processos
+        # Card 2 - Total de Processos (soma exata)
         with col2:
             st.markdown(f"""
             <div class="metric-card processos">
-                <div class="metric-value">{len(df)}</div>
+                <div class="metric-value">{total_registros}</div>
                 <div class="metric-title">Processos</div>
+                <div class="metric-subtitle" style="font-size: 0.85rem; margin-top: 3px;">
+                    Filtrados: {count_cat_16 + count_cat_34}
+                </div>
             </div>
             """, unsafe_allow_html=True)
         
@@ -418,13 +449,11 @@ def renderizar_linha_cards(df_categoria, titulo):
                     
                     with cols[col]:
                         st.markdown(f"""
-                        <div class="stage-card" style="border-left: 5px solid {cor}; margin: 8px 5px 12px 5px; background: white;">
-                            <div class="stage-card-header">
-                                <div style="margin: 0; color: #000000; font-size: 14px; font-weight: 700; white-space: normal; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;"><strong>{row_data['STAGE_NAME_LEGIVEL']}</strong></div>
-                            </div>
-                            <div style="display: flex; align-items: center; justify-content: center;">
-                                <div style="font-size: 22px; font-weight: 900; color: {cor}; margin: 0 5px 0 0;"><strong>{row_data['QUANTIDADE']}</strong></div>
-                                <div style="font-size: 12px; font-weight: 700; color: #555; background-color: {bg_color}; padding: 1px 6px; border-radius: 8px;">{row_data['PERCENTUAL']}%</div>
+                        <div class="stage-card" style="border-left: 4px solid {cor};">
+                            <div class="stage-title">{row_data['STAGE_NAME_LEGIVEL']}</div>
+                            <div class="stage-metrics">
+                                <span class="stage-quantity" style="color: {cor};">{row_data['QUANTIDADE']}</span>
+                                <span class="stage-percentage" style="background-color: {bg_color};">{row_data['PERCENTUAL']}%</span>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
@@ -693,122 +722,119 @@ def visualizar_grafico_cartorio(df):
 
 def aplicar_estilos_cartorio():
     """
-    Aplica os estilos CSS para a visualização dos dados do cartório
+    Aplica estilos CSS para o dashboard de Cartório.
     """
     st.markdown("""
     <style>
-        /* Cards das métricas principais */
-        .metric-card {
-            background-color: white;
-            border-radius: 10px;
-            padding: 20px 15px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 25px;
-            position: relative;
-            overflow: hidden;
-            border-top: 5px solid #1A237E;
-            height: 120px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        
-        /* Cor específica para cada tipo de card */
-        .metric-card.cartorios {
-            border-top-color: #1976D2;
-        }
-        
-        .metric-card.processos {
-            border-top-color: #512DA8;
-        }
-        
-        .metric-card.concluidos {
-            border-top-color: #00897B;
-        }
-        
-        /* Estilo para o valor dentro do card */
-        .metric-value {
-            font-size: 38px;
-            font-weight: 900;
-            color: #0D47A1;
-            margin-bottom: 10px;
-            line-height: 1;
-        }
-        
-        /* Estilo para o título do card */
-        .metric-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #5C6BC0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        /* Seções e subtítulos */
-        .section-subtitle {
-            margin-top: 30px;
-            margin-bottom: 20px;
-            padding: 8px 15px;
-            background-color: #E8EAF6;
-            border-radius: 8px;
-            color: #1A237E;
-            font-size: 18px;
-            border-left: 5px solid #3F51B5;
-        }
-        
-        /* Estilo para os cards de estágios */
-        .stage-card {
-            border: 1px solid #E0E0E0;
-            border-radius: 8px;
-            padding: 10px 12px;
-            margin-bottom: 12px;
-            background-color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            transition: all 0.2s ease;
-        }
-        
-        .stage-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        
-        .stage-card-header {
-            margin-bottom: 8px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #F5F5F5;
-        }
-        
-        /* Divisor visual entre categorias */
-        .divisor {
-            height: 1px;
-            background: linear-gradient(to right, transparent, #3F51B5, transparent);
-            margin: 25px 0;
-            opacity: 0.5;
-        }
-        
-        /* Estilo para destacar registros com correspondência no CRM */
-        .stDataFrame [data-testid="stDataFrameCell"]:has(span:contains("✅ Com correspondência")) {
-            background-color: #E8F5E9 !important;
-        }
-        
-        /* Estilo para destacar registros sem correspondência no CRM */
-        .stDataFrame [data-testid="stDataFrameCell"]:has(span:contains("❌ Sem correspondência")) {
-            background-color: #FFEBEE !important;
-        }
-        
-        /* Estilo especial para o status de correspondência na tabela de detalhes */
-        div[data-testid="stVerticalBlock"] div[data-testid="stDataFrame"] [data-testid="stDataFrameCell"]:has(span:contains("✅")) {
-            background-color: #E8F5E9 !important;
-            font-weight: 600;
-            color: #2E7D32 !important;
-        }
-        
-        div[data-testid="stVerticalBlock"] div[data-testid="stDataFrame"] [data-testid="stDataFrameCell"]:has(span:contains("❌")) {
-            background-color: #FFEBEE !important;
-            font-weight: 600;
-            color: #C62828 !important;
-        }
+    /* Cards de Métricas */
+    .metric-card {
+        background-color: #FFFFFF;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        text-align: center;
+        height: 140px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 20px;
+        position: relative;
+        overflow: hidden;
+        border-top: 3px solid #1976D2; /* Borda superior padrão azul */
+    }
+    
+    .metric-value {
+        font-size: 36px;
+        font-weight: 900;
+        color: #1A237E;
+        margin-bottom: 5px;
+    }
+    
+    .metric-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #546E7A;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .metric-subtitle {
+        font-size: 14px;
+        color: #78909C;
+        margin-top: 5px;
+    }
+    
+    /* Subtítulos e divisores */
+    .section-subtitle {
+        color: #1A237E;
+        font-size: 20px;
+        margin: 30px 0 15px 0;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #E0E0E0;
+    }
+    
+    .divisor {
+        margin: 15px 0;
+        height: 1px;
+        background-color: #EEEEEE;
+    }
+    
+    /* Cards de estágios (Renomeado e estilizado) */
+    .stage-card {
+        background-color: #FFFFFF;
+        border-radius: 8px;
+        padding: 12px 15px; /* Ajuste no padding */
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06); /* Sombra mais sutil */
+        margin-bottom: 12px; /* Espaçamento ajustado */
+        border-left: 4px solid #CCCCCC; /* Borda esquerda mantida */
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between; /* Espaço entre título e métricas */
+        height: 90px; /* Altura ajustada */
+        transition: box-shadow 0.2s ease-in-out;
+    }
+
+    .stage-card:hover {
+        box-shadow: 0 3px 8px rgba(0,0,0,0.1); /* Sombra ao passar o mouse */
+    }
+    
+    .stage-title {
+        font-size: 14px; /* Tamanho da fonte ajustado */
+        font-weight: 600; /* Peso da fonte ajustado */
+        color: #333; /* Cor do título */
+        margin-bottom: 8px;
+        line-height: 1.3; /* Espaçamento entre linhas */
+        /* Gerenciamento de texto longo */
+        display: -webkit-box;
+        -webkit-line-clamp: 2; /* Limita a 2 linhas */
+        -webkit-box-orient: vertical;  
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-height: 36px; /* Garante espaço para 2 linhas */
+    }
+
+    .stage-metrics {
+        display: flex;
+        justify-content: space-between; /* Alinha quantidade à esquerda, percentual à direita */
+        align-items: baseline; /* Alinha pela base do texto */
+        margin-top: auto; /* Empurra para baixo */
+    }
+    
+    .stage-quantity {
+        font-size: 20px; /* Tamanho da quantidade */
+        font-weight: 700; /* Peso da quantidade */
+        /* Cor é definida inline */
+    }
+    
+    .stage-percentage {
+        font-size: 12px; /* Tamanho do percentual */
+        font-weight: 600; /* Peso do percentual */
+        color: #555; /* Cor do percentual */
+        padding: 2px 7px; /* Padding ajustado */
+        border-radius: 12px; /* Bordas arredondadas */
+        /* Background-color é definido inline */
+    }
     </style>
     """, unsafe_allow_html=True)
 
