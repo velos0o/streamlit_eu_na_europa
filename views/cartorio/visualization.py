@@ -321,6 +321,25 @@ def simplificar_nome_estagio(nome):
         'DT1052_34:UC_D0RG5P': 'Certidão Emitida',
         'DT1052_16:UC_JRGCW3': 'Certidão Física',
         'DT1052_34:UC_84B1S2': 'Certidão Física',
+        # Novos mapeamentos adicionados
+        'UC_3LJ0KG': 'Não Trabalhar (Despriorizada)',
+        'DT1052_16:UC_3LJ0KG': 'Não Trabalhar (Despriorizada)',
+        'DT1052_34:UC_3LJ0KG': 'Não Trabalhar (Despriorizada)',
+        'UC_RJC2DD': 'PRIO2 - Fazer Busca CRC',
+        'DT1052_16:UC_RJC2DD': 'PRIO2 - Fazer Busca CRC',
+        'DT1052_34:UC_RJC2DD': 'PRIO2 - Fazer Busca CRC',
+        'UC_XM32IE': 'Sem Dados Suficientes para Busca',
+        'DT1052_16:UC_XM32IE': 'Sem Dados Suficientes para Busca',
+        'DT1052_34:UC_XM32IE': 'Sem Dados Suficientes para Busca',
+        'UC_K85YX7': 'Solicitar Cartório de Origem Prioridade',
+        'DT1052_16:UC_K85YX7': 'Solicitar Cartório de Origem Prioridade',
+        'DT1052_34:UC_K85YX7': 'Solicitar Cartório de Origem Prioridade',
+        'K85YX7': 'PRIO2 - Fazer Busca CRC',
+        'DT1052_16:K85YX7': 'PRIO2 - Fazer Busca CRC',
+        'DT1052_34:K85YX7': 'PRIO2 - Fazer Busca CRC',
+        'UC_7L6CGJ': 'Cancelado',
+        'DT1052_16:UC_7L6CGJ': 'Cancelado',
+        'DT1052_34:UC_7L6CGJ': 'Cancelado',
         # Versões curtas dos nomes (sem prefixo)
         'NEW': 'Aguard. Certidão',
         'PREPARATION': 'Mont. Requerim.',
@@ -397,7 +416,8 @@ def categorizar_estagio(estagio):
     falha_stages = [
         'Devolução ADM', 'Dev. ADM Verificado', 'Devolutiva 2Busca', 
         'Solicitação Duplicada', 'Solic. Duplicada', 'Devolvido Requerimento',
-        'Dev. Requerim.', 'Dev. ADM Verif.', 'Dev. Busca'
+        'Dev. Requerim.', 'Dev. ADM Verif.', 'Dev. Busca',
+        'Cancelado', 'Sem Dados Suficientes para Busca', 'Não Trabalhar (Despriorizada)'
     ]
     
     # Verificar categoria
