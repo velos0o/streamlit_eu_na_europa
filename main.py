@@ -30,6 +30,8 @@ from views.comune.comune_main import show_comune
 from views.tickets import show_tickets
 # Importar nova página de Reclamações (caminho atualizado)
 from views.reclamacoes.reclamacoes_main import show_reclamacoes
+# Importar nova página de Emissões Brasileiras
+from views.cartorio_new.cartorio_new_main import show_cartorio_new
 
 # Importar os novos componentes do guia de relatório
 from components.report_guide import show_guide_sidebar, show_page_guide, show_contextual_help
@@ -133,24 +135,78 @@ st.sidebar.markdown("---")
 # Criar uma seção para os botões de navegação
 st.sidebar.subheader("Navegação")
 
-# Variável de estado para controlar a navegação
+# Variáveis de estado para controlar a navegação
 if 'pagina_atual' not in st.session_state:
     st.session_state['pagina_atual'] = 'Macro Higienização'
+# --- NOVO: Estado para submenu Emissões --- 
+if 'emissao_submenu_expanded' not in st.session_state:
+    st.session_state.emissao_submenu_expanded = False
+if 'emissao_subpagina' not in st.session_state:
+    st.session_state.emissao_subpagina = 'Visão Geral' # Subpágina padrão
+# --- FIM NOVO ---
 
-# Funções simples para alterar a página
-def ir_para_inicio(): st.session_state['pagina_atual'] = 'Macro Higienização'
-def ir_para_producao(): st.session_state['pagina_atual'] = 'Produção Higienização'
-def ir_para_conclusoes(): st.session_state['pagina_atual'] = 'Conclusões Higienização'
-def ir_para_cartorio(): st.session_state['pagina_atual'] = 'Cartório'
-def ir_para_comune(): st.session_state['pagina_atual'] = 'Comune'
-def ir_para_extracoes(): st.session_state['pagina_atual'] = 'Extrações de Dados'
-def ir_para_apresentacao(): st.session_state['pagina_atual'] = 'Apresentação Conclusões'
-def ir_para_tickets(): st.session_state['pagina_atual'] = 'Tickets'
-def ir_para_reclamacoes(): st.session_state['pagina_atual'] = 'Reclamações'
+# Funções para alterar a página e controlar submenu
+def reset_submenu():
+    st.session_state.emissao_submenu_expanded = False
 
-# Botões individuais para navegação (usando método tradicional)
+def ir_para_inicio(): 
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Macro Higienização'
+def ir_para_producao(): 
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Produção Higienização'
+def ir_para_conclusoes(): 
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Conclusões Higienização'
+def ir_para_cartorio(): 
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Cartório'
+def ir_para_comune(): 
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Comune'
+def ir_para_extracoes(): 
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Extrações de Dados'
+def ir_para_apresentacao(): 
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Apresentação Conclusões'
+def ir_para_tickets(): 
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Tickets'
+def ir_para_reclamacoes(): 
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Reclamações'
+
+# --- NOVO: Função para toggle e navegação do submenu Emissões ---
+def toggle_emissao_submenu():
+    st.session_state.emissao_submenu_expanded = not st.session_state.get('emissao_submenu_expanded', False)
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    # Define uma subpágina padrão ao abrir ou se já estiver aberto e clicar de novo
+    st.session_state.emissao_subpagina = 'Visão Geral' 
+# --- FIM NOVO ---
+
+# --- NOVO: Funções on_click para sub-botões Emissões ---
+def ir_para_emissao_visao_geral():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Visão Geral'
+    # Não mexe em emissao_submenu_expanded
+
+def ir_para_emissao_acompanhamento():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Acompanhamento'
+
+def ir_para_emissao_producao():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Produção'
+
+def ir_para_emissao_pendencias():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Pendências'
+# --- FIM NOVO ---
+
+# Botões individuais para navegação
 st.sidebar.button("Macro Higienização", key="btn_inicio", 
-            on_click=ir_para_inicio,
+            on_click=ir_para_inicio, 
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Macro Higienização" else "secondary")
 
@@ -169,6 +225,90 @@ st.sidebar.button("Funil Emissões Bitrix", key="btn_cartorio",
             on_click=ir_para_cartorio,
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Cartório" else "secondary")
+
+# --- ATUALIZADO: Botão para Emissões Brasileiras agora usa toggle_emissao_submenu ---
+st.sidebar.button("Emissões Brasileiras (NOVO)", key="btn_cartorio_new", 
+            on_click=toggle_emissao_submenu, 
+            use_container_width=True,
+            type="primary" if st.session_state['pagina_atual'] == "Emissões Brasileiras" else "secondary",
+            help="Módulo refatorado de emissões de cartórios brasileiros")
+# --- FIM ATUALIZADO ---
+
+# --- ATUALIZADO: Bloco condicional para o submenu com funcionalidade ---
+if st.session_state.get('emissao_submenu_expanded', False):
+    with st.sidebar.container(): 
+        # --- CSS Injetado para Estilo Persistente dos Sub-botões ---
+        st.markdown("""
+        <style>
+        /* Base style para TODOS os sub-botões */
+        [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]) {
+            background: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0.25rem 0.5rem !important;
+            margin: 0 !important;
+            border-radius: 4px !important;
+            font-size: 0.9em !important;
+            text-align: left !important;
+            width: 100% !important;
+            display: block !important;
+            line-height: 1.4 !important;
+            font-weight: 400 !important;
+            color: #333 !important;
+            transition: background-color 0.1s ease, color 0.1s ease !important;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+        /* Efeito Hover (para todos) */
+        [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]):hover:not(:focus) {
+            /* Usando cores fixas aqui, pois não temos variáveis SCSS */
+            color: #2563EB !important; /* Cor primária aproximada */
+            background-color: rgba(59, 130, 246, 0.08) !important; /* Cor primária clara aproximada */
+        }
+        /* Estilo ATIVO (primary) - apenas muda peso e cor */
+        [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button[kind="primary"]:not([data-testid="stIconButton"]) {
+            font-weight: 600 !important;
+            color: #2563EB !important; /* Cor primária aproximada */
+            /* Garante que fundo e borda não voltem */
+            background: none !important; 
+            border: none !important;
+        }
+        /* Garante que o foco não estrague o visual */
+        [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]):focus {
+            background: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            /* outline: 2px solid rgba(59, 130, 246, 0.3) !important; */ /* Outline opcional */
+        }
+        /* Recuo do container do botão */
+        [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] {
+            margin-left: 15px !important;
+            padding: 0 !important;
+            margin-bottom: 2px !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        # --- Fim CSS Injetado ---
+
+        # Botões diretamente dentro do container da sidebar
+        st.button("Visão Geral", key="subbtn_visao_geral", 
+                    on_click=ir_para_emissao_visao_geral,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Visão Geral" else "secondary")
+        st.button("Acompanhamento", key="subbtn_acompanhamento", 
+                    on_click=ir_para_emissao_acompanhamento,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Acompanhamento" else "secondary")
+        st.button("Produção", key="subbtn_producao", 
+                    on_click=ir_para_emissao_producao,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Produção" else "secondary")
+        st.button("Pendências", key="subbtn_pendencias", 
+                    on_click=ir_para_emissao_pendencias,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Pendências" else "secondary")
+# --- FIM ATUALIZADO ---
 
 st.sidebar.button("Comune Bitrix24", key="btn_comune", 
             on_click=ir_para_comune,
@@ -217,7 +357,6 @@ try:
             {"label": "Métricas Gerais", "anchor": "metricas_gerais", "icon": "📊"},
             {"label": "Últimas Conclusões", "anchor": "ultimas_conclusoes", "icon": "✅"}
         ]
-        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_inicio()
         
     elif pagina == "Produção Higienização":
@@ -228,7 +367,6 @@ try:
             {"label": "Tendências Temporais", "anchor": "tendencias_temporais", "icon": "📈"},
             {"label": "Pendências", "anchor": "pendencias", "icon": "⚠️"}
         ]
-        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_producao()
         
     elif pagina == "Conclusões Higienização":
@@ -238,7 +376,6 @@ try:
             {"label": "Análise de Qualidade", "anchor": "analise_qualidade", "icon": "🔍"},
             {"label": "Tendências de Conclusão", "anchor": "tendencias_conclusao", "icon": "📈"}
         ]
-        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_conclusoes()
         
     elif pagina == "Cartório":
@@ -248,7 +385,6 @@ try:
             {"label": "Conversão Entre Etapas", "anchor": "conversao_etapas", "icon": "🔄"},
             {"label": "Previsão de Conclusões", "anchor": "previsao_conclusoes", "icon": "🔮"}
         ]
-        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_cartorio()
         
     elif pagina == "Comune":
@@ -258,7 +394,6 @@ try:
             {"label": "Interações", "anchor": "interacoes", "icon": "🔄"},
             {"label": "Métricas de Engajamento", "anchor": "metricas_engajamento", "icon": "📊"}
         ]
-        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_comune()
         
     elif pagina == "Extrações de Dados":
@@ -268,7 +403,6 @@ try:
             {"label": "Relatórios Prontos", "anchor": "relatorios_prontos", "icon": "📋"},
             {"label": "Exportação", "anchor": "exportacao", "icon": "📤"}
         ]
-        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_extracoes()
         
     elif pagina == "Tickets":
@@ -278,7 +412,6 @@ try:
             {"label": "Por Tempo", "anchor": "por_tempo", "icon": "🕒"},
             {"label": "Detalhes", "anchor": "detalhes", "icon": "🔍"}
         ]
-        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_tickets()
         
     elif pagina == "Reclamações":
@@ -288,7 +421,6 @@ try:
             {"label": "Tendência", "anchor": "tendencia", "icon": "📈"},
             {"label": "Detalhes", "anchor": "detalhes_das_reclamacoes", "icon": "🔍"} # Usar o anchor do subheader em details.py
         ]
-        render_toc(sections, "Navegação Rápida", horizontal=True)
         show_reclamacoes() # Função importada do novo local
         
     elif pagina == "Apresentação Conclusões":
@@ -303,6 +435,15 @@ try:
             
         # Chamar a função com o parâmetro de slide inicial
         show_apresentacao(slide_inicial=slide_inicial)
+        
+    # Nova lógica para a página refatorada
+    elif pagina == "Emissões Brasileiras":
+        # Define as seções para o sumário da página (precisa ser dinâmico ou removido)
+        # sections = [...] 
+        
+        # Chama a função principal, que agora deve rotear internamente
+        show_cartorio_new() # Assumindo que show_cartorio_new agora usa st.session_state.emissao_subpagina para rotear
+        
 except Exception as e:
     st.error(f"Erro ao carregar a página: {str(e)}")
     # Mostrar detalhes do erro para facilitar a depuração

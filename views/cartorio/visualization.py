@@ -58,7 +58,7 @@ def visualizar_cartorio_dados(df):
     """, unsafe_allow_html=True)
 
     # Verificar se o DataFrame está vazio
-    if df.empty:
+    if df.empty:    
         st.warning("Não há dados disponíveis para exibição com os filtros selecionados.")
     else:
         # NÃO FILTRAR NOVAMENTE - usar apenas os dados já filtrados

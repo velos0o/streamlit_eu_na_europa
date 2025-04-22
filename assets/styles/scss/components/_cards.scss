@@ -1,0 +1,122 @@
+@import '../variables';
+@import '../mixins';
+
+.card-visao-geral {
+  @include card-base;
+  @include hover-shadow;
+  height: 65px;
+  border-left-width: 3px;
+  position: relative;
+  overflow: hidden;
+
+  // Layout interno
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: map-get($spacing, 2);
+
+  // Gradiente superior
+  &::before {
+    @include border-gradient(to right, currentColor);
+  }
+
+  // Título do card
+  &__title {
+    @include text-truncate(1);
+    font-size: map-get($font-sizes, 'xs');
+    font-weight: 600;
+    color: var(--card-text);
+    margin-bottom: map-get($spacing, 1);
+    min-height: auto;
+    line-height: 1.2;
+  }
+
+  // Container de métricas
+  &__metrics {
+    @include flex-between;
+    padding-top: map-get($spacing, 1);
+    border-top: none;
+  }
+
+  // Quantidade
+  &__quantity {
+    font-size: map-get($font-sizes, 'lg');
+    font-weight: 700;
+    @include text-gradient(currentColor, currentColor);
+    line-height: 1;
+  }
+
+  // Percentual
+  &__percentage {
+    @include badge(var(--percent-bg), var(--percent-text));
+    font-size: map-get($font-sizes, 'xs');
+    padding: 2px 4px;
+    line-height: 1;
+  }
+
+  // Variantes por categoria
+  &--success {
+    border-left-color: $success;
+    .card-visao-geral__quantity {
+      color: $success;
+    }
+    &::before {
+      background: linear-gradient(to right, $success, transparent);
+    }
+  }
+
+  &--warning {
+    border-left-color: $warning;
+    .card-visao-geral__quantity {
+      color: $warning;
+    }
+    &::before {
+      background: linear-gradient(to right, $warning, transparent);
+    }
+  }
+
+  &--danger {
+    border-left-color: $danger;
+    .card-visao-geral__quantity {
+      color: $danger;
+    }
+    &::before {
+      background: linear-gradient(to right, $danger, transparent);
+    }
+  }
+
+  // Tema escuro
+  @include dark-mode {
+    &--success {
+      border-left-color: $success-light;
+      .card-visao-geral__quantity {
+        color: $success-light;
+      }
+    }
+
+    &--warning {
+      border-left-color: $warning-light;
+      .card-visao-geral__quantity {
+        color: $warning-light;
+      }
+    }
+
+    &--danger {
+      border-left-color: $danger-light;
+      .card-visao-geral__quantity {
+        color: $danger-light;
+      }
+    }
+  }
+
+  // Responsividade
+  @include responsive(sm) {
+    height: 70px;
+    &__title {
+      font-size: map-get($font-sizes, 'sm');
+    }
+    &__quantity {
+      font-size: map-get($font-sizes, 'xl');
+    }
+  }
+} 

@@ -1,0 +1,241 @@
+// Importar variáveis e mixins
+@import 'variables';
+@import 'mixins';
+
+// Importar componentes
+@import 'components/cards';
+
+// Estilos globais
+:root {
+  @each $key, $value in $light-theme {
+    --#{$key}: #{$value};
+  }
+}
+
+// Tema escuro
+body.dark {
+  @each $key, $value in $dark-theme {
+    --#{$key}: #{$value};
+  }
+}
+
+// Estilos base
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  color: var(--card-text);
+  background-color: var(--card-bg);
+}
+
+// Títulos
+.section-title {
+  color: $primary;
+  font-size: map-get($font-sizes, 'xl');
+  font-weight: 700;
+  margin-top: map-get($spacing, 4);
+  margin-bottom: map-get($spacing, 3);
+  padding-bottom: map-get($spacing, 1);
+  border-bottom: 2px solid $primary-light;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.05);
+}
+
+// Divisores
+.divisor {
+  margin: map-get($spacing, 4) 0;
+  height: 1px;
+  background: linear-gradient(to right, var(--card-border), transparent);
+}
+
+// Headers de categoria
+.category-header {
+  display: flex;
+  align-items: center;
+  margin: map-get($spacing, 4) 0 map-get($spacing, 3);
+  padding: map-get($spacing, 2) map-get($spacing, 3);
+  background: var(--header-bg);
+  border-radius: map-get($border-radius, 'md');
+  border-left-width: 4px;
+  box-shadow: map-get($shadows, 'sm');
+
+  .category-title {
+    margin: 0;
+    font-size: map-get($font-sizes, 'lg');
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
+
+// Grid responsivo para cards
+.cards-grid {
+  display: grid;
+  gap: map-get($spacing, 3);
+  
+  grid-template-columns: repeat(2, 1fr);
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  @media (min-width: 1440px) {
+     grid-template-columns: repeat(8, 1fr);
+  }
+}
+
+// Animações
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+// Encontra o container horizontal que segura as colunas
+.stHorizontalBlock {
+
+  // Aplica estilos a cada coluna (stColumn) dentro do bloco horizontal
+  > .stColumn {
+    border: 2px solid; // Borda base
+    border-radius: 8px;
+    padding: 15px 10px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+
+    // Estilos específicos por coluna
+    &:nth-child(1) { // Coluna 1: Sucesso
+      border-color: green !important;
+      background-color: rgba(0, 128, 0, 0.08); // Fundo verde bem claro
+      .category-title { // Título dentro da coluna Sucesso
+        color: green;
+      }
+    }
+    &:nth-child(2) { // Coluna 2: Em Andamento
+      border-color: orange !important;
+      border-style: dashed !important; // Borda tracejada
+      background-color: rgba(255, 165, 0, 0.08); // Fundo amarelo/laranja bem claro
+      .category-title { // Título dentro da coluna Em Andamento
+        color: orange;
+      }
+    }
+    &:nth-child(3) { // Coluna 3: Falha
+      border-color: red !important;
+      background-color: rgba(255, 0, 0, 0.07); // Fundo vermelho bem claro
+      .category-title { // Título dentro da coluna Falha
+        color: red;
+      }
+    }
+  }
+}
+
+// --- Estilos para o conteúdo DENTRO das colunas ---
+
+// Estilo para os cards individuais
+.card-visao-geral {
+  // border: 1px solid red !important; // Borda interna opcional
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 5px;
+  background-clip: padding-box;
+  background-color: #ffffff; // Fundo branco padrão para cards (contraste com fundo da coluna)
+}
+
+// Grid CSS para empilhar os cards
+.cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+// Estilos para o cabeçalho da categoria
+.category-header {
+  margin-bottom: 15px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #eee;
+
+  .category-title {
+    margin-bottom: 0;
+    font-weight: bold;
+    font-size: 1.1em;
+    text-align: center;
+    // A cor é herdada ou definida nos seletores :nth-child acima
+  }
+}
+
+// Ajustes nos títulos e métricas dentro de cada card
+.card-visao-geral__title {
+  font-size: 0.95em;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.card-visao-geral__metrics {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1em;
+
+  .card-visao-geral__quantity {
+    font-weight: bold;
+    color: #000;
+  }
+  // Estilos atualizados para o percentual
+  .card-visao-geral__percentage {
+    // color: #555; // Cor antiga removida
+    font-size: 0.95em; // Um pouco maior
+    font-weight: bold; // Negrito
+    color: blue; // Cor azul
+    // Remover background e padding se não quiser mais o estilo de "tag"
+    // display: inline-flex;
+    // padding: 0.25rem 0.5rem;
+    // border-radius: 9999px;
+    // background-color: var(--percent-bg);
+  }
+}
+
+// --- Estilos para Métricas Removidos (Serão Injetados em Python) ---
+/*
+// Estilo Comum para TODOS os LABELS de st.metric nas seções relevantes
+.metric-container-cartorio [data-testid="stMetricLabel"],
+.metric-success-percentage [data-testid="stMetricLabel"] { ... }
+
+// Estilo para Container das Métricas de Cartório (Borda Tracejada)
+.metric-container-cartorio { ... }
+
+// Estilo Específico para Valor da Métrica de Sucesso
+.metric-success-percentage { ... }
+*/
+
+// --- Bloco de estilos para sub-botões removido (mantido comentado) ---
+/*
+// --- NOVOS Estilos PERSISTENTES para Sub-botões ---
+
+// Estilo base que queremos para TODOS os sub-botões
+%sub-button-persistent-style { ... }
+
+// Aplica margem/recuo ao container do elemento
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] { ... }
+
+// Aplica o estilo base a TODOS os botões sub-menu (ignora 'kind' inicialmente)
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]) { ... }
+
+// Modificação SUTIL APENAS para o botão ATIVO (primary)
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button[kind="primary"]:not([data-testid="stIconButton"]) { ... }
+*/ 

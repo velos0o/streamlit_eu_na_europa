@@ -301,4 +301,84 @@ a:hover {
     padding: 4px 8px;
     border-radius: 4px;
     font-weight: 500;
+}
+
+/* Estilos para st.tabs */
+div[data-baseweb="tab-list"] {
+    justify-content: flex-end !important; /* Alinha as abas à direita */
+}
+
+div[data-baseweb="tab-list"] > button[role="tab"] {
+    margin-left: 8px !important; /* Adiciona um pequeno espaço entre as abas */
+    border-radius: 8px 8px 0 0 !important; /* Cantos superiores arredondados */
+    border: none !important;
+    background-color: var(--secondary-color) !important;
+    color: var(--text-secondary) !important;
+    transition: background-color 0.3s, color 0.3s !important;
+}
+
+div[data-baseweb="tab-list"] > button[role="tab"]:hover {
+    background-color: var(--primary-light) !important;
+    color: white !important;
+}
+
+div[data-baseweb="tab-list"] > button[role="tab"][aria-selected="true"] {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+/* Aplicar cores específicas para cada aba (exemplo) */
+/* Ajuste os seletores nth-child conforme a ordem das suas abas */
+
+/* Aba 1: Visão Geral */
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(1)[aria-selected="true"] {
+    background-color: var(--primary-color) !important; /* Azul padrão */
+}
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(1):not([aria-selected="true"]) {
+    background-color: #e3f2fd !important; /* Azul claro para inativo */
+    color: var(--primary-dark) !important;
+}
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(1):hover {
+    background-color: var(--primary-light) !important;
+    color: white !important;
+}
+
+/* Aba 2: Acompanhamento */
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(2)[aria-selected="true"] {
+    background-color: var(--success-color) !important; /* Verde */
+}
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(2):not([aria-selected="true"]) {
+    background-color: #e8f5e9 !important; /* Verde claro para inativo */
+    color: #1b5e20 !important;
+}
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(2):hover {
+    background-color: #81c784 !important; /* Verde mais claro no hover */
+    color: white !important;
+}
+
+/* Aba 3: Produção */
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(3)[aria-selected="true"] {
+    background-color: var(--warning-color) !important; /* Amarelo */
+}
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(3):not([aria-selected="true"]) {
+    background-color: #fff8e1 !important; /* Amarelo claro para inativo */
+    color: #ff8f00 !important;
+}
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(3):hover {
+    background-color: #ffd54f !important; /* Amarelo mais claro no hover */
+    color: #333 !important; /* Cor de texto escura para contraste */
+}
+
+/* Aba 4: Pendências */
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(4)[aria-selected="true"] {
+    background-color: var(--error-color) !important; /* Vermelho */
+}
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(4):not([aria-selected="true"]) {
+    background-color: #ffebee !important; /* Vermelho claro para inativo */
+    color: #c62828 !important;
+}
+div[data-baseweb="tab-list"] > button[role="tab"]:nth-child(4):hover {
+    background-color: #e57373 !important; /* Vermelho mais claro no hover */
+    color: white !important;
 } 

@@ -1,0 +1,112 @@
+@use 'variables' as *;
+
+// Mixin para tema escuro
+@mixin dark-mode {
+  body.dark & {
+    @content;
+  }
+}
+
+// Mixin para gradiente
+@mixin gradient($direction, $start-color, $end-color) {
+  background: linear-gradient(#{$direction}, #{$start-color}, #{$end-color});
+}
+
+// Mixin para sombra com hover
+@mixin hover-shadow {
+  transition: $transition-base;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: map-get($shadows, 'md');
+  }
+}
+
+// Mixin para texto truncado
+@mixin text-truncate($lines: 1) {
+  display: -webkit-box;
+  -webkit-line-clamp: $lines;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// Mixin para flex center
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Mixin para flex space-between
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+// Mixin para borda com gradiente
+@mixin border-gradient($direction, $color) {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(#{$direction}, #{$color}, transparent);
+    opacity: 0.5;
+  }
+}
+
+// Mixin para texto com gradiente
+@mixin text-gradient($start-color, $end-color) {
+  background: linear-gradient(135deg, #{$start-color}, #{$end-color});
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: $start-color; // Fallback
+}
+
+// Mixin para cartão base
+@mixin card-base {
+  background: var(--card-bg);
+  border-radius: map-get($border-radius, 'lg');
+  padding: map-get($spacing, 4);
+  box-shadow: map-get($shadows, 'sm');
+  transition: $transition-base;
+}
+
+// Mixin para badge/pill
+@mixin badge($bg-color, $text-color) {
+  display: inline-flex;
+  align-items: center;
+  padding: map-get($spacing, 1) map-get($spacing, 2);
+  border-radius: map-get($border-radius, 'full');
+  background-color: $bg-color;
+  color: $text-color;
+  font-size: map-get($font-sizes, 'xs');
+  font-weight: 600;
+  line-height: 1;
+}
+
+// Mixin para responsividade
+@mixin responsive($breakpoint) {
+  @if $breakpoint == sm {
+    @media (min-width: 640px) { @content; }
+  } @else if $breakpoint == md {
+    @media (min-width: 768px) { @content; }
+  } @else if $breakpoint == lg {
+    @media (min-width: 1024px) { @content; }
+  } @else if $breakpoint == xl {
+    @media (min-width: 1280px) { @content; }
+  }
+}
+
+// Mixin para animação suave
+@mixin smooth-transition($properties...) {
+  $transitions: ();
+  @each $prop in $properties {
+    $transitions: append($transitions, $prop 0.2s ease, comma);
+  }
+  transition: $transitions;
+} 

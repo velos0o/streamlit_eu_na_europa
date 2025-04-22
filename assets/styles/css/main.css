@@ -1,0 +1,279 @@
+@charset "UTF-8";
+@use 'variables' as *;
+@use 'variables' as *;
+.card-visao-geral {
+  background: var(--card-bg);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: "0 1px 2px rgba(0, 0, 0, 0.05)";
+  transition: all 0.2s ease;
+  transition: all 0.2s ease;
+  height: 65px;
+  border-left-width: 3px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.5rem; }
+  .card-visao-geral:hover {
+    transform: translateY(-2px);
+    box-shadow: "0 4px 6px rgba(0, 0, 0, 0.1)"; }
+  .card-visao-geral::before {
+    position: relative; }
+    .card-visao-geral::before::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(to right, currentColor, transparent);
+      opacity: 0.5; }
+  .card-visao-geral__title {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--card-text);
+    margin-bottom: 0.25rem;
+    min-height: auto;
+    line-height: 1.2; }
+  .card-visao-geral__metrics {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.25rem;
+    border-top: none; }
+  .card-visao-geral__quantity {
+    font-size: 1.125rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, currentColor, currentColor);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: currentColor;
+    line-height: 1; }
+  .card-visao-geral__percentage {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    background-color: var(--percent-bg);
+    color: var(--percent-text);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    font-size: 0.75rem;
+    padding: 2px 4px;
+    line-height: 1; }
+  .card-visao-geral--success {
+    border-left-color: #22C55E; }
+    .card-visao-geral--success .card-visao-geral__quantity {
+      color: #22C55E; }
+    .card-visao-geral--success::before {
+      background: linear-gradient(to right, #22C55E, transparent); }
+  .card-visao-geral--warning {
+    border-left-color: #F59E0B; }
+    .card-visao-geral--warning .card-visao-geral__quantity {
+      color: #F59E0B; }
+    .card-visao-geral--warning::before {
+      background: linear-gradient(to right, #F59E0B, transparent); }
+  .card-visao-geral--danger {
+    border-left-color: #EF4444; }
+    .card-visao-geral--danger .card-visao-geral__quantity {
+      color: #EF4444; }
+    .card-visao-geral--danger::before {
+      background: linear-gradient(to right, #EF4444, transparent); }
+  body.dark .card-visao-geral--success {
+    border-left-color: #4ADE80; }
+    body.dark .card-visao-geral--success .card-visao-geral__quantity {
+      color: #4ADE80; }
+  body.dark .card-visao-geral--warning {
+    border-left-color: #FBBF24; }
+    body.dark .card-visao-geral--warning .card-visao-geral__quantity {
+      color: #FBBF24; }
+  body.dark .card-visao-geral--danger {
+    border-left-color: #F87171; }
+    body.dark .card-visao-geral--danger .card-visao-geral__quantity {
+      color: #F87171; }
+  @media (min-width: 640px) {
+    .card-visao-geral {
+      height: 70px; }
+      .card-visao-geral__title {
+        font-size: 0.875rem; }
+      .card-visao-geral__quantity {
+        font-size: 1.25rem; } }
+:root {
+  --card-bg: #FFFFFF;
+  --card-text: #1E293B;
+  --card-border: #E2E8F0;
+  --header-bg: #F1F5F9;
+  --percent-text: #475569;
+  --percent-bg: rgba(0, 0, 0, 0.05); }
+
+body.dark {
+  --card-bg: #1E293B;
+  --card-text: #F8FAFC;
+  --card-border: #334155;
+  --header-bg: #0F172A;
+  --percent-text: #CBD5E1;
+  --percent-bg: rgba(255, 255, 255, 0.1); }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  color: var(--card-text);
+  background-color: var(--card-bg); }
+
+.section-title {
+  color: #2563EB;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid #3B82F6;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.05); }
+
+.divisor {
+  margin: 1rem 0;
+  height: 1px;
+  background: linear-gradient(to right, var(--card-border), transparent); }
+
+.category-header {
+  display: flex;
+  align-items: center;
+  margin: 1rem 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--header-bg);
+  border-radius: 0.375rem;
+  border-left-width: 4px;
+  box-shadow: "0 1px 2px rgba(0, 0, 0, 0.05)"; }
+  .category-header .category-title {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em; }
+
+.cards-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, 1fr); }
+  @media (min-width: 640px) {
+    .cards-grid {
+      grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 768px) {
+    .cards-grid {
+      grid-template-columns: repeat(4, 1fr); } }
+  @media (min-width: 1024px) {
+    .cards-grid {
+      grid-template-columns: repeat(6, 1fr); } }
+  @media (min-width: 1440px) {
+    .cards-grid {
+      grid-template-columns: repeat(8, 1fr); } }
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px); }
+  to {
+    opacity: 1;
+    transform: translateY(0); } }
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards; }
+
+.stHorizontalBlock > .stColumn {
+  border: 2px solid;
+  border-radius: 8px;
+  padding: 15px 10px;
+  height: 100%;
+  display: flex;
+  flex-direction: column; }
+  .stHorizontalBlock > .stColumn:nth-child(1) {
+    border-color: green !important;
+    background-color: rgba(0, 128, 0, 0.08); }
+    .stHorizontalBlock > .stColumn:nth-child(1) .category-title {
+      color: green; }
+  .stHorizontalBlock > .stColumn:nth-child(2) {
+    border-color: orange !important;
+    border-style: dashed !important;
+    background-color: rgba(255, 165, 0, 0.08); }
+    .stHorizontalBlock > .stColumn:nth-child(2) .category-title {
+      color: orange; }
+  .stHorizontalBlock > .stColumn:nth-child(3) {
+    border-color: red !important;
+    background-color: rgba(255, 0, 0, 0.07); }
+    .stHorizontalBlock > .stColumn:nth-child(3) .category-title {
+      color: red; }
+
+.card-visao-geral {
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 5px;
+  background-clip: padding-box;
+  background-color: #ffffff; }
+
+.cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; }
+
+.category-header {
+  margin-bottom: 15px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #eee; }
+  .category-header .category-title {
+    margin-bottom: 0;
+    font-weight: bold;
+    font-size: 1.1em;
+    text-align: center; }
+
+.card-visao-geral__title {
+  font-size: 0.95em;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333; }
+
+.card-visao-geral__metrics {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1em; }
+  .card-visao-geral__metrics .card-visao-geral__quantity {
+    font-weight: bold;
+    color: #000; }
+  .card-visao-geral__metrics .card-visao-geral__percentage {
+    font-size: 0.95em;
+    font-weight: bold;
+    color: blue; }
+
+/*
+// Estilo Comum para TODOS os LABELS de st.metric nas seções relevantes
+.metric-container-cartorio [data-testid="stMetricLabel"],
+.metric-success-percentage [data-testid="stMetricLabel"] { ... }
+
+// Estilo para Container das Métricas de Cartório (Borda Tracejada)
+.metric-container-cartorio { ... }
+
+// Estilo Específico para Valor da Métrica de Sucesso
+.metric-success-percentage { ... }
+*/
+/*
+// --- NOVOS Estilos PERSISTENTES para Sub-botões ---
+
+// Estilo base que queremos para TODOS os sub-botões
+%sub-button-persistent-style { ... }
+
+// Aplica margem/recuo ao container do elemento
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] { ... }
+
+// Aplica o estilo base a TODOS os botões sub-menu (ignora 'kind' inicialmente)
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]) { ... }
+
+// Modificação SUTIL APENAS para o botão ATIVO (primary)
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button[kind="primary"]:not([data-testid="stIconButton"]) { ... }
+*/
