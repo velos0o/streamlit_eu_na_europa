@@ -1,5 +1,5 @@
 import streamlit as st
-from .data_loader import carregar_dados_comune, carregar_dados_negocios, carregar_estagios_bitrix
+from .data_loader import carregar_dados_comune, carregar_dados_negocios, carregar_estagios_bitrix, mapear_estagios_comune, mapear_estagios_macro
 from .analysis import criar_visao_geral_comune, criar_visao_macro, cruzar_comune_deal, analisar_distribuicao_deals, analisar_registros_sem_correspondencia, calcular_tempo_solicitacao, criar_metricas_certidoes, criar_metricas_tempo_dias, calcular_tempo_solicitacao_providencia
 from .visualization import (
     visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro,
@@ -7,8 +7,9 @@ from .visualization import (
     visualizar_tempo_solicitacao, visualizar_metricas_certidoes,
     visualizar_metricas_tempo_dias, visualizar_analise_evidencia,
     visualizar_providencias, visualizar_tempo_solicitacao_providencia,
-    visualizar_tempo_solicitacao_individual
+    visualizar_tempo_solicitacao_individual, visualizar_estagios_detalhados
 )
+from .mapa_cat58 import visualizar_mapa_cat58
 
 # Forçar recarregamento do módulo de visualização
 import importlib
@@ -36,6 +37,26 @@ sys.path.insert(0, str(utils_path))
 # Importar funções necessárias
 from bitrix_connector import load_bitrix_data
 from refresh_utils import handle_refresh_trigger, get_force_reload_status, clear_force_reload_flag
+
+@st.cache_data(ttl=3600) # Cache de 1 hora
+def cached_load_comune_data(force_reload=False):
+    """
+    Carrega e cacheia os dados do COMUNE especificamente para a categoria 22.
+    """
+    print(f"Tentando carregar dados para Categoria 22... Force Reload: {force_reload}")
+    df = carregar_dados_comune(category_id="22", force_reload=force_reload)
+    print(f"Dados para Categoria 22 carregados. {len(df) if df is not None else 0} registros.")
+    return df
+
+@st.cache_data(ttl=3600) # Cache de 1 hora
+def cached_load_comune_data_cat58(force_reload=False):
+    """
+    Carrega e cacheia os dados do COMUNE especificamente para a categoria 58.
+    """
+    print(f"Tentando carregar dados para Categoria 58... Force Reload: {force_reload}")
+    df = carregar_dados_comune(category_id="58", force_reload=force_reload)
+    print(f"Dados para Categoria 58 carregados. {len(df) if df is not None else 0} registros.")
+    return df
 
 def show_comune():
     """
@@ -115,7 +136,7 @@ def show_comune():
     
     # Carregar os dados
     with st.spinner("Carregando dados..."):
-        df_comune = carregar_dados_comune(force_reload=force_reload)
+        df_comune = cached_load_comune_data(force_reload)
         df_deal, df_deal_uf = carregar_dados_negocios(force_reload=force_reload)
         
         # Salvar o df_comune na sessão para uso em outras funções
@@ -169,6 +190,7 @@ def show_comune():
             "🗺️ Tempo x Província",
             "📄 Evidencia Comprovante",
             "🇮🇹 PROVÍNCIA",
+            "🗺️ MAPA PROVÍNCIA - Angélica",
         ]
         tabs = st.tabs(tab_nomes)
 
@@ -509,12 +531,32 @@ def show_comune():
         # Aba Evidencia
         with tabs[tab_map["📄 Evidencia Comprovante"]]:
             # Chamar a função de visualização da análise de evidência
-            visualizar_analise_evidencia(df_comune)
+            # Nota: Esta função pode precisar de dados de uma análise específica.
+            # Se ocorrer erro aqui, verificar a função visualizar_analise_evidencia.
+            try:
+                visualizar_analise_evidencia(df_comune)
+            except Exception as e:
+                st.error(f"Erro ao gerar visualização de Evidência: {e}")
+                st.warning("Verifique se a função 'visualizar_analise_evidencia' tem os dados necessários.")
         
         # Aba PROVÍNCIA
         with tabs[tab_map["🇮🇹 PROVÍNCIA"]]:
             # Chamar a função de visualização por providência
             visualizar_providencias(df_comune)
+            
+        # Nova aba para o Mapa Província Categoria 58
+        with tabs[tab_map["🗺️ MAPA PROVÍNCIA - Angélica"]]:
+            # Carregar dados da categoria 58
+            if 'df_comune_cat58' not in locals():
+                with st.spinner("Carregando dados da categoria 58..."):
+                    df_comune_cat58 = cached_load_comune_data_cat58(force_reload)
+            
+            # Visualizar o mapa com os dados da categoria 58
+            if df_comune_cat58 is not None and not df_comune_cat58.empty:
+                visualizar_mapa_cat58(df_comune_cat58)
+            else:
+                st.warning("Não foi possível carregar os dados da categoria 58 para o mapa de província.")
+                st.info("Verifique se os dados da categoria 58 estão disponíveis no Bitrix24.")
     
     # Adicionar download dos dados
     if not df_comune.empty:
@@ -547,4 +589,21 @@ def show_comune():
             data=buffer.getvalue(),
             file_name=f"comune_bitrix24_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.ms-excel"
-        ) 
+        )
+
+    # 1.1 Carregar dados COMUNE Categoria 58 (cacheado)
+    start_time_cat58 = datetime.now()
+    df_comune_cat58 = cached_load_comune_data_cat58(force_reload)
+    end_time_cat58 = datetime.now()
+    st.info(f"Tempo de carregamento (Comune - Cat 58): {(end_time_cat58 - start_time_cat58).total_seconds():.2f} segundos")
+
+    # --- SEÇÃO 7: Análise de Tempo Individual ---
+    st.markdown("--- <br> **Análise de Tempo Individual**", unsafe_allow_html=True)
+    if 'df_comune' in st.session_state and not st.session_state['df_comune'].empty:
+        st.info("Para ver a análise de tempo individual, acesse a aba '⏱️ Tempo Individual' no menu acima.")
+    else:
+        st.warning("Dados do Comune (Cat 22) não carregados para análise de tempo individual.")
+
+# Chamada da função principal para teste local
+if __name__ == "__main__":
+    show_comune() 

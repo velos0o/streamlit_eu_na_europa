@@ -292,12 +292,13 @@ def carregar_coordenadas_mapa():
         st.error(f"Erro ao ler ou processar o arquivo JSON de coordenadas: {e}")
         return pd.DataFrame()
 
-def carregar_dados_comune(force_reload=False):
+def carregar_dados_comune(category_id="22", force_reload=False):
     """
-    Carrega dados do Bitrix, normaliza locais (com limpeza prévia), 
-    junta datas e coordenadas (APENAS fuzzy matching no Comune).
+    Carrega dados do Bitrix para um category_id específico, normaliza locais, 
+    junta datas e coordenadas.
     
     Args:
+        category_id (str): O ID da categoria do item dinâmico a ser carregado. Padrão é "22".
         force_reload (bool): Se True, força o recarregamento dos dados ignorando o cache
         
     Returns:
@@ -311,11 +312,15 @@ def carregar_dados_comune(force_reload=False):
     BITRIX_TOKEN, BITRIX_URL = get_credentials()
     url_items = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_dynamic_items_1052"
     category_filter = {"dimensionsFilters": [[{
-        "fieldName": "CATEGORY_ID", "values": ["22"], "type": "INCLUDE", "operator": "EQUALS"
+        "fieldName": "CATEGORY_ID", "values": [str(category_id)], "type": "INCLUDE", "operator": "EQUALS"
     }]]}
     df_items = load_bitrix_data(url_items, filters=category_filter, force_reload=force_reload)
-    if df_items is None or df_items.empty: return pd.DataFrame()
-    if 'ID' not in df_items.columns: return pd.DataFrame()
+    if df_items is None or df_items.empty:
+        st.warning(f"Nenhum dado encontrado para a categoria {category_id}.")
+        return pd.DataFrame()
+    if 'ID' not in df_items.columns:
+        st.error("Coluna 'ID' não encontrada nos dados carregados.")
+        return pd.DataFrame()
     df_items['ID'] = df_items['ID'].astype(str)
 
     # --- Normalizar Locais Bitrix (com limpeza prévia do Comune) --- 
@@ -353,7 +358,7 @@ def carregar_dados_comune(force_reload=False):
     df_items['COORD_SOURCE'] = pd.NA
 
     if not df_coordenadas.empty and process is not None and fuzz is not None:
-        print("\nIniciando busca de coordenadas via correspondência múltipla...")
+        print(f"\nIniciando busca de coordenadas para category_id={category_id} via correspondência múltipla...")
         # Lista de nomes de comunes únicos do JSON para comparar
         json_comunes_norm_list = df_coordenadas['COMUNE_MAPA_NORM'].unique().tolist()
         if 'nao especificado' in json_comunes_norm_list: 
@@ -536,7 +541,7 @@ def carregar_dados_comune(force_reload=False):
             
             # MELHORIA: Implementar múltiplos tipos de matching
             # 1. Match exato (Comune + Província)
-            print("Aplicando correspondência exata (Comune + Província)...")
+            print(f"Aplicando correspondência exata (Comune + Província) para category_id={category_id}...")
             for idx, row in df_items.iterrows():
                 # Pular se já tem coordenadas
                 if pd.notna(row['latitude']) and pd.notna(row['longitude']):
@@ -562,10 +567,10 @@ def carregar_dados_comune(force_reload=False):
             
             # Contagem de matches exatos
             exact_matches = df_items[df_items['COORD_SOURCE'] == 'ExactMatch_ComuneProv'].shape[0]
-            print(f"Encontrados {exact_matches} correspondências exatas (Comune + Província)")
+            print(f"Encontrados {exact_matches} correspondências exatas (Comune + Província) para category_id={category_id}")
             
             # 2. Match exato (apenas Comune)
-            print("Aplicando correspondência exata (apenas Comune)...")
+            print(f"Aplicando correspondência exata (apenas Comune) para category_id={category_id}...")
             for idx, row in df_items.iterrows():
                 if pd.notna(row['latitude']) and pd.notna(row['longitude']):
                     continue  # Pular se já tem coordenadas
@@ -585,10 +590,10 @@ def carregar_dados_comune(force_reload=False):
             
             # Contagem de matches exatos por comune
             comune_matches = df_items[df_items['COORD_SOURCE'] == 'ExactMatch_Comune'].shape[0]
-            print(f"Encontrados {comune_matches} correspondências exatas (apenas Comune)")
+            print(f"Encontrados {comune_matches} correspondências exatas (apenas Comune) para category_id={category_id}")
             
             # 3. Match Fuzzy (Comune)
-            print("Aplicando correspondência fuzzy...")
+            print(f"Aplicando correspondência fuzzy para category_id={category_id}...")
             fuzzy_matches_map = {}
             # MELHORIA: Usar threshold mais baixo para aumentar correspondências
             match_threshold = 80  # Reduzindo para aumentar as correspondências (era 85)
@@ -696,7 +701,7 @@ def carregar_dados_comune(force_reload=False):
 
             # 5. NOVO: Para casos ainda sem correspondência, tentar pelo início do nome
             # Isso ajuda em casos onde o nome está parcialmente digitado
-            print("Aplicando correspondência por início do nome para casos sem match...")
+            print(f"Aplicando correspondência por início do nome para casos sem match (category_id={category_id})...")
             for idx, row in df_items.iterrows():
                 # Pular se já tem coordenadas
                 if pd.notna(row['latitude']) and pd.notna(row['longitude']):
@@ -724,7 +729,7 @@ def carregar_dados_comune(force_reload=False):
 
             # 6. Último recurso: tentar match por província
             # Após todas as tentativas, use a província como último recurso
-            print("Aplicando correspondência por província para casos sem match...")
+            print(f"Aplicando correspondência por província para casos sem match (category_id={category_id})...")
             for idx, row in df_items.iterrows():
                 # Pular se já tem coordenadas
                 if pd.notna(row['latitude']) and pd.notna(row['longitude']):
@@ -768,12 +773,12 @@ def carregar_dados_comune(force_reload=False):
             prefix_matches = df_items[df_items['COORD_SOURCE'].str.contains('Prefix', na=False)].shape[0] if 'COORD_SOURCE' in df_items.columns else 0
             provincia_matches = df_items[df_items['COORD_SOURCE'].str.contains('Provincia', na=False)].shape[0] if 'COORD_SOURCE' in df_items.columns else 0
             
-            print(f"Correspondências encontradas - Fuzzy: {fuzzy_matches}, Prefixo: {prefix_matches}, Província: {provincia_matches}")
+            print(f"Correspondências encontradas (category_id={category_id}) - Fuzzy: {fuzzy_matches}, Prefixo: {prefix_matches}, Província: {provincia_matches}")
             
             total_matches = df_items[pd.notna(df_items['latitude']) & pd.notna(df_items['longitude'])].shape[0]
             match_rate = (total_matches / len(df_items)) * 100 if len(df_items) > 0 else 0
             
-            print(f"Taxa de correspondência total: {match_rate:.1f}% ({total_matches}/{len(df_items)})")
+            print(f"Taxa de correspondência total (category_id={category_id}): {match_rate:.1f}% ({total_matches}/{len(df_items)})")
     
     # Aplicar limpeza final e conversão de tipos
     if 'latitude' in df_items.columns and 'longitude' in df_items.columns:
@@ -820,7 +825,7 @@ def carregar_dados_negocios(force_reload=False):
     df_deal = load_bitrix_data(url_deal, filters=category_filter, force_reload=force_reload)
     
     # Verificar se conseguiu carregar os dados
-    if df_deal.empty:
+    if df_deal is None or df_deal.empty:
         print("Nenhum dado encontrado para CRM_DEAL com CATEGORY_ID=32")
         return pd.DataFrame(), pd.DataFrame()
     else:
@@ -873,7 +878,7 @@ def carregar_dados_negocios(force_reload=False):
     df_deal_uf = load_bitrix_data(url_deal_uf, filters=deal_filter, force_reload=force_reload)
     
     # Verificar se conseguiu carregar os dados
-    if df_deal_uf.empty:
+    if df_deal_uf is None or df_deal_uf.empty:
         print("Nenhum dado encontrado em DEAL_UF para os IDs filtrados")
         return df_deal, pd.DataFrame()
     else:

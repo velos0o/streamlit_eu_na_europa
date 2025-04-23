@@ -3648,7 +3648,7 @@ def visualizar_tempo_solicitacao_individual(df_comune_completo):
         max_value=slider_max,
         value=(min_dias, max_dias),
         step=1,
-        key="slider_tempo_individual" # Adicionar chave única para o slider
+        key=f"slider_tempo_individual_{id(df_individual)}"  # Usando ID do dataframe para criar chave única
     )
 
     # Filtrar o DataFrame com base no slider
