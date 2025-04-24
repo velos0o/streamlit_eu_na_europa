@@ -1,0 +1,43 @@
+// assets/styles/scss/components/_tables.scss
+
+// Estilos para tabelas geradas por st.dataframe (usando seletores padrão)
+// Pode ser refinado usando uma classe específica se necessário.
+
+.stDataFrame {
+  th { /* Cabeçalho */
+    font-weight: bold;
+    background-color: #f8f9fa; /* Cor de fundo leve */
+    text-align: center;
+    color: #343a40; // Cor do texto do cabeçalho
+  }
+
+  // Alinhamento e Estilo por coluna (baseado na ordem ATUAL em acompanhamento.py)
+  // data-col indexa a partir de 0
+  td {
+    text-align: center; // Centraliza a maioria por padrão
+    vertical-align: middle; // Alinha verticalmente ao centro
+  }
+
+  td[data-col='0'] { // Nome da Família
+    text-align: left; // Alinha nome da família à esquerda
+    font-weight: 500;
+  }
+
+  /* Colunas Cinza */
+  td[data-col='1'], /* Total Requerentes */
+  td[data-col='2']  /* Total Certidões */
+  {
+    color: #6c757d; /* Cinza Bootstrap */
+    font-weight: 500;
+  }
+
+  /* Colunas Verde */
+  td[data-col='3'] /* Concluídas */
+  {
+    color: #198754; /* Verde Bootstrap Success */
+    font-weight: bold;
+  }
+
+  /* A coluna % Conclusão (data-col='4') é estilizada pelo ProgressColumn */
+  td[data-col='4'] { }
+} 

@@ -1,0 +1,93 @@
+/* assets/styles/scss/components/_metrics_cartorio.scss */
+
+/* Estilos base para st.metric */
+[data-testid="stMetric"] {
+  background-color: #f8f9fa; /* Cor de fundo clara */
+  border: 1px solid #dee2e6; /* Borda sutil */
+  border-radius: 0.375rem; /* Bordas arredondadas (equivalente a Bootstrap .rounded) */
+  padding: 1rem; /* Espaçamento interno */
+  margin-bottom: 1rem; /* Espaço abaixo de cada métrica */
+  transition: box-shadow 0.15s ease-in-out; /* Transição suave para hover */
+
+  &:hover {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); /* Sombra suave no hover */
+  }
+
+  /* Estilo do Label */
+  label[data-testid="stMetricLabel"] {
+    p {
+      font-weight: 600 !important; /* Negrito */
+      color: #495057 !important; /* Cor do texto (cinza escuro) */
+      margin-bottom: 0.25rem !important; /* Espaço menor abaixo do label */
+      font-size: 0.9rem; /* Tamanho da fonte ligeiramente menor */
+    }
+  }
+
+  /* Estilo do Valor */
+  div[data-testid="stMetricValue"] {
+    font-size: 1.75rem !important; /* Tamanho maior para o valor */
+    font-weight: 500 !important; /* Peso da fonte */
+    color: #212529 !important; /* Cor do texto (quase preto) */
+  }
+
+  /* Estilo do Delta (se houver) - opcional */
+  div[data-testid="stMetricDelta"] {
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+  }
+}
+
+/* Estilos específicos para métricas dentro de colunas (como em visao_geral.py) */
+/* Seleciona stMetric que são filhos diretos de elementos dentro de stColumn */
+div[data-testid="stVerticalBlock"] > div[style*="column"] > div[data-testid="element-container"] > div[data-testid="stMetric"],
+/* Seleciona stMetric dentro de stHorizontalBlock > stColumn (caso comum) */
+div[data-testid="stHorizontalBlock"] > div[data-testid*="stColumn"] > div > div > div > div[data-testid="stMetric"] {
+  border: 1px solid #ced4da;
+  background-color: #ffffff; /* Fundo branco para destaque */
+  /* Outros estilos específicos, se necessário */
+}
+
+
+/* Estilo específico para a métrica de Percentual de Conclusão (baseado no CSS injetado) */
+/* Idealmente, usar uma classe CSS se possível, mas data-testid pode funcionar */
+div[data-testid="stMetric"]:has(label p:contains("Percentual de Conclusão")) {
+  border-left: 5px solid #198754; /* Borda verde à esquerda */
+  background-color: rgba(25, 135, 84, 0.05); /* Fundo levemente esverdeado */
+
+  /* Valor em verde */
+  div[data-testid="stMetricValue"] {
+     &, > div, > p { /* Target value container and potential inner tags */
+        color: #198754 !important; /* Verde */
+        font-weight: 600 !important;
+     }
+  }
+}
+
+/* Estilo para métricas dentro dos cards de categoria em producao.py */
+/* Usando as classes que já definimos para os cards */
+.card-visao-geral {
+  /* Resetar estilos gerais de stMetric se necessário, ou adicionar específicos */
+  [data-testid="stMetric"] {
+    border: none;
+    background-color: transparent;
+    padding: 0.5rem; /* Menor padding dentro dos cards */
+    margin-bottom: 0.5rem;
+
+    label[data-testid="stMetricLabel"] p {
+        font-size: 0.85rem; /* Menor label dentro do card */
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 1.5rem; /* Menor valor dentro do card */
+    }
+  }
+
+  &--sucesso [data-testid="stMetric"] div[data-testid="stMetricValue"] {
+      color: #198754 !important; /* Verde */
+  }
+  &--em-andamento [data-testid="stMetric"] div[data-testid="stMetricValue"] {
+      color: #fd7e14 !important; /* Laranja/Amarelo */
+  }
+   &--falha [data-testid="stMetric"] div[data-testid="stMetricValue"] {
+       color: #dc3545 !important; /* Vermelho */
+   }
+} 

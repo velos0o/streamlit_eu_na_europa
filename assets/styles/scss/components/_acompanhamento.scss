@@ -1,0 +1,63 @@
+// assets/styles/scss/components/_acompanhamento.scss
+// Estilos específicos para a página views/cartorio_new/acompanhamento.py
+
+// Exemplo: Estilizar o container das métricas (se você adicionar um container no .py)
+// .acompanhamento-metricas-container {
+//   display: grid;
+//   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+//   gap: $spacing-medium;
+//   margin-bottom: $spacing-large;
+
+//   .stMetric {
+//     background-color: $background-color-secondary;
+//     padding: $spacing-medium;
+//     border-radius: $border-radius-medium;
+//     border: 1px solid $border-color-light;
+
+//     label { // Estilizar o rótulo da métrica
+//       font-size: $font-size-small;
+//       color: $text-color-secondary;
+//     }
+
+//     div[data-testid="stMetricValue"] { // Estilizar o valor da métrica
+//       font-size: $font-size-large;
+//       font-weight: $font-weight-bold;
+//       color: $primary-color;
+//     }
+//   }
+// }
+
+// Estilizar a barra de busca
+// div[data-testid="stTextInput"][key="busca_familia_acompanhamento"] label {
+//   font-weight: $font-weight-semibold;
+//   color: $text-color-primary;
+// }
+// div[data-testid="stTextInput"][key="busca_familia_acompanhamento"] input {
+//    border-radius: $border-radius-medium;
+//    border: 1px solid $primary-color;
+//    &:focus {
+//       border-color: darken($primary-color, 10%);
+//       box-shadow: 0 0 0 2px rgba($primary-color, 0.2);
+//    }
+// }
+
+
+// Estilizar o container da tabela (se você adicionar um container no .py)
+// .acompanhamento-tabela-container {
+//   margin-top: $spacing-medium;
+
+//   .stDataFrame { // Estilos gerais para o dataframe
+//      border: 1px solid $border-color-light;
+//      border-radius: $border-radius-medium;
+
+//      // Você pode tentar estilizar cabeçalhos ou células, mas pode ser instável
+//      // a compatibilidade do Streamlit
+//      // thead th {
+//      //   background-color: $background-color-tertiary;
+//      //   color: $text-color-primary;
+//      //   font-weight: $font-weight-bold;
+//      // }
+//   }
+// }
+
+// Adicione aqui mais estilos conforme necessário 

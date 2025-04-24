@@ -42,12 +42,7 @@ rapidfuzz==3.12.2        # Dependência opcional para thefuzz
 
 # Bibliotecas para tema escuro e componentes visuais avançados
 streamlit-toggle-switch==1.0.2  # Toggle switch para alternar entre temas
-# streamlit-theme-editor==0.0.2   # Edição de temas no Streamlit (removido - indisponível no Python 3.12)
 httpx==0.27.0            # Cliente HTTP assíncrono (dependência)
 extra-streamlit-components==0.1.60  # Componentes extras avançados 
 
-# Dependências para SASS/SCSS e compilação de estilos
-libsass==0.22.0         # Compilador SASS para Python
-watchdog==3.0.0         # Monitoramento de arquivos para hot-reloading
-pathspec==0.12.1        # Dependência do watchdog para padrões de arquivo
-argh==0.31.2            # Dependência do watchdog para CLI 
+streamlit-aggrid # Para tabelas interativas avançadas

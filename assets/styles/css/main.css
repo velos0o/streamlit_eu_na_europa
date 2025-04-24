@@ -106,6 +106,145 @@
         font-size: 0.875rem; }
       .card-visao-geral__quantity {
         font-size: 1.25rem; } }
+.stDataFrame {
+  /* Colunas Cinza */
+  /* Colunas Verde */
+  /* A coluna % Conclusão (data-col='4') é estilizada pelo ProgressColumn */ }
+  .stDataFrame th {
+    /* Cabeçalho */
+    font-weight: bold;
+    background-color: #f8f9fa;
+    /* Cor de fundo leve */
+    text-align: center;
+    color: #343a40; }
+  .stDataFrame td {
+    text-align: center;
+    vertical-align: middle; }
+  .stDataFrame td[data-col='0'] {
+    text-align: left;
+    font-weight: 500; }
+  .stDataFrame td[data-col='1'],
+  .stDataFrame td[data-col='2'] {
+    color: #6c757d;
+    /* Cinza Bootstrap */
+    font-weight: 500; }
+  .stDataFrame td[data-col='3'] {
+    color: #198754;
+    /* Verde Bootstrap Success */
+    font-weight: bold; }
+
+[data-testid="stMetric"] label[data-testid="stMetricLabel"] p {
+  font-weight: 600 !important;
+  color: var(--text-strong) !important;
+  margin-bottom: 0.1rem !important;
+  text-align: center; }
+
+[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-metric); }
+
+h4:contains("Métricas Gerais") + div[data-testid="stHorizontalBlock"] > div[data-testid="stVerticalBlock"] > div.stColumn:nth-child(4) [data-testid="stMetricValue"] {
+  color: #22C55E !important; }
+
+h4:contains("Métricas Gerais") + div[data-testid="stHorizontalBlock"] > div[data-testid="stVerticalBlock"] > div.stColumn:nth-child(5) [data-testid="stMetricValue"] {
+  color: #22C55E !important; }
+
+@use 'components/pendencias_table';
+/* assets/styles/scss/components/_metrics_cartorio.scss */
+/* Estilos base para st.metric */
+[data-testid="stMetric"] {
+  background-color: #f8f9fa;
+  /* Cor de fundo clara */
+  border: 1px solid #dee2e6;
+  /* Borda sutil */
+  border-radius: 0.375rem;
+  /* Bordas arredondadas (equivalente a Bootstrap .rounded) */
+  padding: 1rem;
+  /* Espaçamento interno */
+  margin-bottom: 1rem;
+  /* Espaço abaixo de cada métrica */
+  transition: box-shadow 0.15s ease-in-out;
+  /* Transição suave para hover */
+  /* Estilo do Label */
+  /* Estilo do Valor */
+  /* Estilo do Delta (se houver) - opcional */ }
+  [data-testid="stMetric"]:hover {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    /* Sombra suave no hover */ }
+  [data-testid="stMetric"] label[data-testid="stMetricLabel"] p {
+    font-weight: 600 !important;
+    /* Negrito */
+    color: #495057 !important;
+    /* Cor do texto (cinza escuro) */
+    margin-bottom: 0.25rem !important;
+    /* Espaço menor abaixo do label */
+    font-size: 0.9rem;
+    /* Tamanho da fonte ligeiramente menor */ }
+  [data-testid="stMetric"] div[data-testid="stMetricValue"] {
+    font-size: 1.75rem !important;
+    /* Tamanho maior para o valor */
+    font-weight: 500 !important;
+    /* Peso da fonte */
+    color: #212529 !important;
+    /* Cor do texto (quase preto) */ }
+  [data-testid="stMetric"] div[data-testid="stMetricDelta"] {
+    font-size: 0.85rem !important;
+    font-weight: 500 !important; }
+
+/* Estilos específicos para métricas dentro de colunas (como em visao_geral.py) */
+/* Seleciona stMetric que são filhos diretos de elementos dentro de stColumn */
+div[data-testid="stVerticalBlock"] > div[style*="column"] > div[data-testid="element-container"] > div[data-testid="stMetric"],
+div[data-testid="stHorizontalBlock"] > div[data-testid*="stColumn"] > div > div > div > div[data-testid="stMetric"] {
+  border: 1px solid #ced4da;
+  background-color: #ffffff;
+  /* Fundo branco para destaque */
+  /* Outros estilos específicos, se necessário */ }
+
+/* Estilo específico para a métrica de Percentual de Conclusão (baseado no CSS injetado) */
+/* Idealmente, usar uma classe CSS se possível, mas data-testid pode funcionar */
+div[data-testid="stMetric"]:has(label p:contains("Percentual de Conclusão")) {
+  border-left: 5px solid #198754;
+  /* Borda verde à esquerda */
+  background-color: rgba(25, 135, 84, 0.05);
+  /* Fundo levemente esverdeado */
+  /* Valor em verde */ }
+  div[data-testid="stMetric"]:has(label p:contains("Percentual de Conclusão")) div[data-testid="stMetricValue"], div[data-testid="stMetric"]:has(label p:contains("Percentual de Conclusão")) div[data-testid="stMetricValue"] > div, div[data-testid="stMetric"]:has(label p:contains("Percentual de Conclusão")) div[data-testid="stMetricValue"] > p {
+    /* Target value container and potential inner tags */
+    color: #198754 !important;
+    /* Verde */
+    font-weight: 600 !important; }
+
+/* Estilo para métricas dentro dos cards de categoria em producao.py */
+/* Usando as classes que já definimos para os cards */
+.card-visao-geral {
+  /* Resetar estilos gerais de stMetric se necessário, ou adicionar específicos */ }
+  .card-visao-geral [data-testid="stMetric"] {
+    border: none;
+    background-color: transparent;
+    padding: 0.5rem;
+    /* Menor padding dentro dos cards */
+    margin-bottom: 0.5rem; }
+    .card-visao-geral [data-testid="stMetric"] label[data-testid="stMetricLabel"] p {
+      font-size: 0.85rem;
+      /* Menor label dentro do card */ }
+    .card-visao-geral [data-testid="stMetric"] div[data-testid="stMetricValue"] {
+      font-size: 1.5rem;
+      /* Menor valor dentro do card */ }
+  .card-visao-geral--sucesso [data-testid="stMetric"] div[data-testid="stMetricValue"] {
+    color: #198754 !important;
+    /* Verde */ }
+  .card-visao-geral--em-andamento [data-testid="stMetric"] div[data-testid="stMetricValue"] {
+    color: #fd7e14 !important;
+    /* Laranja/Amarelo */ }
+  .card-visao-geral--falha [data-testid="stMetric"] div[data-testid="stMetricValue"] {
+    color: #dc3545 !important;
+    /* Vermelho */ }
+
+@use 'components/card_styles';
+@use 'components/metric_cards';
+@use 'components/pendencias_table';
 :root {
   --card-bg: #FFFFFF;
   --card-text: #1E293B;
@@ -186,28 +325,26 @@ body {
 .fade-in {
   animation: fadeIn 0.3s ease-out forwards; }
 
-.stHorizontalBlock > .stColumn {
-  border: 2px solid;
+.stHorizontalBlock > .stColumn:has(.category-title) {
   border-radius: 8px;
   padding: 15px 10px;
   height: 100%;
   display: flex;
   flex-direction: column; }
-  .stHorizontalBlock > .stColumn:nth-child(1) {
-    border-color: green !important;
+  .stHorizontalBlock > .stColumn:has(.category-title):nth-child(1) {
+    border: 2px solid green !important;
     background-color: rgba(0, 128, 0, 0.08); }
-    .stHorizontalBlock > .stColumn:nth-child(1) .category-title {
+    .stHorizontalBlock > .stColumn:has(.category-title):nth-child(1) .category-title {
       color: green; }
-  .stHorizontalBlock > .stColumn:nth-child(2) {
-    border-color: orange !important;
-    border-style: dashed !important;
+  .stHorizontalBlock > .stColumn:has(.category-title):nth-child(2) {
+    border: 2px dashed orange !important;
     background-color: rgba(255, 165, 0, 0.08); }
-    .stHorizontalBlock > .stColumn:nth-child(2) .category-title {
+    .stHorizontalBlock > .stColumn:has(.category-title):nth-child(2) .category-title {
       color: orange; }
-  .stHorizontalBlock > .stColumn:nth-child(3) {
-    border-color: red !important;
+  .stHorizontalBlock > .stColumn:has(.category-title):nth-child(3) {
+    border: 2px solid red !important;
     background-color: rgba(255, 0, 0, 0.07); }
-    .stHorizontalBlock > .stColumn:nth-child(3) .category-title {
+    .stHorizontalBlock > .stColumn:has(.category-title):nth-child(3) .category-title {
       color: red; }
 
 .card-visao-geral {
@@ -277,3 +414,89 @@ body {
 // Modificação SUTIL APENAS para o botão ATIVO (primary)
 [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button[kind="primary"]:not([data-testid="stIconButton"]) { ... }
 */
+/* Adiciona estilos específicos para date inputs */
+[data-testid="stDateInput"] {
+  /* Tenta selecionar o container interno com as classes st-... */
+  /* Tenta aplicar estilo de foco quando o componente está focado */
+  /* Garante que o input interno REAL não tenha borda */ }
+  [data-testid="stDateInput"] div.st-ah > div[data-baseweb="input"] {
+    border: 1px solid #C0C0C0 !important;
+    /* Borda cinza prateado */
+    border-radius: 0.25rem;
+    /* Mantém um arredondamento padrão */
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    background-color: var(--background-color, #fff);
+    /* Garante fundo branco ou da variável */
+    box-shadow: none;
+    /* Remove qualquer sombra padrão */
+    /* Foco aplicado diretamente neste elemento */
+    /* Streamlit pode adicionar classes de foco aqui, mas :focus-within no pai é mais robusto */ }
+    [data-testid="stDateInput"] div.st-ah > div[data-baseweb="input"]:hover {
+      border-color: #a0a0a0 !important;
+      /* Escurece um pouco no hover */ }
+  [data-testid="stDateInput"]:has(input:focus),
+  [data-testid="stDateInput"] div.st-ah > div[data-baseweb="input"]:focus-within {
+    /* Mais genérico que input:focus */ }
+    [data-testid="stDateInput"]:has(input:focus) div.st-ah > div[data-baseweb="input"],
+    [data-testid="stDateInput"] div.st-ah > div[data-baseweb="input"]:focus-within div.st-ah > div[data-baseweb="input"] {
+      border-color: #80bdff !important;
+      /* Cor padrão do Bootstrap para foco */
+      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+      /* Sombra padrão do Bootstrap para foco */ }
+  [data-testid="stDateInput"] input {
+    border: none !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
+    /* Input interno transparente */ }
+
+/* ===== FIM ESTILOS DATE INPUT ===== */
+/* existing styles... */
+/* Certifique-se de que esta regra seja adicionada antes ou depois de outras regras globais,
+   dependendo da especificidade desejada. Colocar no final geralmente aumenta a prioridade. */
+@use 'variables' as *;
+[data-testid="stMultiSelect"]:has(label:contains("Selecione os Cartórios"))
++ [data-testid="stHorizontalBlock"] > .stColumn:nth-child(-n+3) [data-testid="stMetric"] {
+  border: 2px dashed #fd7e14 !important;
+  background-color: rgba(253, 126, 20, 0.04) !important;
+  border-radius: 6px !important;
+  padding: 0.6rem 0.8rem !important;
+  margin-bottom: 0.5rem; }
+  [data-testid="stMultiSelect"]:has(label:contains("Selecione os Cartórios"))
++ [data-testid="stHorizontalBlock"] > .stColumn:nth-child(-n+3) [data-testid="stMetric"] label[data-testid="stMetricLabel"] p {
+    font-weight: 600 !important;
+    color: #495057 !important; }
+
+[data-testid="stDateInput"] {
+  /* Tenta selecionar o container interno com as classes st-... */
+  /* Tenta aplicar estilo de foco quando o componente está focado */
+  /* Garante que o input interno REAL não tenha borda */ }
+  [data-testid="stDateInput"] div.st-ah > div[data-baseweb="input"] {
+    border: 1px solid #C0C0C0 !important;
+    /* Borda cinza prateado */
+    border-radius: 0.25rem;
+    /* Mantém um arredondamento padrão */
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    background-color: var(--background-color, #fff);
+    /* Garante fundo branco ou da variável */
+    box-shadow: none;
+    /* Remove qualquer sombra padrão */ }
+    [data-testid="stDateInput"] div.st-ah > div[data-baseweb="input"]:hover {
+      border-color: #a0a0a0 !important;
+      /* Escurece um pouco no hover */ }
+  [data-testid="stDateInput"]:has(input:focus),
+  [data-testid="stDateInput"] div.st-ah > div[data-baseweb="input"]:focus-within {
+    /* Mais genérico que input:focus */ }
+    [data-testid="stDateInput"]:has(input:focus) div.st-ah > div[data-baseweb="input"],
+    [data-testid="stDateInput"] div.st-ah > div[data-baseweb="input"]:focus-within div.st-ah > div[data-baseweb="input"] {
+      border-color: #80bdff !important;
+      /* Cor padrão do Bootstrap para foco */
+      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+      /* Sombra padrão do Bootstrap para foco */ }
+  [data-testid="stDateInput"] input {
+    border: none !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
+    /* Input interno transparente */ }
+
+/* ===== FIM ESTILOS DATE INPUT ===== */
+/* Certifique-se de que não há outras regras após esta que possam sobrescrevê-la */

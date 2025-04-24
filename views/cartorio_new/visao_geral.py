@@ -9,56 +9,11 @@ def exibir_visao_geral(df_original):
     Utiliza CSS INJETADO para estilização específica das métricas.
     """
     # --- CSS Injetado para Métricas ---
-    st.markdown("""
-    <style>
-        /* Aplica a TODOS os labels de métrica nesta página */
-        /* Targeting a <p> tag inside the label structure */
-        [data-testid="stMetric"] > label[data-testid="stMetricLabel"] p {
-            font-weight: 600 !important;
-            color: #212529 !important;
-            margin-bottom: 0.1rem !important;
-        }
-
-        /* Seleciona as 3 MÉTRICAS que estão dentro das COLUNAS após o filtro */
-        /* Assumes st.columns(3) is used for these metrics */
-        /* This selector targets the stMetric element itself */
-        div[data-testid="stMultiSelect"] + div[data-testid="stHorizontalBlock"] > .stColumn > div > div > div > div[data-testid="stMetric"] {
-             border: 2px dashed #fd7e14 !important;
-             background-color: rgba(253, 126, 20, 0.04) !important;
-             border-radius: 6px !important;
-             padding: 0.6rem 0.8rem !important;
-             /* margin-bottom might not be needed if padding is sufficient */
-             /* margin-bottom: 0.75rem !important; */ 
-        }
-        
-        /* Reforça o bold no label DENTRO das métricas com borda */
-         div[data-testid="stMultiSelect"] + div[data-testid="stHorizontalBlock"] > .stColumn > div > div > div > div[data-testid="stMetric"] label[data-testid="stMetricLabel"] p {
-             font-weight: 600 !important;
-        }
-
-
-        /* Seleciona a MÉTRICA específica de Percentual de Sucesso */
-        /* Targets the metric whose LABEL contains 'Percentual de Conclusão' */
-        /* Note: :has() and :contains() might not be supported in all environments/browsers */
-        div[data-testid="stMetric"]:has(label p:contains("Percentual de Conclusão")) {
-            /* Style the VALUE inside this specific metric */
-            > div[data-testid="stMetricValue"] {
-                 &, > div, > p { /* Target value container and potential inner tags */
-                    color: #198754 !important; /* Verde */
-                    font-weight: 600 !important;
-                    font-size: 1.5rem !important;
-                 }
-            }
-             /* Ensure label inside this specific metric is also bold */
-             label[data-testid="stMetricLabel"] p {
-                 font-weight: 600 !important;
-             }
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    # REMOVER TODO ESTE BLOCO st.markdown("""...""", unsafe_allow_html=True)
+    # st.markdown(""" ... """, unsafe_allow_html=True)
     # --- Fim CSS Injetado ---
 
-    # Carregar CSS compilado externo (se ainda houver outros estilos lá)
+    # Carregar CSS compilado externo (MANTER OU AJUSTAR ESTA PARTE)
     try:
         with open('assets/styles/css/main.css', 'r', encoding='utf-8') as f:
             st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)

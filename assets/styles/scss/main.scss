@@ -4,6 +4,16 @@
 
 // Importar componentes
 @import 'components/cards';
+@import 'components/tables';
+@import 'components/metrics';
+@import 'components/acompanhamento';
+@use 'components/pendencias_table';
+@import 'components/metrics_cartorio';
+
+// Importar estilos de componentes
+@use 'components/card_styles';
+@use 'components/metric_cards';
+@use 'components/pendencias_table';
 
 // Estilos globais
 :root {
@@ -106,40 +116,35 @@ body {
   animation: fadeIn 0.3s ease-out forwards;
 }
 
-// Encontra o container horizontal que segura as colunas
-.stHorizontalBlock {
+// NOVA REGRA (AJUSTADA): Aplica estilos APENAS às colunas que contêm um elemento com a classe .category-title
+.stHorizontalBlock > .stColumn:has(.category-title) {
+  // Estilos base para as colunas das métricas
+  border-radius: 8px;
+  padding: 15px 10px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 
-  // Aplica estilos a cada coluna (stColumn) dentro do bloco horizontal
-  > .stColumn {
-    border: 2px solid; // Borda base
-    border-radius: 8px;
-    padding: 15px 10px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-
-    // Estilos específicos por coluna
-    &:nth-child(1) { // Coluna 1: Sucesso
-      border-color: green !important;
-      background-color: rgba(0, 128, 0, 0.08); // Fundo verde bem claro
-      .category-title { // Título dentro da coluna Sucesso
-        color: green;
-      }
+  // Estilos específicos por coluna de métrica
+  &:nth-child(1) { // Coluna 1: Sucesso
+    border: 2px solid green !important;
+    background-color: rgba(0, 128, 0, 0.08);
+    .category-title { // Título dentro da coluna Sucesso
+      color: green;
     }
-    &:nth-child(2) { // Coluna 2: Em Andamento
-      border-color: orange !important;
-      border-style: dashed !important; // Borda tracejada
-      background-color: rgba(255, 165, 0, 0.08); // Fundo amarelo/laranja bem claro
-      .category-title { // Título dentro da coluna Em Andamento
-        color: orange;
-      }
+  }
+  &:nth-child(2) { // Coluna 2: Em Andamento
+    border: 2px dashed orange !important;
+    background-color: rgba(255, 165, 0, 0.08);
+    .category-title { // Título dentro da coluna Em Andamento
+      color: orange;
     }
-    &:nth-child(3) { // Coluna 3: Falha
-      border-color: red !important;
-      background-color: rgba(255, 0, 0, 0.07); // Fundo vermelho bem claro
-      .category-title { // Título dentro da coluna Falha
-        color: red;
-      }
+  }
+  &:nth-child(3) { // Coluna 3: Falha
+    border: 2px solid red !important;
+    background-color: rgba(255, 0, 0, 0.07);
+    .category-title { // Título dentro da coluna Falha
+      color: red;
     }
   }
 }
@@ -238,4 +243,104 @@ body {
 
 // Modificação SUTIL APENAS para o botão ATIVO (primary)
 [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button[kind="primary"]:not([data-testid="stIconButton"]) { ... }
-*/ 
+*/
+
+/* Adiciona estilos específicos para date inputs */
+[data-testid="stDateInput"] {
+  /* Tenta selecionar o container interno com as classes st-... */
+  div.st-ah > div[data-baseweb="input"] {
+    border: 1px solid #C0C0C0 !important; /* Borda cinza prateado */
+    border-radius: 0.25rem; /* Mantém um arredondamento padrão */
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    background-color: var(--background-color, #fff); /* Garante fundo branco ou da variável */
+    box-shadow: none; /* Remove qualquer sombra padrão */
+
+    &:hover {
+      border-color: #a0a0a0 !important; /* Escurece um pouco no hover */
+    }
+
+    /* Foco aplicado diretamente neste elemento */
+    /* Streamlit pode adicionar classes de foco aqui, mas :focus-within no pai é mais robusto */
+  }
+
+  /* Tenta aplicar estilo de foco quando o componente está focado */
+  &:has(input:focus),
+  div.st-ah > div[data-baseweb="input"]:focus-within { /* Mais genérico que input:focus */
+    div.st-ah > div[data-baseweb="input"] {
+      border-color: #80bdff !important; /* Cor padrão do Bootstrap para foco */
+      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important; /* Sombra padrão do Bootstrap para foco */
+    }
+  }
+
+  /* Garante que o input interno REAL não tenha borda */
+  input {
+      border: none !important;
+      box-shadow: none !important;
+      background-color: transparent !important; /* Input interno transparente */
+  }
+}
+
+/* ===== FIM ESTILOS DATE INPUT ===== */
+
+/* existing styles... */
+/* Certifique-se de que esta regra seja adicionada antes ou depois de outras regras globais,
+   dependendo da especificidade desejada. Colocar no final geralmente aumenta a prioridade. */
+@import 'variables';
+@import 'mixins';
+// ... resto do seu main.scss ...
+
+// Regra para métricas específicas de cartório (Total Selecionado, etc.) - NOVA ABORDAGEM
+// Target the multiselect filter used for Cartórios
+[data-testid="stMultiSelect"]:has(label:contains("Selecione os Cartórios")) // Tentativa de ser específico ao filtro
+// Select the immediately following horizontal block
++ [data-testid="stHorizontalBlock"] {
+  // Target the stMetric within the first 3 columns of THAT block
+  > .stColumn:nth-child(-n+3) [data-testid="stMetric"] {
+    border: 2px dashed #fd7e14 !important; // Laranja tracejado
+    background-color: rgba(253, 126, 20, 0.04) !important;
+    border-radius: 6px !important;
+    padding: 0.6rem 0.8rem !important;
+    margin-bottom: 0.5rem;
+
+    label[data-testid="stMetricLabel"] p {
+      font-weight: 600 !important;
+      color: #495057 !important;
+    }
+  }
+}
+
+// Manter os estilos específicos para os date inputs separados
+[data-testid="stDateInput"] {
+  /* Tenta selecionar o container interno com as classes st-... */
+  div.st-ah > div[data-baseweb="input"] {
+    border: 1px solid #C0C0C0 !important; /* Borda cinza prateado */
+    border-radius: 0.25rem; /* Mantém um arredondamento padrão */
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    background-color: var(--background-color, #fff); /* Garante fundo branco ou da variável */
+    box-shadow: none; /* Remove qualquer sombra padrão */
+
+    &:hover {
+      border-color: #a0a0a0 !important; /* Escurece um pouco no hover */
+    }
+  }
+
+  /* Tenta aplicar estilo de foco quando o componente está focado */
+  &:has(input:focus),
+  div.st-ah > div[data-baseweb="input"]:focus-within { /* Mais genérico que input:focus */
+    div.st-ah > div[data-baseweb="input"] {
+      border-color: #80bdff !important; /* Cor padrão do Bootstrap para foco */
+      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important; /* Sombra padrão do Bootstrap para foco */
+    }
+  }
+
+  /* Garante que o input interno REAL não tenha borda */
+  input {
+      border: none !important;
+      box-shadow: none !important;
+      background-color: transparent !important; /* Input interno transparente */
+  }
+}
+
+/* ===== FIM ESTILOS DATE INPUT ===== */
+
+/* Certifique-se de que não há outras regras após esta que possam sobrescrevê-la */ 

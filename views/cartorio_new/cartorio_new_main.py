@@ -52,11 +52,11 @@ def show_cartorio_new():
     if subpagina_selecionada == "Visão Geral":
         exibir_visao_geral(df_cartorio)
     elif subpagina_selecionada == "Acompanhamento":
-        exibir_acompanhamento()
+        exibir_acompanhamento(df_cartorio)
     elif subpagina_selecionada == "Produção":
-        exibir_producao()
+        exibir_producao(df_cartorio)
     elif subpagina_selecionada == "Pendências":
-        exibir_pendencias()
+        exibir_pendencias(df_cartorio)
     else:
         st.warning(f"Subpágina desconhecida: {subpagina_selecionada}")
 

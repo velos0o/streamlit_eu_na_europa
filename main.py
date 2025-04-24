@@ -20,7 +20,6 @@ sys.path.append(str(path_root))
 from views.inicio import show_inicio
 from views.producao import show_producao
 from views.conclusoes import show_conclusoes
-from views.cartorio.cartorio_main import show_cartorio
 from views.extracoes.extracoes_main import show_extracoes
 # Importar nova página de apresentação de conclusões
 from views.apresentacao import show_apresentacao
@@ -158,9 +157,6 @@ def ir_para_producao():
 def ir_para_conclusoes(): 
     reset_submenu()
     st.session_state['pagina_atual'] = 'Conclusões Higienização'
-def ir_para_cartorio(): 
-    reset_submenu()
-    st.session_state['pagina_atual'] = 'Cartório'
 def ir_para_comune(): 
     reset_submenu()
     st.session_state['pagina_atual'] = 'Comune'
@@ -221,13 +217,8 @@ st.sidebar.button("Conclusões Higienização", key="btn_conclusoes",
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Conclusões Higienização" else "secondary")
 
-st.sidebar.button("Funil Emissões Bitrix", key="btn_cartorio", 
-            on_click=ir_para_cartorio,
-            use_container_width=True,
-            type="primary" if st.session_state['pagina_atual'] == "Cartório" else "secondary")
-
 # --- ATUALIZADO: Botão para Emissões Brasileiras agora usa toggle_emissao_submenu ---
-st.sidebar.button("Emissões Brasileiras (NOVO)", key="btn_cartorio_new", 
+st.sidebar.button("Emissões Brasileiras", key="btn_cartorio_new", 
             on_click=toggle_emissao_submenu, 
             use_container_width=True,
             type="primary" if st.session_state['pagina_atual'] == "Emissões Brasileiras" else "secondary",
@@ -377,15 +368,6 @@ try:
             {"label": "Tendências de Conclusão", "anchor": "tendencias_conclusao", "icon": "📈"}
         ]
         show_conclusoes()
-        
-    elif pagina == "Cartório":
-        # Definir as seções para o sumário da página
-        sections = [
-            {"label": "Visão do Funil", "anchor": "visao_funil", "icon": "📋"},
-            {"label": "Conversão Entre Etapas", "anchor": "conversao_etapas", "icon": "🔄"},
-            {"label": "Previsão de Conclusões", "anchor": "previsao_conclusoes", "icon": "🔮"}
-        ]
-        show_cartorio()
         
     elif pagina == "Comune":
         # Definir as seções para o sumário da página
