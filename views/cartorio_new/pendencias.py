@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 # Remover import re, não é mais necessário
+from datetime import date
+import numpy as np
 
 # Importar AgGrid
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode, JsCode
@@ -144,46 +146,255 @@ def exibir_pendencias(df_original):
 
     df = df_original.copy()
 
-    # --- Verificação das Colunas Essenciais ---
-    coluna_responsavel = 'UF_CRM_12_1724194024'
+    # --- Definição das Colunas --- 
+    coluna_data_criacao = 'CREATED_TIME' # Coluna para o filtro de data
+    coluna_responsavel_adm = 'UF_CRM_12_1724194024'
+    # Assumindo que existe uma coluna com o nome do assigned_by
+    # Se o nome for diferente, ajuste aqui!
+    coluna_assigned_name = 'ASSIGNED_BY_NAME' 
     coluna_estagio_id = 'STAGE_ID'
     coluna_estagio_name = 'STAGE_NAME'
-
-    if coluna_responsavel not in df.columns:
-        st.error(f"Erro: A coluna de responsável '{coluna_responsavel}' não foi encontrada.")
-        st.caption(f"Colunas disponíveis: {list(df.columns)}")
-        return
+    # Mantendo a coluna de ID caso precise no futuro, mas o foco é o nome
+    coluna_assigned_id = 'ASSIGNED_BY_ID' 
+    coluna_nome_familia = 'UF_CRM_12_1722882763189' # << NOVA COLUNA PARA FILTRO
 
     # Determinar qual coluna de estágio usar
     coluna_estagio = coluna_estagio_id if coluna_estagio_id in df.columns else coluna_estagio_name
-    if coluna_estagio not in df.columns:
-        st.error(f"Erro: Nenhuma coluna de estágio ('{coluna_estagio_id}' ou '{coluna_estagio_name}') encontrada.")
+
+    # --- Criar coluna ESTAGIO_SIMPLIFICADO (MOVIDO PARA CIMA) ---
+    # Garantir que a coluna de estágio seja string antes de aplicar
+    df[coluna_estagio] = df[coluna_estagio].astype(str)
+    df['ESTAGIO_SIMPLIFICADO'] = df[coluna_estagio].apply(simplificar_nome_estagio)
+
+    # --- Expander para Filtros --- 
+    with st.expander("Filtros", expanded=True): # Começa expandido
+        # Linha 1: Filtro de Data
+        col_data1, col_data2, col_data3 = st.columns([0.3, 0.35, 0.35])
+        with col_data1:
+            aplicar_filtro_data = st.checkbox("Data Criação", value=False, key="aplicar_filtro_data_pendencias")
+
+        datas_validas = pd.Series(dtype='datetime64[ns]') # Inicializa como série vazia
+        min_date = date.today()
+        max_date = date.today()
+
+        if coluna_data_criacao not in df.columns:
+            with col_data1:
+                st.caption(f":warning: Coluna '{coluna_data_criacao}' não encontrada.")
+            aplicar_filtro_data = False # Força desabilitar se coluna não existe
+        else:
+            # Tenta converter para datetime ANTES de calcular min/max
+            df[coluna_data_criacao] = pd.to_datetime(df[coluna_data_criacao], errors='coerce')
+            datas_validas = df[coluna_data_criacao].dropna()
+            if not datas_validas.empty:
+                min_date = datas_validas.min().date()
+                max_date = datas_validas.max().date()
+
+        # Campos de data aparecem apenas se o checkbox estiver marcado
+        data_inicio = None
+        data_fim = None
+        if aplicar_filtro_data:
+            with col_data2:
+                data_inicio = st.date_input(
+                    "De:",
+                    value=min_date,
+                    min_value=min_date,
+                    max_value=max_date,
+                    key="data_inicio_pendencias",
+                    label_visibility="collapsed"
+                )
+            with col_data3:
+                data_fim = st.date_input(
+                    "Até:",
+                    value=max_date,
+                    min_value=min_date,
+                    max_value=max_date,
+                    key="data_fim_pendencias",
+                    label_visibility="collapsed"
+                )
+
+        # Linha 2: Filtro de Etapas e Busca Responsável
+        col_etapa, col_busca = st.columns([0.6, 0.4])
+
+        # Linha 3: Filtro de Família
+        # Verificar se a coluna família existe para habilitar o filtro
+        filtro_familia_habilitado = coluna_nome_familia in df.columns
+        if not filtro_familia_habilitado:
+            st.caption(f":warning: Coluna '{coluna_nome_familia}' não encontrada. Filtro de família desabilitado.")
+
+        termo_busca_familia_widget = st.text_input(
+            "Buscar Família/Contrato:",
+            key="busca_familia_pendencias_widget",
+            placeholder="Nome...",
+            disabled=not filtro_familia_habilitado # Desabilitar se coluna não existe
+        )
+
+        # --- Sugestões para Busca de Família --- 
+        sugestoes_familia = []
+        termo_digitado_familia = termo_busca_familia_widget.strip()
+        if termo_digitado_familia and filtro_familia_habilitado:
+            # Obter nomes únicos do DF ORIGINAL para sugestões mais completas
+            nomes_unicos_familia = df_original[coluna_nome_familia].fillna('Desconhecido').astype(str).unique()
+            sugestoes_familia = [ 
+                nome for nome in nomes_unicos_familia 
+                if termo_digitado_familia.lower() in nome.lower()
+            ][:5] # Limitar a 5 sugestões
+            
+            if sugestoes_familia:
+                st.caption("Sugestões: " + ", ".join(sugestoes_familia))
+            elif len(termo_digitado_familia) > 1: # Não mostrar se só digitou 1 letra e não achou
+                st.caption("Nenhuma família/contrato encontrado para o termo digitado.")
+
+        # Obter etapas disponíveis a partir da coluna já criada
+        # Precisamos recalcular após filtro de data se ele for aplicado
+        # Placeholder: recalcular etapas depois
+        estagios_sucesso_para_excluir_filtro = ['Entregue', 'Física Entregue', 'Emitida (Cliente)']
+        opcoes_etapas_filtro = sorted([
+            e for e in df['ESTAGIO_SIMPLIFICADO'].unique() 
+            if e not in estagios_sucesso_para_excluir_filtro
+        ])
+
+        with col_etapa:
+            etapas_selecionadas_widget = st.multiselect(
+                "Etapa(s):",
+                options=opcoes_etapas_filtro, 
+                default=opcoes_etapas_filtro, # Default para todas as pendentes (exceto sucesso)
+                key="filtro_etapas_pendencias_widget",
+                # label_visibility="collapsed" # Manter label para clareza
+            )
+        with col_busca:
+            termo_busca_widget = st.text_input(
+                "Buscar Responsável:", 
+                key="busca_responsavel_pendencias_widget", 
+                placeholder="Nome...",
+                # label_visibility="collapsed"
+            ) 
+
+    # --- Aplicar Filtros (Fora do Expander) ---
+    # Aplicar filtro de data se ativo e datas válidas
+    if aplicar_filtro_data and data_inicio and data_fim:
+        start_datetime = pd.to_datetime(data_inicio)
+        end_datetime = pd.to_datetime(data_fim) + pd.Timedelta(days=1)
+
+        df = df[
+            (df[coluna_data_criacao].notna()) &
+            (df[coluna_data_criacao] >= start_datetime) &
+            (df[coluna_data_criacao] < end_datetime)
+        ].copy()
+
+    # Aplicar filtro de Família/Contrato
+    termo_familia = termo_busca_familia_widget.strip()
+    if termo_familia and filtro_familia_habilitado:
+        # Tratar Nulos na coluna antes de filtrar
+        df[coluna_nome_familia] = df[coluna_nome_familia].fillna('Desconhecido').astype(str)
+        df = df[df[coluna_nome_familia].str.contains(termo_familia, case=False, na=False)]
+
+    # Verificar se df ficou vazio APÓS filtro de família (e data)
+    if df.empty:
+        st.info("Nenhum dado encontrado para os filtros de data e/ou família aplicados.")
+        return
+
+    # --- Verificação das Colunas Essenciais ---
+    colunas_necessarias = [coluna_estagio_id, coluna_estagio_name]
+    colunas_responsaveis = [coluna_responsavel_adm, coluna_assigned_name, coluna_assigned_id]
+    
+    colunas_faltando = [col for col in colunas_necessarias if col not in df.columns and col != coluna_estagio_name] # stage_name é opcional se stage_id existir
+    if 'STAGE_ID' not in df.columns and 'STAGE_NAME' not in df.columns:
+         colunas_faltando.append("STAGE_ID ou STAGE_NAME")
+
+    if colunas_faltando:
+        st.error(f"Erro: Colunas essenciais de estágio não encontradas: {colunas_faltando}")
         st.caption(f"Colunas disponíveis: {list(df.columns)}")
         return
+        
+    # Verificar se existe pelo menos UMA forma de obter o responsável
+    existe_resp_adm = coluna_responsavel_adm in df.columns
+    existe_assigned_name = coluna_assigned_name in df.columns
+    # existe_assigned_id = coluna_assigned_id in df.columns # Não usamos ID diretamente para nome
+    
+    if not existe_resp_adm and not existe_assigned_name:
+         st.error(f"Erro: Nenhuma coluna para identificar o responsável encontrada (verificadas: '{coluna_responsavel_adm}', '{coluna_assigned_name}').")
+         st.caption(f"Colunas disponíveis: {list(df.columns)}")
+         return
+    elif not existe_assigned_name:
+        st.warning(f"Aviso: Coluna de nome do responsável de fallback ('{coluna_assigned_name}') não encontrada. Apenas '{coluna_responsavel_adm}' será usada para nomes.")
+    elif not existe_resp_adm:
+         st.warning(f"Aviso: Coluna principal de responsável ('{coluna_responsavel_adm}') não encontrada. Usando '{coluna_assigned_name}' como fallback.")
+         # Criar coluna ADM vazia para simplificar lógica
+         df[coluna_responsavel_adm] = pd.NA
 
-    # --- Pré-processamento ---
-    df = df.dropna(subset=[coluna_responsavel, coluna_estagio])
-    df = df[df[coluna_responsavel] != '']
-    df[coluna_responsavel] = df[coluna_responsavel].astype(str)
-    df['ESTAGIO_SIMPLIFICADO'] = df[coluna_estagio].astype(str).apply(simplificar_nome_estagio)
+    # --- Pré-processamento (Continuação) --- 
+    df = df.dropna(subset=[coluna_estagio], how='all') # Remove linhas sem estágio original (se necessário)
+    
+    # Garantir que as colunas de responsável existam (mesmo que vazias)
+    if coluna_responsavel_adm not in df.columns: df[coluna_responsavel_adm] = pd.NA
+    if coluna_assigned_name not in df.columns: df[coluna_assigned_name] = pd.NA
+    
+    # 1. Tentar extrair nome da coluna ADM
+    df['RESP_NOME_TEMP'] = df[coluna_responsavel_adm].apply(extrair_nome_responsavel)
+    
+    # Identificar valores "vazios" padrão (None, NaN, strings vazias, 'nan', 'None', <NA>)
+    empty_values = [None, '', 'nan', 'None', '<NA>']
+    # Verificar onde o nome extraído da ADM é considerado vazio OU é a string '[]' (caso comum de lista vazia)
+    condition_adm_vazio = df['RESP_NOME_TEMP'].isin(empty_values) | df['RESP_NOME_TEMP'].isnull() | (df['RESP_NOME_TEMP'] == '[]')
 
-    def extrair_nome_responsavel(resp):
-        if isinstance(resp, (list, dict)):
-            if isinstance(resp, dict):
-                return resp.get('name', resp.get('NAME', str(resp)))
-            elif isinstance(resp, list) and len(resp) > 0 and isinstance(resp[0], dict):
-                 return resp[0].get('name', resp[0].get('NAME', str(resp)))
-            else:
-                return str(resp)
-        return str(resp)
+    # 2. Preencher com ASSIGNED_BY_NAME onde ADM falhou (e a coluna existe)
+    if existe_assigned_name:
+        # Tratar a coluna assigned_name também, convertendo nulos/vazios para None para consistência
+        df[coluna_assigned_name] = df[coluna_assigned_name].replace(empty_values, None)
+        # Preencher onde ADM estava vazio E assigned_name TEM um valor
+        df.loc[condition_adm_vazio & df[coluna_assigned_name].notnull(), 'RESP_NOME_TEMP'] = df.loc[condition_adm_vazio & df[coluna_assigned_name].notnull(), coluna_assigned_name]
 
-    df['RESPONSAVEL_NOME'] = df[coluna_responsavel].apply(extrair_nome_responsavel)
+    # 3. Reavaliar onde o nome ainda está vazio após tentar ADM e Assigned Name
+    # Garantir que o tipo seja string antes de aplicar isin
+    df['RESP_NOME_TEMP'] = df['RESP_NOME_TEMP'].astype(str) 
+    condition_ainda_vazio = df['RESP_NOME_TEMP'].isin(empty_values + ['[]', 'nan']) | df['RESP_NOME_TEMP'].isnull()
+    
+    # 4. Preencher com "SEM_RESPONSAVEL" onde ainda está vazio
+    df.loc[condition_ainda_vazio, 'RESP_NOME_TEMP'] = 'SEM_RESPONSAVEL'
 
+    # Definir a coluna final
+    df['RESPONSAVEL_NOME'] = df['RESP_NOME_TEMP']
+
+    # Remover linhas onde RESPONSAVEL_NOME ainda é vazio ou 'SEM_RESPONSAVEL' se quisermos ignorá-los
+    # Por enquanto, vamos mantê-los para que os números batam
+    # df = df[df['RESPONSAVEL_NOME'] != 'SEM_RESPONSAVEL'] # Descomentar se quiser remover
+    df = df.dropna(subset=['RESPONSAVEL_NOME'])
+    df = df[df['RESPONSAVEL_NOME'] != '']
+
+    # Remover coluna temporária
+    df = df.drop(columns=['RESP_NOME_TEMP'])
+
+    # --- NOVO: Filtrar para remover estágios de sucesso --- 
+    estagios_excluir = ['Entregue', 'Física Entregue', 'Emitida (Cliente)']
+    df = df[~df['ESTAGIO_SIMPLIFICADO'].isin(estagios_excluir)]
+
+    # Verificar se o df está vazio APÓS filtro de data E exclusão de sucesso
     if df.empty:
-        st.info("Não há dados válidos após o pré-processamento para gerar a tabela de pendências.")
+        st.info("Não há pendências encontradas (após excluir estágios de sucesso e aplicar filtros de data/etapa/busca).") # Mensagem mais completa
         return
 
-    # --- Criação da Tabela Dinâmica ---
+    # --- Aplicar Filtro de Etapas ---
+    # Recalcular etapas disponíveis APÓS filtros anteriores
+    lista_etapas_pendentes_atualizada = sorted(df['ESTAGIO_SIMPLIFICADO'].unique())
+    # Filtrar o dataframe com base no valor do widget
+    etapas_selecionadas = etapas_selecionadas_widget
+    if etapas_selecionadas:
+        # Filtrar apenas pelas etapas que AINDA existem no df filtrado
+        etapas_validas_selecionadas = [e for e in etapas_selecionadas if e in lista_etapas_pendentes_atualizada]
+        df = df[df['ESTAGIO_SIMPLIFICADO'].isin(etapas_validas_selecionadas)]
+    else:
+        st.warning("Nenhuma etapa selecionada no filtro.")
+        return # Mais simples retornar aqui
+
+    # Verificar se df ficou vazio APÓS filtro de etapas
+    if df.empty:
+        st.info("Nenhuma pendência encontrada para as etapas selecionadas.")
+        return
+
+    # Obter termo de busca do widget
+    termo_busca = termo_busca_widget
+
+    # --- Criação da Tabela Dinâmica (agora com df filtrado por data, etapas) ---
     try:
         tabela_pendencias = pd.pivot_table(
             df,
@@ -224,63 +435,66 @@ def exibir_pendencias(df_original):
     # Renomear índice para um nome mais amigável
     tabela_pendencias_reset = tabela_pendencias_reset.rename(columns={'RESPONSAVEL_NOME': 'Responsável'})
 
-    # --- Barra de Busca --- 
-    termo_busca = st.text_input("Buscar por Responsável:", key="busca_responsavel_pendencias", placeholder="Digite parte do nome...")
-
-    # --- Filtragem da Tabela ---
-    tabela_filtrada = tabela_pendencias_reset.copy()
+    # --- Filtragem por Responsável (termo_busca) ANTES de adicionar Total Geral ---
+    tabela_filtrada_antes_total = tabela_pendencias_reset.copy()
+    
+    # Excluir a linha TOTAL GERAL temporariamente se ela existir da pivot table original
+    if 'TOTAL GERAL' in tabela_filtrada_antes_total['Responsável'].values:
+        tabela_sem_total_original = tabela_filtrada_antes_total[tabela_filtrada_antes_total['Responsável'] != 'TOTAL GERAL'].copy()
+    else:
+        tabela_sem_total_original = tabela_filtrada_antes_total.copy()
+        
+    # Aplicar filtro de busca
     if termo_busca:
-        # Separar linha de total antes de filtrar
-        total_row = tabela_filtrada[tabela_filtrada['Responsável'] == 'TOTAL GERAL']
-        tabela_sem_total = tabela_filtrada[tabela_filtrada['Responsável'] != 'TOTAL GERAL']
-        
-        # Filtrar linhas (responsáveis) que contêm o termo de busca (case-insensitive)
-        mask = tabela_sem_total['Responsável'].str.contains(termo_busca, case=False, na=False)
-        tabela_filtrada = tabela_sem_total[mask]
-        
-        # Readicionar a linha de total no final, se houver resultados ou se a busca estiver vazia
-        if not tabela_filtrada.empty:
-             tabela_filtrada = pd.concat([tabela_filtrada, total_row], ignore_index=True)
-        elif not termo_busca:
-             tabela_filtrada = tabela_pendencias_reset # Mostra tudo se busca vazia
-        else:
-             # CORREÇÃO: Usar colunas de tabela_pendencias_reset (que inclui 'Responsável')
-             tabela_filtrada = pd.concat([
-                 pd.DataFrame(columns=tabela_pendencias_reset.columns), 
-                 total_row
-             ], ignore_index=True)
-             st.info("Nenhum responsável encontrado.")
+        mask = tabela_sem_total_original['Responsável'].str.contains(termo_busca, case=False, na=False)
+        tabela_filtrada = tabela_sem_total_original[mask]
+        if tabela_filtrada.empty:
+             st.info("Nenhum responsável encontrado para o termo buscado.")
+             # Mantem tabela_filtrada vazia para não mostrar nada
+    else:
+        # Se não houver busca, usa todos os dados (sem o total original)
+        tabela_filtrada = tabela_sem_total_original
 
-    # --- Configuração das Colunas para st.dataframe ---
+    # --- Recalcular e Adicionar Total Geral (APÓS filtro de busca) ---
+    if not tabela_filtrada.empty:
+        # Calcular totais apenas das colunas numéricas (estágios + TOTAL GERAL da pivot original se existir)
+        numeric_cols = tabela_filtrada.select_dtypes(include=np.number).columns
+        total_row_calculada = tabela_filtrada[numeric_cols].sum().to_frame().T
+        total_row_calculada['Responsável'] = 'TOTAL GERAL'
+        # Garantir que a coluna 'Responsável' seja a primeira
+        cols = ['Responsável'] + [col for col in tabela_filtrada.columns if col != 'Responsável']
+        total_row_calculada = total_row_calculada[cols]
+        
+        # Concatenar a nova linha de total
+        tabela_filtrada = pd.concat([tabela_filtrada, total_row_calculada], ignore_index=True)
+    # Se tabela_filtrada estava vazia após a busca, ela continua vazia
+
+    # --- Configuração das Colunas para st.dataframe (APÓS TODA MANIPULAÇÃO) ---
+    st.markdown("##### Contagem de Processos")
+
+    # --- Exibição com st.dataframe ---
     column_config = {
         "Responsável": st.column_config.TextColumn(
             "Responsável",
             help="Nome do responsável pelo processo.",
-            width="large", # <-- Aumentar largura sugerida
-        ),
-        "TOTAL GERAL": st.column_config.NumberColumn(
-            "Total", 
-            help="Total de processos para o responsável.",
-            format="%d",
-            width="small",
+            width="large",
         )
     }
-    
-    # Configurar colunas de estágio dinamicamente
-    for col_name in colunas_ordenadas:
+    # Adicionar colunas presentes na tabela filtrada (exceto 'Responsável')
+    for col_name in tabela_filtrada.columns:
+        if col_name == 'Responsável':
+            continue # Já configurado
+            
+        is_total_geral = (col_name == 'TOTAL GERAL')
         column_config[col_name] = st.column_config.NumberColumn(
-            col_name, # Usar o nome simplificado como label
-            help=f"Processos no estágio {col_name}",
-            format="%d", # Formato inteiro
-            width="medium", # Tentar largura média para evitar quebra
-            # Não há opção direta para cor ou alinhamento central aqui
+            "Total" if is_total_geral else col_name, # Label especial para Total Geral
+            help=f"Total de processos para o responsável." if is_total_geral else f"Processos no estágio {col_name}",
+            format="%d",
+            width="small" if is_total_geral else "medium",
         )
 
     # --- Exibição com st.dataframe ---
-    st.markdown("##### Contagem de Processos")
-    if tabela_filtrada.empty and termo_busca:
-        pass # Mensagem já exibida
-    elif tabela_filtrada.empty:
+    if tabela_filtrada.empty:
          st.info("Tabela de pendências vazia.")
     else:
         # DEBUG 2: Verificar colunas antes de exibir (REMOVIDO)
@@ -307,3 +521,20 @@ def exibir_pendencias(df_original):
        mime='text/csv',
        key='download-pendencias-csv'
     ) 
+
+def extrair_nome_responsavel(resp):
+    """ Extrai o nome do responsável de diferentes formatos possíveis ou retorna 'SEM_RESPONSAVEL'. """
+    if resp == 'SEM_RESPONSAVEL':
+        return 'SEM_RESPONSAVEL'
+    if isinstance(resp, (list, dict)):
+        if isinstance(resp, dict):
+            # Tenta buscar por 'name' ou 'NAME', caso contrário retorna a representação string
+            return resp.get('name', resp.get('NAME', str(resp)))
+        elif isinstance(resp, list) and len(resp) > 0 and isinstance(resp[0], dict):
+            # Pega o nome do primeiro item da lista, se for um dict
+            return resp[0].get('name', resp[0].get('NAME', str(resp)))
+        else:
+            # Caso de lista vazia ou lista com itens não-dict
+            return str(resp)
+    # Se for string ou outro tipo, retorna como string
+    return str(resp) 

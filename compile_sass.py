@@ -4,10 +4,19 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import time
 
+# Obtém o diretório absoluto onde o script está localizado
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# Assume que a pasta 'assets' está no mesmo nível que o script
+base_dir = script_dir # Diretório pai é onde está 'assets'
+
 class SassCompiler(FileSystemEventHandler):
     def __init__(self):
-        self.scss_dir = 'assets/styles/scss'
-        self.css_dir = 'assets/styles/css'
+        # Usa caminhos absolutos baseados na localização do script
+        self.scss_dir = os.path.join(base_dir, 'assets', 'styles', 'scss')
+        self.css_dir = os.path.join(base_dir, 'assets', 'styles', 'css')
+        
+        print(f"[Debug] SCSS Dir: {self.scss_dir}")
+        print(f"[Debug] CSS Dir: {self.css_dir}")
         
         # Criar diretório CSS se não existir
         if not os.path.exists(self.css_dir):

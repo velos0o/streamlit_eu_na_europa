@@ -1,19 +1,18 @@
-// Importar variáveis e mixins
+// Importar variáveis e mixins primeiro
 @import 'variables';
 @import 'mixins';
 
-// Importar componentes
+// Depois, importar módulos com @use
+@use 'components/pendencias_table';
+@use 'components/card_styles';
+@use 'components/metric_cards';
+
+// Finalmente, importar o restante com @import
 @import 'components/cards';
 @import 'components/tables';
 @import 'components/metrics';
 @import 'components/acompanhamento';
-@use 'components/pendencias_table';
 @import 'components/metrics_cartorio';
-
-// Importar estilos de componentes
-@use 'components/card_styles';
-@use 'components/metric_cards';
-@use 'components/pendencias_table';
 
 // Estilos globais
 :root {
@@ -153,19 +152,51 @@ body {
 
 // Estilo para os cards individuais
 .card-visao-geral {
-  // border: 1px solid red !important; // Borda interna opcional
-  margin-bottom: 10px;
-  padding: 10px;
-  border-radius: 5px;
+  // background-color: var(--card-bg, #ffffff); // Usar variável de tema se aplicável
+  background-color: #ffffff; // Mantendo branco por enquanto
+  border-radius: map-get($border-radius, 'md'); // Usar variável (6px)
+  padding: map-get($spacing, 3); // Aumentar padding (12px)
+  margin-bottom: map-get($spacing, 2); // Ajustar margem inferior (8px)
+  box-shadow: map-get($shadows, 'sm'); // Adicionar sombra suave
+  transition: $transition-base; // Adicionar transição base
   background-clip: padding-box;
-  background-color: #ffffff; // Fundo branco padrão para cards (contraste com fundo da coluna)
+
+  &:hover {
+    box-shadow: map-get($shadows, 'md'); // Aumentar sombra no hover
+    transform: translateY(-2px); // Levantar levemente no hover
+  }
+
+  // Remover regras específicas de cor daqui se elas forem aplicadas por classes modificadoras
+  // Ex: .card-visao-geral--sucesso { border-left-color: $success; }
+
+  &__title { // Ajustes no título interno
+    font-size: map-get($font-sizes, 'sm'); // Usar variável (14px)
+    font-weight: 600; // Um pouco mais de peso
+    color: var(--card-text, $gray-700); // Usar variável de tema/fallback
+    margin-bottom: map-get($spacing, 2); // Espaçamento inferior (8px)
+  }
+
+  &__metrics { // Ajustes nas métricas internas
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline; // Alinhar pela base do texto
+    font-size: map-get($font-sizes, 'base'); // Usar variável (16px)
+
+    .card-visao-geral__quantity {
+      font-weight: 700; // Mais peso para a quantidade
+      color: var(--card-text, $gray-900); // Usar variável de tema/fallback mais escuro
+    }
+    
+    // Remover estilos específicos de percentual se não aplicável a este card
+    /* .card-visao-geral__percentage { ... } */
+  }
 }
 
 // Grid CSS para empilhar os cards
 .cards-grid {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: map-get($spacing, 2); // Espaçamento entre cards (8px)
 }
 
 // Estilos para o cabeçalho da categoria

@@ -177,8 +177,6 @@ def ir_para_reclamacoes():
 def toggle_emissao_submenu():
     st.session_state.emissao_submenu_expanded = not st.session_state.get('emissao_submenu_expanded', False)
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    # Define uma subpágina padrão ao abrir ou se já estiver aberto e clicar de novo
-    st.session_state.emissao_subpagina = 'Visão Geral' 
 # --- FIM NOVO ---
 
 # --- NOVO: Funções on_click para sub-botões Emissões ---

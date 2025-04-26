@@ -118,34 +118,47 @@ def exibir_acompanhamento(df_cartorio):
 
     # --- Filtros --- 
     with st.expander("Filtros", expanded=True): 
-        # Layout: Ajustar proporções das colunas [Busca, Data, Percentual, Botão]
-        col_busca, col_data, col_perc, col_btn = st.columns([5, 5, 6, 2]) 
+        # Layout: Linha 1 (Família, Data), Linha 2 (Percentual, Botão Limpar)
+        col_l1_familia, col_l1_data = st.columns([0.5, 0.5])
+        col_l2_perc, col_l2_btn = st.columns([0.8, 0.2])
         
-        with col_busca:
+        with col_l1_familia:
             st.text_input(
-                "Buscar por Nome da Família", 
+                "Buscar Família/Contrato", # Label consistente
                 placeholder="Digite parte do nome...",
                 key=KEY_BUSCA_FAMILIA 
             )
-        
-        with col_data:
+
+            # --- Sugestões para Busca de Família --- 
+            sugestoes_familia = []
+            # Ler termo diretamente do session_state que o widget atualiza
+            termo_digitado_familia = st.session_state.get(KEY_BUSCA_FAMILIA, "").strip()
+            # A coluna nome_familia é verificada no início, assumimos que existe aqui
+            if termo_digitado_familia:
+                # Usar df_agrupado que já tem nomes únicos e tratados
+                nomes_unicos_familia = df_agrupado[coluna_nome_familia].unique()
+                sugestoes_familia = [ 
+                    nome for nome in nomes_unicos_familia 
+                    if termo_digitado_familia.lower() in str(nome).lower() # Garantir str 
+                ][:5] # Limitar a 5 sugestões
+                
+                if sugestoes_familia:
+                    st.caption("Sugestões: " + ", ".join(sugestoes_familia))
+                elif len(termo_digitado_familia) > 1: 
+                    st.caption("Nenhuma família/contrato encontrado.")
+
+        with col_l1_data:
             st.markdown("**Data de Venda**") 
-            st.date_input(
-                "De", 
-                key=KEY_DATA_INICIO,
-                min_value=min_date_default, 
-                max_value=max_date_default,
-            )
-            st.date_input(
-                "Até", 
-                key=KEY_DATA_FIM,
-                min_value=min_date_default,
-                max_value=max_date_default,
-            )
+            # Usar colunas internas para alinhar De/Até
+            date_col1, date_col2 = st.columns(2)
+            with date_col1:
+                st.date_input("De", key=KEY_DATA_INICIO, min_value=min_date_default, max_value=max_date_default, label_visibility="collapsed")
+            with date_col2:
+                st.date_input("Até", key=KEY_DATA_FIM, min_value=min_date_default, max_value=max_date_default, label_visibility="collapsed")
             if st.session_state[KEY_DATA_INICIO] > st.session_state[KEY_DATA_FIM]:
                  st.warning("Data 'De' não pode ser maior que a data 'Até'.")
 
-        with col_perc:
+        with col_l2_perc:
             opcoes_percentual = [
                 "0% - 9%", 
                 "10% - 30%",
@@ -162,8 +175,10 @@ def exibir_acompanhamento(df_cartorio):
                 key=KEY_PERCENTUAL 
             )
             
-        with col_btn:
+        with col_l2_btn:
             # Remover <br> e deixar alinhamento padrão da coluna por enquanto
+            # Adicionar um pouco de espaço acima do botão
+            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) 
             st.button("Limpar", on_click=clear_filters, help="Limpar todos os filtros")
             
     # --- Fim Filtros ---
