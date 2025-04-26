@@ -33,37 +33,65 @@ def exibir_visao_geral(df_original):
     
     if coluna_cartorio not in df_original.columns:
         st.error(f"Erro: A coluna '{coluna_cartorio}' não foi encontrada no DataFrame. Verifique o nome da coluna.")
-        # Tenta listar colunas disponíveis para ajudar na depuração
         st.caption(f"Colunas disponíveis: {list(df_original.columns)}")
         return
-        
-    lista_cartorios = sorted(df_original[coluna_cartorio].astype(str).unique())
-    
+
+    # --- Obter lista de cartórios diretamente dos dados --- 
+    # Garante que os valores usados no filtro e nas opções são idênticos
+    lista_cartorios_original = sorted(df_original[coluna_cartorio].unique())
+
     cartorios_selecionados = st.multiselect(
         "Selecione os Cartórios:",
-        options=lista_cartorios,
-        default=lista_cartorios, # Começa com todos selecionados
+        options=lista_cartorios_original,  # Usar a lista direto dos dados
+        default=lista_cartorios_original, # Começa com todos selecionados
         key="filtro_cartorio_visao_geral"
     )
 
     if not cartorios_selecionados:
         st.warning("Selecione pelo menos um cartório para visualizar os dados.")
-        # Limpa visualizações inferiores se nada for selecionado
-        st.write("") # Força re-render parcial
+        st.write("") 
         return
-        
-    # Filtrar DataFrame principal
+
+    # Filtrar DataFrame principal usando os valores selecionados (que vieram dos dados originais)
     df = df_original[df_original[coluna_cartorio].isin(cartorios_selecionados)].copy()
-    
+
     if df.empty:
         st.info("Nenhum dado encontrado para os cartórios selecionados.")
         return
-    # --- FIM Filtro ---
 
-    # --- NOVO: Métricas Macro e Sucesso ---
+    # --- DEBUG: Final check of filtered df value_counts ---
+    # st.write("--- FINAL DEBUG: Value Counts of Filtered DF ---") # REMOVIDO
+    # filtered_counts = df[coluna_cartorio].value_counts()
+    # st.dataframe(filtered_counts)
+    # st.write(f"Check: Is 'CARTÓRIO TATUAPÉ' in filtered_counts index? {'CARTÓRIO TATUAPÉ' in filtered_counts.index}")
+    # st.write("--- END FINAL DEBUG ---") # REMOVIDO
+    # --- END DEBUG ---
+
+    # --- Métricas Macro e Sucesso --- 
     total_selecionados = len(df)
-    total_casa_verde = len(df[df[coluna_cartorio] == 'Casa Verde']) if 'Casa Verde' in cartorios_selecionados else 0
-    total_tatuape = len(df[df[coluna_cartorio] == 'Tatuapé']) if 'Tatuapé' in cartorios_selecionados else 0
+    # contagem_cartorios_filtrados = df[coluna_cartorio].value_counts() # Não precisamos mais disso para as métricas específicas
+
+    # !!! CORREÇÃO: Calcular métricas usando CATEGORY_ID do df filtrado !!!
+    if 'CATEGORY_ID' not in df.columns:
+        st.error("Erro crítico: Coluna 'CATEGORY_ID' não encontrada no DataFrame filtrado!")
+        total_casa_verde = 0
+        total_tatuape = 0
+    else:
+        # Contar diretamente os IDs 16 e 34 na coluna CATEGORY_ID do df filtrado
+        total_casa_verde = (df['CATEGORY_ID'] == 16).sum()
+        total_tatuape = (df['CATEGORY_ID'] == 34).sum()
+            
+    # Remover loop anterior
+    # total_casa_verde = 0
+    # total_tatuape = 0
+    # target_casa_verde = 'CARTÓRIO CASA VERDE'
+    # target_tatuape = 'CARTÓRIO TATUAPÉ'
+    # for index_val, count in contagem_cartorios_filtrados.items():
+    #     cleaned_index_val = str(index_val).strip() # Limpa espaços da chave atual
+    #     if cleaned_index_val == target_casa_verde:
+    #         total_casa_verde = count
+    #     elif cleaned_index_val == target_tatuape:
+    #         total_tatuape = count
 
     st.markdown("#### Métricas por Cartório")
     col_m1, col_m2, col_m3 = st.columns(3)
