@@ -1,97 +1,86 @@
-# Dashboard Analítico - CRM Bitrix24
+# Dashboard Analítico - Streamlit Eu na Europa
 
 ## Sobre o Projeto
 
-Dashboard desenvolvido em Streamlit para análise de dados do CRM Bitrix24, com foco na visualização e análise do status de higienização de processos, tickets de suporte e reclamações de clientes.
+Dashboard desenvolvido em Streamlit para análise de dados da operação Eu na Europa, com foco na visualização e análise de processos, produtividade, conclusões e outros indicadores relevantes, utilizando dados do CRM Bitrix24 e outras fontes.
 
 ## Estrutura do Projeto
 
 ```
-dash_higilizacao/ # Nome da pasta raiz (pode variar)
-├── main.py                    # Arquivo principal da aplicação
-├── requirements.txt           # Dependências do projeto
-├── .env.example               # Exemplo de arquivo para variáveis de ambiente
-├── .streamlit/                # Configurações do Streamlit
-│   └── config.toml            # Arquivo de configuração do tema e opções
-├── assets/                    # Recursos estáticos (CSS, imagens, logos)
-│   ├── styles.css             # Estilos CSS globais (se houver)
-│   └── LOGO-*.svg             # Arquivos de logo
-├── api/                       # Módulos de conexão com APIs
-│   └── bitrix_connector.py    # Conector para a API do Bitrix24 (BI e REST)
-│   └── __init__.py
-├── components/                # Componentes reutilizáveis da UI
-│   ├── report_guide.py       # Guia/ajuda contextual
-│   ├── search_component.py   # Componente de busca global
-│   ├── table_of_contents.py  # Sumário de navegação (TOC)
-│   ├── refresh_button.py     # Botão de atualização global
-│   └── __init__.py
-├── views/                     # Módulos representando cada página/seção
-│   ├── inicio.py              # Página: Macro Higienização
-│   ├── producao.py            # Página: Produção Higienização
-│   ├── conclusoes.py          # Página: Conclusões Higienização
-│   ├── apresentacao.py       # Página: Apresentação modo TV
-│   ├── tickets.py             # Página: Tickets de Suporte
-│   ├── cartorio/              # Módulo: Funil Emissões Bitrix
-│   │   ├── cartorio_main.py  # -> Página Principal
-│   │   └── __init__.py
-│   ├── comune/                # Módulo: Comune Bitrix24
-│   │   ├── comune_main.py    # -> Página Principal
-│   │   └── __init__.py
-│   ├── extracoes/             # Módulo: Extrações de Dados
-│   │   ├── extracoes_main.py # -> Página Principal
-│   │   └── __init__.py
-│   ├── reclamacoes/           # Módulo: Reclamações de Clientes
-│   │   ├── reclamacoes_main.py # -> Página Principal
-│   │   ├── data_loader.py    # -> Lógica de carregamento de dados
-│   │   ├── styles.py         # -> Estilos específicos da página
-│   │   ├── metrics_cards.py  # -> Componentes de cards de métricas
-│   │   ├── charts.py         # -> Componentes de gráficos
-│   │   ├── details.py        # -> Seção de detalhes e filtros
-│   │   └── __init__.py
-│   └── __init__.py
-└── utils/                     # Funções utilitárias gerais
-    ├── data_processor.py      # Funções genéricas de processamento de dados
-    ├── animation_utils.py     # Utilitários para animações (Lottie)
-    ├── refresh_utils.py       # Utilitários para controle de refresh global
-    └── __init__.py
+📂 streamlit_eu_na_europa/
+│
+├── 📄 main.py                   # Arquivo principal da aplicação
+│
+├── 📂 assets/                   # Recursos estáticos
+│   └── 📂 styles/             # Estilos CSS e SCSS
+│       ├── 📂 css/
+│       └── 📂 scss/
+│           └── 📂 components/
+│   └── 📂 animations/         # Animações (Lottie)
+│
+├── 📂 views/                    # Páginas (abas) do dashboard
+│   ├── 📂 apresentacao/         # Módulo: Apresentação modo TV
+│   │   ├── 📂 cartorio/
+│   │   ├── 📂 conclusoes/
+│   │   ├── 📂 producao/
+│   │   └── 📂 slides/
+│   ├── 📂 cartorio/             # Módulo: Cartório (Análise Funil Emissões - antigo)
+│   ├── 📂 cartorio_new/         # Módulo: Cartório (Análise Funil Emissões - novo)
+│   ├── 📂 comune/               # Módulo: Comune (Análise Comune)
+│   ├── 📂 extracoes/            # Módulo: Extrações de Dados
+│   └── 📂 reclamacoes/          # Módulo: Reclamações de Clientes (se aplicável)
+│
+├── 📂 components/               # Componentes reutilizáveis da UI
+│   ├── 📄 report_guide.py       # Guia e ajuda contextual
+│   ├── 📄 search_component.py   # Componente de busca
+│   ├── 📄 table_of_contents.py  # Sumário de navegação
+│   └── 📄 refresh_button.py     # Botões de atualização
+│
+├── 📂 api/                      # Módulos de conexão com APIs (ex: Bitrix24)
+├── 📂 data/                     # Dados processados ou estáticos
+├── 📂 utils/                    # Funções utilitárias gerais
+│
+├── 📄 requirements.txt          # Dependências do projeto
+├── 📄 compile_sass.py         # Script de compilação SASS
+├── 📄 .gitignore                # Arquivos ignorados pelo Git
+└── ... (outros arquivos e pastas de configuração)
 ```
 
 ## Funcionalidades Implementadas
 
-O dashboard inclui as seguintes páginas e funcionalidades:
+O dashboard inclui as seguintes páginas (visualizações) e funcionalidades:
 
-- **Higienização:**
-    - **Macro:** Visão geral do status de higienização.
-    - **Produção:** Métricas detalhadas, tabelas por responsável, pendências.
-    - **Conclusões:** Métricas de conclusão e qualidade.
-- **Funil Emissões (Cartório):** Análise do funil de emissões de documentos.
-- **Comune:** Análise de dados relacionados a comunes.
-- **Extrações:** Funcionalidades para exportar dados.
-- **Tickets:** Análise de tickets de suporte (status, tempo, etc.).
-- **Reclamações:** Gestão e visualização de reclamações de clientes (status, origem, tendência).
-- **Apresentação:** Modo otimizado para exibição em TVs.
+- **Páginas Principais (definidas em `main.py` e `views/`):**
+    - **Apresentação:** Modo otimizado para exibição em TVs/slideshow.
+        - **Cartório:** Dados específicos de cartório para apresentação.
+        - **Conclusões:** Dados de conclusões para apresentação.
+        - **Produção:** Dados de produção para apresentação.
+    - **Cartório:** Análise detalhada do funil de emissões e processos relacionados a cartórios (versões antiga e nova).
+    - **Comune:** Análise de dados relacionados a comunes, incluindo mapas e planilhas.
+    - **Extrações:** Funcionalidades para exportar dados e relatórios personalizados.
+    - **Reclamações:** Gestão e visualização de reclamações de clientes (se implementado).
+    - *Nota: As páginas "Macro", "Produção" e "Conclusões" mencionadas anteriormente podem estar integradas dentro dos módulos acima ou na seção `apresentacao/`.*
 
-**Funcionalidades Globais:**
-- Navegação via sidebar.
-- Botão de atualização global de dados.
-- Barra de pesquisa.
-- Guia contextual por página.
-- Sumário de navegação rápida (TOC) em páginas selecionadas.
-- Tema claro/escuro customizável.
-- Modo de depuração para desenvolvedores.
+**Funcionalidades Globais (definidas em `components/`):**
+- Navegação via sidebar controlada pelo `main.py`.
+- Botão de atualização global de dados (`refresh_button.py`).
+- Barra de pesquisa (`search_component.py`).
+- Guia contextual por página (`report_guide.py`).
+- Sumário de navegação rápida (`table_of_contents.py`).
+- Tema customizável (via CSS/SCSS e `.streamlit/config.toml`).
 
 ## Campos Analisados (Exemplos)
 
-- **Higienização:** `UF_CRM_HIGILIZACAO_STATUS`, `UF_CRM_1741183785848`, `UF_CRM_1741183721969`, etc.
-- **Reclamações:** `STAGE_NAME` (Status), `DATE_CREATE`, `ASSIGNED_BY_NAME`, `UF_CRM_28_DEPARTAMENTO`, `UF_CRM_28_ORIGEM`.
-- **Tickets:** Campos relacionados a status, prioridade, tempo de resposta, etc. (conforme entidade no Bitrix).
+- Dependendo da visualização, podem incluir status de processos, datas, responsáveis, métricas de produtividade, dados geográficos (comune), etc.
+- **Reclamações (se aplicável):** `STAGE_NAME` (Status), `DATE_CREATE`, `ASSIGNED_BY_NAME`, `UF_CRM_28_DEPARTAMENTO`, `UF_CRM_28_ORIGEM`.
+- *Outros campos específicos do Bitrix24 ou das fontes de dados utilizadas.*
 
 ## Como Executar
 
 1.  **Clone o repositório:**
     ```bash
-    git clone <url_do_repositorio>
-    cd <nome_da_pasta>
+    git clone https://github.com/velos0o/streamlit_eu_na_europa.git
+    cd streamlit_eu_na_europa
     ```
 2.  **Crie um ambiente virtual (recomendado):**
     ```bash
@@ -104,38 +93,40 @@ O dashboard inclui as seguintes páginas e funcionalidades:
     ```bash
     pip install -r requirements.txt
     ```
-4.  **Configure as variáveis de ambiente:**
-    - Renomeie `.env.example` para `.env`.
-    - Preencha as variáveis no arquivo `.env` com suas credenciais do Bitrix24:
+4.  **Compile o SASS (se necessário):**
+    Se houver alterações nos arquivos `.scss`, execute:
+    ```bash
+    python compile_sass.py
+    ```
+5.  **Configure as variáveis de ambiente (se aplicável):**
+    - Verifique se existe um arquivo `.env` ou `.env.example`. Se existir, renomeie para `.env` e preencha as credenciais necessárias (ex: API do Bitrix24).
       ```dotenv
-      BITRIX_TOKEN=seu_token_bi_aqui
-      BITRIX_URL=sua_url_base_bitrix_aqui # Ex: https://seu_dominio.bitrix24.com
-      # BITRIX_REST_TOKEN=seu_token_rest_webhook_aqui (Opcional, se usado)
-      # BITRIX_REST_URL=sua_url_rest_webhook_aqui (Opcional, se usado)
+      # Exemplo:
+      # BITRIX_TOKEN=seu_token_bi_aqui
+      # BITRIX_URL=sua_url_base_bitrix_aqui
       ```
-    - Alternativamente, configure como Secrets no Streamlit Cloud.
+    - Alternativamente, configure como Secrets no Streamlit Cloud se for fazer deploy lá.
 
-5.  **Execute a aplicação:**
+6.  **Execute a aplicação:**
     ```bash
     streamlit run main.py
     ```
 
 ## Otimização de Carregamento
 
-- **Cache Inteligente:** Funções de carregamento de dados usam `@st.cache_data` para evitar recargas desnecessárias.
-- **Modo de Demonstração:** Algumas páginas podem oferecer um modo de demonstração com dados simulados para testes rápidos ou offline.
-- **Atualização Manual:** O botão "Atualizar Dados" limpa o cache e força a recarga dos dados da API.
+- **Cache Inteligente:** Funções de carregamento de dados devem usar `@st.cache_data` ou `@st.cache_resource` para otimizar performance.
+- **Atualização Manual:** O botão "Atualizar Dados" (se implementado globalmente ou por página) pode ser usado para limpar o cache e recarregar os dados.
 
 ## Design e Estilo
 
-- Utiliza componentes nativos do Streamlit combinados com CSS personalizado inspirado no Tailwind CSS.
-- Tema claro e escuro com cores definidas.
-- Estilos globais e específicos por módulo para consistência.
-- Animações sutis para melhorar a experiência do usuário.
+- Utiliza componentes nativos do Streamlit.
+- Estilização customizada via arquivos SCSS compilados para CSS (`assets/styles/`).
+- Possibilidade de tema claro/escuro definido em `.streamlit/config.toml`.
+- Animações Lottie podem ser usadas (`assets/animations/`).
 
 ## Notas de Desenvolvimento
 
-- Última atualização: Agosto 2024
+- Última atualização: Julho 2024
 - A estrutura modular com subpastas em `views/` permite melhor organização e escalabilidade.
 - O uso de `__init__.py` em cada subpasta as torna pacotes Python importáveis.
 

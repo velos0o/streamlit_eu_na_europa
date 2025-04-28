@@ -1,0 +1,1 @@
+"""Inicializa o módulo comune_new.""" 

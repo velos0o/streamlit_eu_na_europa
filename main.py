@@ -31,6 +31,8 @@ from views.tickets import show_tickets
 from views.reclamacoes.reclamacoes_main import show_reclamacoes
 # Importar nova página de Emissões Brasileiras
 from views.cartorio_new.cartorio_new_main import show_cartorio_new
+# --- NOVO: Importar nova página de Comune (Novo) ---
+from views.comune_new.comune_new_main import show_comune_new
 
 # Importar os novos componentes do guia de relatório
 from components.report_guide import show_guide_sidebar, show_page_guide, show_contextual_help
@@ -144,9 +146,17 @@ if 'emissao_subpagina' not in st.session_state:
     st.session_state.emissao_subpagina = 'Visão Geral' # Subpágina padrão
 # --- FIM NOVO ---
 
+# --- NOVO: Estado para submenu Comune (Novo) ---
+if 'comune_submenu_expanded' not in st.session_state:
+    st.session_state.comune_submenu_expanded = False
+if 'comune_subpagina' not in st.session_state:
+    st.session_state.comune_subpagina = 'Visão Geral' # Subpágina padrão
+# --- FIM NOVO ---
+
 # Funções para alterar a página e controlar submenu
 def reset_submenu():
     st.session_state.emissao_submenu_expanded = False
+    st.session_state.comune_submenu_expanded = False # Resetar submenu Comune também
 
 def ir_para_inicio(): 
     reset_submenu()
@@ -176,27 +186,44 @@ def ir_para_reclamacoes():
 # --- NOVO: Função para toggle e navegação do submenu Emissões ---
 def toggle_emissao_submenu():
     st.session_state.emissao_submenu_expanded = not st.session_state.get('emissao_submenu_expanded', False)
+    st.session_state.comune_submenu_expanded = False # Fecha outro submenu
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
 # --- FIM NOVO ---
 
-# --- NOVO: Funções on_click para sub-botões Emissões ---
-def ir_para_emissao_visao_geral():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'Visão Geral'
-    # Não mexe em emissao_submenu_expanded
-
-def ir_para_emissao_acompanhamento():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'Acompanhamento'
-
-def ir_para_emissao_producao():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'Produção'
-
-def ir_para_emissao_pendencias():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'Pendências'
+# --- NOVO: Função para toggle e navegação do submenu Comune (Novo) ---
+def toggle_comune_submenu():
+    st.session_state.comune_submenu_expanded = not st.session_state.get('comune_submenu_expanded', False)
+    st.session_state.emissao_submenu_expanded = False # Fecha outro submenu
+    # Define a página principal e subpágina padrão ao abrir/fechar
+    if st.session_state.comune_submenu_expanded:
+        st.session_state['pagina_atual'] = 'Comune (Novo)'
+        # Mantém a subpágina atual se já estiver em uma subpágina do Comune
+        if st.session_state.get('pagina_atual') != 'Comune (Novo)':
+            st.session_state.comune_subpagina = 'Visão Geral' 
+    # Se fechar, não muda a página atual
 # --- FIM NOVO ---
+
+# Funções on_click para sub-botões Comune (Novo)
+def ir_para_comune_visao_geral():
+    st.session_state['pagina_atual'] = 'Comune (Novo)'
+    st.session_state.comune_subpagina = 'Visão Geral'
+
+def ir_para_comune_tempo_solicitacao():
+    st.session_state['pagina_atual'] = 'Comune (Novo)'
+    st.session_state.comune_subpagina = 'Tempo de Solicitação'
+
+# Funções on_click para sub-botões do MAPA (dentro de Comune Novo)
+def ir_para_mapa_comune_1():
+    st.session_state['pagina_atual'] = 'Comune (Novo)' # Permanece na página principal
+    st.session_state.comune_subpagina = 'Mapa Comune 1' # Define a subpágina para o mapa 1
+
+def ir_para_mapa_comune_2():
+    st.session_state['pagina_atual'] = 'Comune (Novo)'
+    st.session_state.comune_subpagina = 'Mapa Comune 2'
+
+def ir_para_mapa_comune_3():
+    st.session_state['pagina_atual'] = 'Comune (Novo)'
+    st.session_state.comune_subpagina = 'Mapa Comune 3'
 
 # Botões individuais para navegação
 st.sidebar.button("Macro Higienização", key="btn_inicio", 
@@ -223,10 +250,22 @@ st.sidebar.button("Emissões Brasileiras", key="btn_cartorio_new",
             help="Módulo refatorado de emissões de cartórios brasileiros")
 # --- FIM ATUALIZADO ---
 
-# --- ATUALIZADO: Bloco condicional para o submenu com funcionalidade ---
-if st.session_state.get('emissao_submenu_expanded', False):
-    with st.sidebar.container(): 
-        # --- CSS Injetado para Estilo Persistente dos Sub-botões ---
+st.sidebar.button("Comune Bitrix24", key="btn_comune", 
+            on_click=ir_para_comune,
+            use_container_width=True,
+            type="primary" if st.session_state['pagina_atual'] == "Comune" else "secondary")
+
+# --- NOVO: Botão para Comune (Novo) com toggle ---
+st.sidebar.button("Comune (Novo)", key="btn_comune_new",
+            on_click=toggle_comune_submenu,
+            use_container_width=True,
+            type="primary" if st.session_state['pagina_atual'] == "Comune (Novo)" else "secondary",
+            help="Módulo refatorado de Comune")
+
+# --- NOVO: Bloco condicional para o submenu Comune (Novo) ---
+if st.session_state.get('comune_submenu_expanded', False):
+    with st.sidebar.container():
+        # Reutilizar o mesmo CSS injetado dos sub-botões de Emissões
         st.markdown("""
         <style>
         /* Base style para TODOS os sub-botões */
@@ -260,7 +299,7 @@ if st.session_state.get('emissao_submenu_expanded', False):
             font-weight: 600 !important;
             color: #2563EB !important; /* Cor primária aproximada */
             /* Garante que fundo e borda não voltem */
-            background: none !important; 
+            background: none !important;
             border: none !important;
         }
         /* Garante que o foco não estrague o visual */
@@ -278,31 +317,34 @@ if st.session_state.get('emissao_submenu_expanded', False):
         }
         </style>
         """, unsafe_allow_html=True)
-        # --- Fim CSS Injetado ---
 
         # Botões diretamente dentro do container da sidebar
-        st.button("Visão Geral", key="subbtn_visao_geral", 
-                    on_click=ir_para_emissao_visao_geral,
+        st.button("Visão Geral", key="subbtn_comune_visao_geral",
+                    on_click=ir_para_comune_visao_geral,
                     use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Visão Geral" else "secondary")
-        st.button("Acompanhamento", key="subbtn_acompanhamento", 
-                    on_click=ir_para_emissao_acompanhamento,
+                    type="primary" if st.session_state.get('comune_subpagina') == "Visão Geral" else "secondary")
+        st.button("Tempo de Solicitação", key="subbtn_comune_tempo",
+                    on_click=ir_para_comune_tempo_solicitacao,
                     use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Acompanhamento" else "secondary")
-        st.button("Produção", key="subbtn_producao", 
-                    on_click=ir_para_emissao_producao,
+                    type="primary" if st.session_state.get('comune_subpagina') == "Tempo de Solicitação" else "secondary")
+        
+        # Adicionar Separador e Botões do Mapa
+        st.markdown("<hr style='margin: 5px 0; border-top: 1px solid #ddd;'/>", unsafe_allow_html=True)
+        st.markdown("<span style='font-size: 0.8em; color: #666; margin-left: 15px; font-weight: bold;'>Mapas</span>", unsafe_allow_html=True)
+        
+        st.button("Mapa Comune 1 (Cat 22)", key="subbtn_mapa_c1",
+                    on_click=ir_para_mapa_comune_1,
                     use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Produção" else "secondary")
-        st.button("Pendências", key="subbtn_pendencias", 
-                    on_click=ir_para_emissao_pendencias,
+                    type="primary" if st.session_state.get('comune_subpagina') == "Mapa Comune 1" else "secondary")
+        st.button("Mapa Comune 2 (Cat 58)", key="subbtn_mapa_c2",
+                    on_click=ir_para_mapa_comune_2,
                     use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Pendências" else "secondary")
-# --- FIM ATUALIZADO ---
-
-st.sidebar.button("Comune Bitrix24", key="btn_comune", 
-            on_click=ir_para_comune,
-            use_container_width=True,
-            type="primary" if st.session_state['pagina_atual'] == "Comune" else "secondary")
+                    type="primary" if st.session_state.get('comune_subpagina') == "Mapa Comune 2" else "secondary")
+        st.button("Mapa Comune 3 (Cat 60)", key="subbtn_mapa_c3",
+                    on_click=ir_para_mapa_comune_3,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('comune_subpagina') == "Mapa Comune 3" else "secondary")
+# --- FIM NOVO ---
 
 st.sidebar.button("Extrações", key="btn_extracoes", 
             on_click=ir_para_extracoes,
@@ -424,6 +466,12 @@ try:
         # Chama a função principal, que agora deve rotear internamente
         show_cartorio_new() # Assumindo que show_cartorio_new agora usa st.session_state.emissao_subpagina para rotear
         
+    # --- NOVO: Lógica para a página Comune (Novo) ---
+    elif pagina == "Comune (Novo)":
+        # Não precisa mais diferenciar 'Mapa Comunes' aqui
+        show_comune_new() # A função interna agora roteia a subpágina
+    # --- FIM NOVO ---
+
 except Exception as e:
     st.error(f"Erro ao carregar a página: {str(e)}")
     # Mostrar detalhes do erro para facilitar a depuração
