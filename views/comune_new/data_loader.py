@@ -147,6 +147,7 @@ def _normalizar_localizacao(series):
         'ponte piave': 'ponte piave', # Para Parrocchia Ponte di Piave
         's andrea apostolo mason vicentino': 'mason vicentino',
         'santi pietro paolo coreglia antelminelli': 'coreglia antelminelli',
+        'eusebio cortiglione asti': 'cortiglione asti', # Adicionado para caso Parrocchia S. Eusebio
         'zenone vescovo martire': 'zenone',
         'villa conte': 'villa conte', # Para VILLA DEL CONTE
         'pier disonzo': 'san pier isonzo',
@@ -276,8 +277,9 @@ def _normalizar_localizacao(series):
         'parrocchia santa fosca a roncadelle brescia': 'roncadelle',
         'via roma 67 cap 36010 - chiuppano': 'chiuppano',
         'paroquia maria ss. assunta collegiata': 'offida', # Mapeamento pelo contexto
-        'parrocchia santa gertrude rotzo': 'rotzo',
+        'parrocchia santa gertrude rotzo': 'rotzo', # Adicionado mapeamento direto
         'parrocchia s.giovanni battista - montesarchio': 'montesarchio',
+        'parrocchia san michele arcangelo quarto altino': 'quarto altino', # Adicionado mapeamento direto
         'piazza san marco 1 - cap 35043 monselice': 'monselice',
         'via dante maiocchi 55 - cap 01100 roccalvecce': 'viterbo', # Fração de Viterbo
         'via europa 10 - cap 55030 - vagli sotto': 'vagli sotto',
@@ -480,69 +482,84 @@ def _normalizar_localizacao(series):
     return normalized
 
 # --- Função para carregar coordenadas (adaptada) ---
-@st.cache_data(ttl=86400) # Cache de 1 dia para o JSON de comuns
+@st.cache_data(ttl=86400) # Cache de 1 dia
 def _carregar_coordenadas_mapa_normalizadas():
     """
-    Carrega as coordenadas do arquivo JSON mapa_italia.json, normaliza e retorna DataFrame.
-    Assume que o JSON tem campos 'city', 'admin_name', 'lat', 'lng'.
+    Carrega os dados de comunes e coordenadas dos arquivos CSV do 
+    repositório opendatasicilia/comuni-italiani, junta-os, normaliza 
+    e retorna um DataFrame.
+    Assume a presença dos arquivos 'comuni.csv' e 'coordinate.csv' na pasta 'comuni-italiani-main/dati/'.
     """
-    # Construir caminho relativo à pasta do projeto
+    # Caminhos relativos para os arquivos CSV
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Caminho relativo para o JSON
-    json_path = os.path.join(script_dir, '..', 'comune', 'Mapa', 'mapa_italia.json') 
-    
+    base_path = os.path.join(script_dir, '..', '..', 'comuni-italiani-main', 'dati')
+    comuni_path = os.path.join(base_path, 'comuni.csv')
+    coords_path = os.path.join(base_path, 'coordinate.csv')
+
     try:
-        # Ler o JSON
-        df_coords = pd.read_json(json_path)
+        # Ler os arquivos CSV
+        df_comuni = pd.read_csv(comuni_path)
+        df_coords = pd.read_csv(coords_path)
+
+        # Verificar colunas essenciais em cada arquivo
+        cols_comuni_necessarias = ['comune', 'sigla', 'pro_com_t']
+        cols_coords_necessarias = ['pro_com_t', 'lat', 'long']
         
-        # Renomear colunas para o padrão esperado (do JSON para o DataFrame)
-        df_coords = df_coords.rename(columns={
-            'city': 'COMUNE_MAPA_ORIG', 
-            'admin_name': 'PROVINCIA_MAPA_ORIG',
-            'lat': 'latitude', 
-            'lng': 'longitude' 
-        })
-        
-        # Verificar se colunas essenciais foram carregadas/renomeadas
-        col_lat_json = 'latitude' 
-        col_lon_json = 'longitude' 
-        cols_necessarias = ['COMUNE_MAPA_ORIG', 'PROVINCIA_MAPA_ORIG', col_lat_json, col_lon_json]
-        
-        if not all(col in df_coords.columns for col in cols_necessarias):
-            cols_faltantes = [col for col in cols_necessarias if col not in df_coords.columns]
-            st.error(f"JSON {json_path} sem campos esperados após rename: {', '.join(cols_faltantes)}. Necessário: {cols_necessarias}")
-            st.info("Verifique a estrutura do arquivo JSON e os nomes usados no rename.")
+        if not all(col in df_comuni.columns for col in cols_comuni_necessarias):
+            cols_faltantes = [col for col in cols_comuni_necessarias if col not in df_comuni.columns]
+            st.error(f"Arquivo {comuni_path} sem colunas esperadas: {', '.join(cols_faltantes)}. Necessário: {cols_comuni_necessarias}")
             return pd.DataFrame()
         
-        # Aplicar Normalização
-        df_coords['COMUNE_MAPA_NORM'] = _normalizar_localizacao(df_coords['COMUNE_MAPA_ORIG'])
-        df_coords['PROVINCIA_MAPA_NORM'] = _normalizar_localizacao(df_coords['PROVINCIA_MAPA_ORIG'])
+        if not all(col in df_coords.columns for col in cols_coords_necessarias):
+            cols_faltantes = [col for col in cols_coords_necessarias if col not in df_coords.columns]
+            st.error(f"Arquivo {coords_path} sem colunas esperadas: {', '.join(cols_faltantes)}. Necessário: {cols_coords_necessarias}")
+            return pd.DataFrame()
+            
+        # Juntar os DataFrames usando 'pro_com_t'
+        df_merged = pd.merge(df_comuni, df_coords, on='pro_com_t', how='inner')
         
-        # Remover duplicatas baseadas nas colunas normalizadas
-        df_coords.drop_duplicates(subset=['COMUNE_MAPA_NORM', 'PROVINCIA_MAPA_NORM'], keep='first', inplace=True)
+        # Renomear colunas para o padrão esperado pela lógica de matching
+        df_merged = df_merged.rename(columns={
+            'comune': 'COMUNE_MAPA_ORIG',      # Nome do Comune original
+            'sigla': 'PROVINCIA_MAPA_ORIG',    # Usar a SIGLA como Província original para normalização
+            'lat': 'latitude',             # Latitude
+            'long': 'longitude'            # Longitude
+        })
         
-        # Selecionar apenas as colunas necessárias para o merge
-        df_coords_final = df_coords[['COMUNE_MAPA_NORM', 'PROVINCIA_MAPA_NORM', col_lat_json, col_lon_json]].copy()
+        # Selecionar e manter apenas as colunas renomeadas necessárias
+        cols_manter = ['COMUNE_MAPA_ORIG', 'PROVINCIA_MAPA_ORIG', 'latitude', 'longitude']
+        df_merged = df_merged[cols_manter].copy()
+
+        # Aplicar Normalização aos nomes de comune e província (sigla)
+        df_merged['COMUNE_MAPA_NORM'] = _normalizar_localizacao(df_merged['COMUNE_MAPA_ORIG'])
+        # Normalizar a sigla também (remove acentos caso haja, embora improvável para siglas)
+        df_merged['PROVINCIA_MAPA_NORM'] = _normalizar_localizacao(df_merged['PROVINCIA_MAPA_ORIG'])
         
-        # Converter coordenadas para numérico e remover NaNs
-        # Certifique-se que as colunas renomeadas (latitude, longitude) são usadas aqui
+        # Remover duplicatas baseadas nas colunas normalizadas (importante após normalização)
+        df_merged.drop_duplicates(subset=['COMUNE_MAPA_NORM', 'PROVINCIA_MAPA_NORM'], keep='first', inplace=True)
+        
+        # Selecionar apenas as colunas finais necessárias para o merge posterior
+        df_coords_final = df_merged[['COMUNE_MAPA_NORM', 'PROVINCIA_MAPA_NORM', 'latitude', 'longitude']].copy()
+        
+        # Converter coordenadas para numérico e remover NaNs/Inválidos
         df_coords_final['latitude'] = pd.to_numeric(df_coords_final['latitude'], errors='coerce')
         df_coords_final['longitude'] = pd.to_numeric(df_coords_final['longitude'], errors='coerce')
         df_coords_final.dropna(subset=['latitude', 'longitude'], inplace=True)
 
+        st.success(f"Dados de coordenadas carregados e processados de {len(df_coords_final)} comunes únicos (Fonte: OpendataSicilia).")
         return df_coords_final
         
-    except FileNotFoundError:
-        st.error(f"Arquivo JSON de coordenadas não encontrado em: {json_path}")
+    except FileNotFoundError as fnf_err:
+        st.error(f"Erro: Arquivo CSV não encontrado: {fnf_err}. Verifique se 'comuni.csv' e 'coordinate.csv' estão em 'comuni-italiani-main/dati/'.")
         return pd.DataFrame()
     except ValueError as ve:
-         st.error(f"Erro ao ler JSON de coordenadas: Problema nos dados ou estrutura inválida. Verifique '{ve}'")
+         st.error(f"Erro ao ler CSV de coordenadas/comunes: Problema nos dados ou estrutura inválida. Verifique '{ve}'")
          return pd.DataFrame()
     except Exception as e:
-        st.error(f"Erro ao ler/processar o JSON de coordenadas: {e}")
+        st.error(f"Erro inesperado ao carregar/processar CSVs de coordenadas/comunes: {e}")
+        st.exception(e) # Mostra traceback completo para debug
         return pd.DataFrame()
-# --- Fim Carregar Coordenadas ---
-
+# --- Fim Carregar Coordenadas --- 
 
 @st.cache_data(ttl=3600) # Cache de 1 hora
 def load_comune_data(force_reload: bool = False) -> pd.DataFrame:
@@ -845,98 +862,74 @@ def load_comune_data(force_reload: bool = False) -> pd.DataFrame:
                      "parrocchia sant ambrogio dego dego": (45.7833, 12.6167, "Correção Manual"), "chiesa parrocchiale tempio sassari": (45.7833, 12.6167, "Correção Manual"),
                      "via roma 67 cap 36010 - chiuppano": (45.7833, 12.6167, "Correção Manual"), "paroquia maria ss. assunta collegiata": (45.7833, 12.6167, "Correção Manual"),
                      "parrocchia santa gertrude rotzo": (45.7833, 12.6167, "Correção Manual"), "parrocchia s.giovanni battista - montesarchio": (45.7833, 12.6167, "Correção Manual"),
-                     "piazza san marco 1 - cap 35043 monselice": (45.7833, 12.6167, "Correção Manual"), "via dante maiocchi 55 - cap 01100 roccalvecce": (45.7833, 12.6167, "Correção Manual"),
-                     "via europa 10 - cap 55030 - vagli sotto": (45.7833, 12.6167, "Correção Manual"), "piazza aldo moro 24 - cap 45010 villadose": (45.7833, 12.6167, "Correção Manual"),
-                     "piazza caduti 1- cap 31024 ormelle": (45.7833, 12.6167, "Correção Manual"), "via umberto i 2 - cap 30014 cavarzere": (45.7833, 12.6167, "Correção Manual"),
-                     "via roma 115 - cap 88825 savelli": (45.7833, 12.6167, "Correção Manual"), "via garibaldi 14 - cap 31046 oderzo": (45.7833, 12.6167, "Correção Manual"),
-                     "careggine lu": (45.7833, 12.6167, "Correção Manual"), "viale papa giovanni xxiii 2 - cap 31030 castelcucco": (45.7833, 12.6167, "Correção Manual"),
-                     "longarone bl": (45.7833, 12.6167, "Correção Manual"), "san bartolomeo in galdo bn": (45.7833, 12.6167, "Correção Manual"),
-                     "ceggia ve": (45.7833, 12.6167, "Correção Manual"), "paola cs": (45.7833, 12.6167, "Correção Manual"),
-                     "mira ve": (45.7833, 12.6167, "Correção Manual"), "san zenone al po pv": (45.7833, 12.6167, "Correção Manual"),
-                     "favaro veneto": (45.7833, 12.6167, "Correção Manual"), "fonte tv": (45.7833, 12.6167, "Correção Manual"),
-                     "fardella pz": (45.7833, 12.6167, "Correção Manual"), "molazzana lu": (45.7833, 12.6167, "Correção Manual"),
-                     "norbello or": (45.7833, 12.6167, "Correção Manual"), "pedace cs": (45.7833, 12.6167, "Correção Manual"),
-                     "ittiri ss": (45.7833, 12.6167, "Correção Manual"), "leonforte en": (45.7833, 12.6167, "Correção Manual"),
-                     "samassi su": (45.7833, 12.6167, "Correção Manual"), "arcugnano vi": (45.7833, 12.6167, "Correção Manual"),
-                     "piazza iv novembre 10 - 37022 - fumane": (45.7833, 12.6167, "Correção Manual"), "loiano bo": (45.7833, 12.6167, "Correção Manual"),
-                     "piazza xiv dicembre 5 - 28019 - suno": (45.7833, 12.6167, "Correção Manual"), "soave vr": (45.7833, 12.6167, "Correção Manual"),
-                     "ottaviano na": (45.7833, 12.6167, "Correção Manual"), "via pietro leopoldo 24 - 51028 - san marcello pistoiese": (45.7833, 12.6167, "Correção Manual"),
-                     "grezzago mi": (45.7833, 12.6167, "Correção Manual"), "piazza martiri della liberta 3 - 31040 - cessalto": (45.7833, 12.6167, "Correção Manual"),
-                     "via xxi luglio cap 81037 sessa aurunca": (45.7833, 12.6167, "Correção Manual"), "via giuseppe garibaldi 60 35020 - correzzola": (45.7833, 12.6167, "Correção Manual"),
-                     "zero branco tv": (45.7833, 12.6167, "Correção Manual"), "fumachi": (45.7833, 12.6167, "Correção Manual"),
-                     "filippini": (45.7833, 12.6167, "Correção Manual"), "de lucca": (45.7833, 12.6167, "Correção Manual"),
-                     "censi": (45.7833, 12.6167, "Correção Manual"), "davi": (45.7833, 12.6167, "Correção Manual"),
-                     "fabbiani": (45.7833, 12.6167, "Correção Manual"), "simoncello": (45.7833, 12.6167, "Correção Manual"),
-                     "gabrieli": (45.7833, 12.6167, "Correção Manual"), "simonetto": (45.7833, 12.6167, "Correção Manual"),
-                     "ortolan": (45.7833, 12.6167, "Correção Manual"), "costellini": (45.7833, 12.6167, "Correção Manual"),
-                     "vanzelli": (45.7833, 12.6167, "Correção Manual"), "defalco": (45.7833, 12.6167, "Correção Manual"),
-                     "garofalo": (45.7833, 12.6167, "Correção Manual"), "conti": (45.7833, 12.6167, "Correção Manual"),
-                     "pizzinat": (45.7833, 12.6167, "Correção Manual"), "bernardini": (45.7833, 12.6167, "Correção Manual"),
-                     "via roma 29 - cap 46031 - bagnolo san vito": (45.7833, 12.6167, "Correção Manual"), "rissi": (45.7833, 12.6167, "Correção Manual"),
-                     "linguanotto": (45.7833, 12.6167, "Correção Manual"), "quinzi": (45.7833, 12.6167, "Correção Manual"),
-                     "colombo": (45.7833, 12.6167, "Correção Manual"), "ragonezi": (45.7833, 12.6167, "Correção Manual"),
-                     "morandin": (45.7833, 12.6167, "Correção Manual"), "zanatta": (45.7833, 12.6167, "Correção Manual"),
-                     "guerra": (45.7833, 12.6167, "Correção Manual"), "cerantola": (45.7833, 12.6167, "Correção Manual"),
-                     "da re": (45.7833, 12.6167, "Correção Manual"), "maggiolo": (45.7833, 12.6167, "Correção Manual"),
-                     "pagotto": (45.7833, 12.6167, "Correção Manual"), "cagnotto": (45.7833, 12.6167, "Correção Manual"),
-                     "possenatto": (45.7833, 12.6167, "Correção Manual"), "galante": (45.7833, 12.6167, "Correção Manual"),
-                     "ravgnani": (45.7833, 12.6167, "Correção Manual"), "giacomin": (45.7833, 12.6167, "Correção Manual"),
-                     "morelli": (45.7833, 12.6167, "Correção Manual"), "bussadori": (45.7833, 12.6167, "Correção Manual"),
-                     "rizotto": (45.7833, 12.6167, "Correção Manual"), "galuppo": (45.7833, 12.6167, "Correção Manual"),
-                     "zerbinati": (45.7833, 12.6167, "Correção Manual"), "buosi": (45.7833, 12.6167, "Correção Manual"),
-                     "maiolo": (45.7833, 12.6167, "Correção Manual"), "magnani": (45.7833, 12.6167, "Correção Manual"),
-                     "dal ponte": (45.7833, 12.6167, "Correção Manual"), "bettin": (45.7833, 12.6167, "Correção Manual"),
-                     "bovi": (45.7833, 12.6167, "Correção Manual"), "fante": (45.7833, 12.6167, "Correção Manual"),
-                     "ravasio": (45.7833, 12.6167, "Correção Manual"), "rosa": (45.7833, 12.6167, "Correção Manual"),
-                     "pagliarone": (45.7833, 12.6167, "Correção Manual"), "pagliari": (45.7833, 12.6167, "Correção Manual"),
-                     "zuccon": (45.7833, 12.6167, "Correção Manual"), "zambotti": (45.7833, 12.6167, "Correção Manual"),
-                     "zoccaratto": (45.7833, 12.6167, "Correção Manual"), "ferronato": (45.7833, 12.6167, "Correção Manual"),
-                     "rossato": (45.7833, 12.6167, "Correção Manual"), "marin": (45.7833, 12.6167, "Correção Manual"),
-                     "bobbo": (45.7833, 12.6167, "Correção Manual"), "ungarelli": (45.7833, 12.6167, "Correção Manual"),
-                     "mariani": (45.7833, 12.6167, "Correção Manual"), "pace": (45.7833, 12.6167, "Correção Manual"),
-                     "bertoncello": (45.7833, 12.6167, "Correção Manual"), "camaduro": (45.7833, 12.6167, "Correção Manual"),
-                     "lombello": (45.7833, 12.6167, "Correção Manual"), "furlan": (45.7833, 12.6167, "Correção Manual"),
-                     "asinelli": (45.7833, 12.6167, "Correção Manual"), "gualtieri": (45.7833, 12.6167, "Correção Manual"),
-                     "ferri": (45.7833, 12.6167, "Correção Manual"), "borelli": (45.7833, 12.6167, "Correção Manual"),
-                     "facchini": (45.7833, 12.6167, "Correção Manual"), "marchesin": (45.7833, 12.6167, "Correção Manual"),
-                     "rizzati": (45.7833, 12.6167, "Correção Manual"), "andruccioli": (45.7833, 12.6167, "Correção Manual"),
-                     "conti": (45.7833, 12.6167, "Correção Manual"), "nesi": (45.7833, 12.6167, "Correção Manual"),
-                     "bailo": (45.7833, 12.6167, "Correção Manual"), "gabrielli": (45.7833, 12.6167, "Correção Manual"),
-                     "faragutti": (45.7833, 12.6167, "Correção Manual"), "gobbi": (45.7833, 12.6167, "Correção Manual"),
-                     "biguetto": (45.7833, 12.6167, "Correção Manual"), "cola": (45.7833, 12.6167, "Correção Manual"),
-                     "zonatto": (45.7833, 12.6167, "Correção Manual"), "massarotto": (45.7833, 12.6167, "Correção Manual"),
-                     "marruchella": (45.7833, 12.6167, "Correção Manual"), "rampazzo": (45.7833, 12.6167, "Correção Manual"),
-                     "perissoto": (45.7833, 12.6167, "Correção Manual"), "esposte": (45.7833, 12.6167, "Correção Manual"),
-                     "chiebao": (45.7833, 12.6167, "Correção Manual"), "musacco": (45.7833, 12.6167, "Correção Manual"),
-                     "misurelli": (45.7833, 12.6167, "Correção Manual"), "perrone": (45.7833, 12.6167, "Correção Manual"),
-                     "ghisoni": (45.7833, 12.6167, "Correção Manual"), "massoni": (45.7833, 12.6167, "Correção Manual"),
-                     "scappini": (45.7833, 12.6167, "Correção Manual"), "magri": (45.7833, 12.6167, "Correção Manual"),
-                     "andreoli": (45.7833, 12.6167, "Correção Manual"), "toffolo": (45.7833, 12.6167, "Correção Manual"),
-                     "bettanin": (45.7833, 12.6167, "Correção Manual"), "sabbadini": (45.7833, 12.6167, "Correção Manual"),
-                     "franchini": (45.7833, 12.6167, "Correção Manual"), "dall osto": (45.7833, 12.6167, "Correção Manual"),
-                     "flora": (45.7833, 12.6167, "Correção Manual"), "giordano": (45.7833, 12.6167, "Correção Manual"),
-                     "marchiori": (45.7833, 12.6167, "Correção Manual"), "rettore": (45.7833, 12.6167, "Correção Manual"),
-                     "fontanella": (45.7833, 12.6167, "Correção Manual"), "furlanetto": (45.7833, 12.6167, "Correção Manual"),
-                     "corradini": (45.7833, 12.6167, "Correção Manual"), "michielon": (45.7833, 12.6167, "Correção Manual"),
-                     "pedace": (45.7833, 12.6167, "Correção Manual"), "romio": (45.7833, 12.6167, "Correção Manual"),
-                     "zampiva": (45.7833, 12.6167, "Correção Manual"), "sabbadin": (45.7833, 12.6167, "Correção Manual"),
-                     "perette": (45.7833, 12.6167, "Correção Manual"), "rizzon deon": (45.7833, 12.6167, "Correção Manual"),
-                     "polo": (45.7833, 12.6167, "Correção Manual"), "dettori": (45.7833, 12.6167, "Correção Manual"),
-                     "bulgarelli": (45.7833, 12.6167, "Correção Manual"), "peruchi": (45.7833, 12.6167, "Correção Manual"),
-                     "squizzato": (45.7833, 12.6167, "Correção Manual"), "rissi": (45.7833, 12.6167, "Correção Manual"),
-                     "meotti": (45.7833, 12.6167, "Correção Manual"), "galletti": (45.7833, 12.6167, "Correção Manual"),
-                     "chinelato": (45.7833, 12.6167, "Correção Manual"), "begalli": (45.7833, 12.6167, "Correção Manual"),
-                     "petrone": (45.7833, 12.6167, "Correção Manual"), "bovo": (45.7833, 12.6167, "Correção Manual"),
-                     "massarelli": (45.7833, 12.6167, "Correção Manual"), "rigazzo": (45.7833, 12.6167, "Correção Manual"),
-                     "pagnota": (45.7833, 12.6167, "Correção Manual"), "olivo": (45.7833, 12.6167, "Correção Manual"),
-                     "biondi": (45.7833, 12.6167, "Correção Manual"), "masarut": (45.7833, 12.6167, "Correção Manual"),
-                     "escopo": (45.7833, 12.6167, "Correção Manual"), "funghi": (45.7833, 12.6167, "Correção Manual"),
-                     "azzolini": (45.7833, 12.6167, "Correção Manual"), "naressi": (45.7833, 12.6167, "Correção Manual"),
-                     "pra nichele": (45.7833, 12.6167, "Correção Manual"), "stasio": (45.7833, 12.6167, "Correção Manual"),
-                     "marson": (45.7833, 12.6167, "Correção Manual"), "zocconelli": (45.7833, 12.6167, "Correção Manual"),
-                     "lovato": (45.7833, 12.6167, "Correção Manual"), "cicuto": (45.7833, 12.6167, "Correção Manual"),
-                     "ruzzon": (45.7833, 12.6167, "Correção Manual"), "carazzo": (45.7833, 12.6167, "Correção Manual"),
-                     "benito": (45.7833, 12.6167, "Correção Manual"), "bressan": (45.7833, 12.6167, "Correção Manual"),
+                     "parrocchia san michele arcangelo quarto altino": (45.7833, 12.6167, "Correção Manual"), "piazza san marco 1 - cap 35043 monselice": (45.7833, 12.6167, "Correção Manual"),
+                     "via dante maiocchi 55 - cap 01100 roccalvecce": (45.7833, 12.6167, "Correção Manual"), "via europa 10 - cap 55030 - vagli sotto": (45.7833, 12.6167, "Correção Manual"),
+                     "piazza aldo moro 24 - cap 45010 villadose": (45.7833, 12.6167, "Correção Manual"), "piazza caduti 1- cap 31024 ormelle": (45.7833, 12.6167, "Correção Manual"),
+                     "via umberto i 2 - cap 30014 cavarzere": (45.7833, 12.6167, "Correção Manual"), "via roma 115 - cap 88825 savelli": (45.7833, 12.6167, "Correção Manual"),
+                     "via garibaldi 14 - cap 31046 oderzo": (45.7833, 12.6167, "Correção Manual"), "careggine lu": (45.7833, 12.6167, "Correção Manual"),
+                     "viale papa giovanni xxiii 2 - cap 31030 castelcucco": (45.7833, 12.6167, "Correção Manual"), "longarone bl": (45.7833, 12.6167, "Correção Manual"),
+                     "san bartolomeo in galdo bn": (45.7833, 12.6167, "Correção Manual"), "ceggia ve": (45.7833, 12.6167, "Correção Manual"),
+                     "paola cs": (45.7833, 12.6167, "Correção Manual"), "mira ve": (45.7833, 12.6167, "Correção Manual"),
+                     "san zenone al po pv": (45.7833, 12.6167, "Correção Manual"), "favaro veneto": (45.7833, 12.6167, "Correção Manual"),
+                     "fonte tv": (45.7833, 12.6167, "Correção Manual"), "fardella pz": (45.7833, 12.6167, "Correção Manual"),
+                     "molazzana lu": (45.7833, 12.6167, "Correção Manual"), "norbello or": (45.7833, 12.6167, "Correção Manual"),
+                     "pedace cs": (45.7833, 12.6167, "Correção Manual"), "ittiri ss": (45.7833, 12.6167, "Correção Manual"),
+                     "leonforte en": (45.7833, 12.6167, "Correção Manual"), "samassi su": (45.7833, 12.6167, "Correção Manual"),
+                     "arcugnano vi": (45.7833, 12.6167, "Correção Manual"), "piazza iv novembre 10 - 37022 - fumane": (45.7833, 12.6167, "Correção Manual"),
+                     "loiano bo": (45.7833, 12.6167, "Correção Manual"), "piazza xiv dicembre 5 - 28019 - suno": (45.7833, 12.6167, "Correção Manual"),
+                     "soave vr": (45.7833, 12.6167, "Correção Manual"), "ottaviano na": (45.7833, 12.6167, "Correção Manual"),
+                     "via pietro leopoldo 24 - 51028 - san marcello pistoiese": (45.7833, 12.6167, "Correção Manual"), "grezzago mi": (45.7833, 12.6167, "Correção Manual"),
+                     "piazza martiri della liberta 3 - 31040 - cessalto": (45.7833, 12.6167, "Correção Manual"), "via xxi luglio cap 81037 sessa aurunca": (45.7833, 12.6167, "Correção Manual"),
+                     "via giuseppe garibaldi 60 35020 - correzzola": (45.7833, 12.6167, "Correção Manual"), "zero branco tv": (45.7833, 12.6167, "Correção Manual"),
+                     "fumachi": (45.7833, 12.6167, "Correção Manual"), "filippini": (45.7833, 12.6167, "Correção Manual"), "de lucca": (45.7833, 12.6167, "Correção Manual"),
+                     "censi": (45.7833, 12.6167, "Correção Manual"), "davi": (45.7833, 12.6167, "Correção Manual"), "fabbiani": (45.7833, 12.6167, "Correção Manual"),
+                     "simoncello": (45.7833, 12.6167, "Correção Manual"), "gabrieli": (45.7833, 12.6167, "Correção Manual"), "simonetto": (45.7833, 12.6167, "Correção Manual"),
+                     "ortolan": (45.7833, 12.6167, "Correção Manual"), "costellini": (45.7833, 12.6167, "Correção Manual"), "vanzelli": (45.7833, 12.6167, "Correção Manual"),
+                     "defalco": (45.7833, 12.6167, "Correção Manual"), "garofalo": (45.7833, 12.6167, "Correção Manual"), "conti": (45.7833, 12.6167, "Correção Manual"),
+                     "pizzinat": (45.7833, 12.6167, "Correção Manual"), "bernardini": (45.7833, 12.6167, "Correção Manual"), "via roma 29 - cap 46031 - bagnolo san vito": (45.7833, 12.6167, "Correção Manual"),
+                     "rissi": (45.7833, 12.6167, "Correção Manual"), "linguanotto": (45.7833, 12.6167, "Correção Manual"), "quinzi": (45.7833, 12.6167, "Correção Manual"),
+                     "colombo": (45.7833, 12.6167, "Correção Manual"), "ragonezi": (45.7833, 12.6167, "Correção Manual"), "morandin": (45.7833, 12.6167, "Correção Manual"),
+                     "zanatta": (45.7833, 12.6167, "Correção Manual"), "guerra": (45.7833, 12.6167, "Correção Manual"), "cerantola": (45.7833, 12.6167, "Correção Manual"),
+                     "da re": (45.7833, 12.6167, "Correção Manual"), "maggiolo": (45.7833, 12.6167, "Correção Manual"), "pagotto": (45.7833, 12.6167, "Correção Manual"),
+                     "cagnotto": (45.7833, 12.6167, "Correção Manual"), "possenatto": (45.7833, 12.6167, "Correção Manual"), "galante": (45.7833, 12.6167, "Correção Manual"),
+                     "ravgnani": (45.7833, 12.6167, "Correção Manual"), "giacomin": (45.7833, 12.6167, "Correção Manual"), "morelli": (45.7833, 12.6167, "Correção Manual"),
+                     "bussadori": (45.7833, 12.6167, "Correção Manual"), "rizotto": (45.7833, 12.6167, "Correção Manual"), "galuppo": (45.7833, 12.6167, "Correção Manual"),
+                     "zerbinati": (45.7833, 12.6167, "Correção Manual"), "buosi": (45.7833, 12.6167, "Correção Manual"), "maiolo": (45.7833, 12.6167, "Correção Manual"),
+                     "magnani": (45.7833, 12.6167, "Correção Manual"), "dal ponte": (45.7833, 12.6167, "Correção Manual"), "bettin": (45.7833, 12.6167, "Correção Manual"),
+                     "bovi": (45.7833, 12.6167, "Correção Manual"), "fante": (45.7833, 12.6167, "Correção Manual"), "ravasio": (45.7833, 12.6167, "Correção Manual"),
+                     "rosa": (45.7833, 12.6167, "Correção Manual"), "pagliarone": (45.7833, 12.6167, "Correção Manual"), "pagliari": (45.7833, 12.6167, "Correção Manual"),
+                     "zuccon": (45.7833, 12.6167, "Correção Manual"), "zambotti": (45.7833, 12.6167, "Correção Manual"), "zoccaratto": (45.7833, 12.6167, "Correção Manual"),
+                     "ferronato": (45.7833, 12.6167, "Correção Manual"), "rossato": (45.7833, 12.6167, "Correção Manual"), "marin": (45.7833, 12.6167, "Correção Manual"),
+                     "bobbo": (45.7833, 12.6167, "Correção Manual"), "ungarelli": (45.7833, 12.6167, "Correção Manual"), "mariani": (45.7833, 12.6167, "Correção Manual"),
+                     "pace": (45.7833, 12.6167, "Correção Manual"), "bertoncello": (45.7833, 12.6167, "Correção Manual"), "camaduro": (45.7833, 12.6167, "Correção Manual"),
+                     "lombello": (45.7833, 12.6167, "Correção Manual"), "furlan": (45.7833, 12.6167, "Correção Manual"), "asinelli": (45.7833, 12.6167, "Correção Manual"),
+                     "gualtieri": (45.7833, 12.6167, "Correção Manual"), "ferri": (45.7833, 12.6167, "Correção Manual"), "borelli": (45.7833, 12.6167, "Correção Manual"),
+                     "facchini": (45.7833, 12.6167, "Correção Manual"), "marchesin": (45.7833, 12.6167, "Correção Manual"), "rizzati": (45.7833, 12.6167, "Correção Manual"),
+                     "andruccioli": (45.7833, 12.6167, "Correção Manual"), "conti": (45.7833, 12.6167, "Correção Manual"), "nesi": (45.7833, 12.6167, "Correção Manual"),
+                     "bailo": (45.7833, 12.6167, "Correção Manual"), "gabrielli": (45.7833, 12.6167, "Correção Manual"), "faragutti": (45.7833, 12.6167, "Correção Manual"),
+                     "gobbi": (45.7833, 12.6167, "Correção Manual"), "biguetto": (45.7833, 12.6167, "Correção Manual"), "cola": (45.7833, 12.6167, "Correção Manual"),
+                     "zonatto": (45.7833, 12.6167, "Correção Manual"), "massarotto": (45.7833, 12.6167, "Correção Manual"), "marruchella": (45.7833, 12.6167, "Correção Manual"),
+                     "rampazzo": (45.7833, 12.6167, "Correção Manual"), "perissoto": (45.7833, 12.6167, "Correção Manual"), "esposte": (45.7833, 12.6167, "Correção Manual"),
+                     "chiebao": (45.7833, 12.6167, "Correção Manual"), "musacco": (45.7833, 12.6167, "Correção Manual"), "misurelli": (45.7833, 12.6167, "Correção Manual"),
+                     "perrone": (45.7833, 12.6167, "Correção Manual"), "ghisoni": (45.7833, 12.6167, "Correção Manual"), "massoni": (45.7833, 12.6167, "Correção Manual"),
+                     "scappini": (45.7833, 12.6167, "Correção Manual"), "magri": (45.7833, 12.6167, "Correção Manual"), "andreoli": (45.7833, 12.6167, "Correção Manual"),
+                     "toffolo": (45.7833, 12.6167, "Correção Manual"), "bettanin": (45.7833, 12.6167, "Correção Manual"), "sabbadini": (45.7833, 12.6167, "Correção Manual"),
+                     "franchini": (45.7833, 12.6167, "Correção Manual"), "dall osto": (45.7833, 12.6167, "Correção Manual"), "flora": (45.7833, 12.6167, "Correção Manual"),
+                     "giordano": (45.7833, 12.6167, "Correção Manual"), "marchiori": (45.7833, 12.6167, "Correção Manual"), "rettore": (45.7833, 12.6167, "Correção Manual"),
+                     "fontanella": (45.7833, 12.6167, "Correção Manual"), "furlanetto": (45.7833, 12.6167, "Correção Manual"), "corradini": (45.7833, 12.6167, "Correção Manual"),
+                     "michielon": (45.7833, 12.6167, "Correção Manual"), "pedace": (45.7833, 12.6167, "Correção Manual"), "romio": (45.7833, 12.6167, "Correção Manual"),
+                     "zampiva": (45.7833, 12.6167, "Correção Manual"), "sabbadin": (45.7833, 12.6167, "Correção Manual"), "perette": (45.7833, 12.6167, "Correção Manual"),
+                     "rizzon deon": (45.7833, 12.6167, "Correção Manual"), "polo": (45.7833, 12.6167, "Correção Manual"), "dettori": (45.7833, 12.6167, "Correção Manual"),
+                     "bulgarelli": (45.7833, 12.6167, "Correção Manual"), "peruchi": (45.7833, 12.6167, "Correção Manual"), "squizzato": (45.7833, 12.6167, "Correção Manual"),
+                     "rissi": (45.7833, 12.6167, "Correção Manual"), "meotti": (45.7833, 12.6167, "Correção Manual"), "galletti": (45.7833, 12.6167, "Correção Manual"),
+                     "chinelato": (45.7833, 12.6167, "Correção Manual"), "begalli": (45.7833, 12.6167, "Correção Manual"), "petrone": (45.7833, 12.6167, "Correção Manual"),
+                     "bovo": (45.7833, 12.6167, "Correção Manual"), "massarelli": (45.7833, 12.6167, "Correção Manual"), "rigazzo": (45.7833, 12.6167, "Correção Manual"),
+                     "pagnota": (45.7833, 12.6167, "Correção Manual"), "olivo": (45.7833, 12.6167, "Correção Manual"), "biondi": (45.7833, 12.6167, "Correção Manual"),
+                     "masarut": (45.7833, 12.6167, "Correção Manual"), "escopo": (45.7833, 12.6167, "Correção Manual"), "funghi": (45.7833, 12.6167, "Correção Manual"),
+                     "azzolini": (45.7833, 12.6167, "Correção Manual"), "naressi": (45.7833, 12.6167, "Correção Manual"), "pra nichele": (45.7833, 12.6167, "Correção Manual"),
+                     "stasio": (45.7833, 12.6167, "Correção Manual"), "marson": (45.7833, 12.6167, "Correção Manual"), "zocconelli": (45.7833, 12.6167, "Correção Manual"),
+                     "lovato": (45.7833, 12.6167, "Correção Manual"), "cicuto": (45.7833, 12.6167, "Correção Manual"), "ruzzon": (45.7833, 12.6167, "Correção Manual"),
+                     "carazzo": (45.7833, 12.6167, "Correção Manual"), "benito": (45.7833, 12.6167, "Correção Manual"), "bressan": (45.7833, 12.6167, "Correção Manual"),
                      "casadei": (45.7833, 12.6167, "Correção Manual"), "gobbo": (45.7833, 12.6167, "Correção Manual")
                 }
                 provincias_manuais = { # ... (dicionário mantido) ...

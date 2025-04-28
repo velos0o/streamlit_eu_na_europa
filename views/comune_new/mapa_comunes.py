@@ -45,12 +45,44 @@ def exibir_mapa_comune(df_mapa, category_id):
         st.dataframe(df_mapa)
         return
 
-    # --- Métricas de Mapeamento ---
-    # Calcular estatísticas de correspondência antes de filtrar
-    total_processos = len(df_mapa)
+    # --- Filtro de Estágios Indesejados ---
+    # Lista atualizada com os IDs fornecidos pelo usuário em 2024-07-26
+    stages_para_excluir = [
+        "DT1052_22:UC_2QZ8S2",  # PENDENTE
+        "DT1052_22:UC_E1VKYT",  # PESQUISA NÃO FINALIZADA
+        "DT1052_22:UC_MVS02R",  # DEVOLUTIVA EMISSOR
+        "DT1052_22:CLIENT",     # ENTREGUE PDF (CLIENT ?) - Verificar se este é o ID correto para "Entregue PDF"
+        "DT1052_22:NEW",        # SOLICITAR (NEW ?) - Verificar se este é o ID correto para "Solicitar"
+        "DT1052_22:FAIL",       # CANCELADO (FAIL ?) - Verificar se este é o ID correto para "Cancelado"
+        "DT1052_22:SUCCESS",    # DOCUMENTO FISICO ENTREGUE (SUCCESS ?) - Verificar se este é o ID correto para "Doc Físico Entregue"
+        "DT1052_22:UC_A9UEMO",  # ID específico fornecido (Devolutiva Emissor?)
+        # Adicione aqui outros STAGE_IDs conforme necessário para outras categorias (58, 60)
+        # Exemplo para Categoria 58: 'DT1052_58:FAIL'
+        # Exemplo para Categoria 60: 'DT1052_60:NEW'
+        # Certifique-se que os prefixos (DT1052_XX) estão corretos para cada categoria
+    ]
+    
+    # Adicionar prefixo da categoria aos estágios genéricos se necessário
+    # (Ajustar a lógica se os nomes fornecidos pelo usuário já incluírem o prefixo)
+    # Esta lógica não afetará os IDs que já possuem prefixo como os da lista acima.
+    stages_para_excluir_com_prefixo = [
+        f"DT1052_{category_id}:{stage}" if not stage.startswith(f"DT1052_{category_id}:") and not stage.startswith(f"DT1052_") else stage 
+        for stage in stages_para_excluir
+    ]
+    
+    # Filtrar o DataFrame
+    df_mapa_filtrado = df_mapa[~df_mapa[col_stage_id].isin(stages_para_excluir_com_prefixo)].copy()
+    registros_excluidos = len(df_mapa) - len(df_mapa_filtrado)
+    
+    if registros_excluidos > 0:
+        st.info(f"Foram excluídos {registros_excluidos} registros devido a estágios indesejados.")
+
+    # --- Métricas de Mapeamento (usar df_mapa_filtrado) ---
+    # Calcular estatísticas de correspondência após filtrar por estágio
+    total_processos = len(df_mapa_filtrado) # AGORA USA O DF FILTRADO
     
     # Remover linhas sem coordenadas válidas
-    df_mapa_coords = df_mapa.dropna(subset=[col_lat, col_lon]).copy() # Usar .copy()
+    df_mapa_coords = df_mapa_filtrado.dropna(subset=[col_lat, col_lon]).copy() # Usar df_mapa_filtrado
     
     pontos_no_mapa = len(df_mapa_coords)
     percentual_mapeado = (pontos_no_mapa / total_processos * 100) if total_processos > 0 else 0
@@ -67,15 +99,15 @@ def exibir_mapa_comune(df_mapa, category_id):
         st.metric("Sem Coordenadas", total_processos - pontos_no_mapa)
 
     if df_mapa_coords.empty:
-        st.warning(f"Nenhum processo com coordenadas válidas encontrado para a Categoria {category_id}.")
+        st.warning(f"Nenhum processo com coordenadas válidas encontrado para a Categoria {category_id} após filtros.")
         
-        # Exibir tabela de registros não mapeados
-        registros_nao_mapeados = df_mapa[df_mapa[col_lat].isna() | df_mapa[col_lon].isna()].copy()
+        # Exibir tabela de registros não mapeados (do dataframe original filtrado por estágio)
+        registros_nao_mapeados = df_mapa_filtrado[df_mapa_filtrado[col_lat].isna() | df_mapa_filtrado[col_lon].isna()].copy()
         if not registros_nao_mapeados.empty:
-            with st.expander(f"Ver {len(registros_nao_mapeados)} Registros Sem Coordenadas", expanded=True):
+            with st.expander(f"Ver {len(registros_nao_mapeados)} Registros Sem Coordenadas (Após Filtro de Estágio)", expanded=True):
                 st.markdown(f"""
                 <div style="background-color: #fff8e1; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #ffa000;">
-                <h4 style="color: #e65100; margin-top: 0;">Atenção: {len(registros_nao_mapeados)} registros sem coordenadas geográficas</h4>
+                <h4 style="color: #e65100; margin-top: 0;">Atenção: {len(registros_nao_mapeados)} registros sem coordenadas geográficas (após filtro de estágio)</h4>
                 <p>Estes registros não puderam ser mapeados e podem requerer revisão manual dos campos de Comune/Província.</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -95,7 +127,7 @@ def exibir_mapa_comune(df_mapa, category_id):
 
     # ----- Filtro de Tempo (Data de Criação) -----
     col_data_filtro = 'CREATED_TIME' 
-    df_filtrado_data = df_mapa_coords.copy() # Começa com todos os pontos com coordenadas
+    df_filtrado_data = df_mapa_coords.copy() # Começa com os pontos com coordenadas (já filtrados por estágio)
     
     if col_data_filtro in df_filtrado_data.columns:
         df_filtrado_data[col_data_filtro] = pd.to_datetime(df_filtrado_data[col_data_filtro], errors='coerce')
@@ -281,13 +313,20 @@ def exibir_mapa_comune(df_mapa, category_id):
          st.warning("Não foi possível encontrar colunas para exibir na tabela.")
          
     # ----- Exibir Registros Não Mapeados -----
-    registros_nao_mapeados = df_mapa[df_mapa[col_lat].isna() | df_mapa[col_lon].isna()].copy()
+    # Nota: registros_nao_mapeados agora se refere aos registros *depois* do filtro de estágio, mas *sem* coordenadas.
+    # Se precisar mostrar os que foram excluídos pelo filtro de estágio, seria necessário um cálculo separado antes.
+    registros_nao_mapeados = df_mapa_filtrado[df_mapa_filtrado[col_lat].isna() | df_mapa_filtrado[col_lon].isna()].copy()
     if not registros_nao_mapeados.empty:
-        with st.expander(f"Ver {len(registros_nao_mapeados)} Registros Não Mapeados (Sem Coordenadas Válidas)", expanded=False):
+        with st.expander(f"Ver {len(registros_nao_mapeados)} Registros Não Mapeados (Sem Coordenadas Válidas Após Filtro de Estágio)", expanded=False):
             st.markdown(f"""
             <div style="background-color: #fff8e1; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 5px solid #ffa000;">
-            <h4 style="color: #e65100; margin-top: 0;">Atenção: {len(registros_nao_mapeados)} registros sem coordenadas geográficas válidas</h4>
-            <p>Estes registros não puderam ser exibidos no mapa e podem requerer revisão manual dos campos de Comune/Província ou da geocodificação no `data_loader`.</p>
+            <h4 style="color: #e65100; margin-top: 0;">Atenção: {len(registros_nao_mapeados)} registros sem coordenadas geográficas válidas (após filtro de estágio)</h4>
+            <p>Estes registros não puderam ser exibidos no mapa porque não foi possível encontrar coordenadas (latitude/longitude) para eles. Isso geralmente ocorre devido a:</p>
+            <ul>
+                <li>Nomes de Comune ou Província inválidos, incompletos ou com erros de digitação nos campos originais (verifique as colunas abaixo).</li>
+                <li>Falha no processo de geocodificação (verifique a coluna <code>COORD_SOURCE</code> para mais detalhes sobre a tentativa de mapeamento).</li>
+            </ul>
+            <p><strong>Ação Sugerida:</strong> Use o botão 'Baixar Registros Não Mapeados' abaixo, corrija os dados no CSV e utilize-o para atualizar a fonte de dados ou a lógica de geocodificação no <code>data_loader</code>.</p>
             </div>
             """, unsafe_allow_html=True)
             
