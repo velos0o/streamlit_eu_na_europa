@@ -187,7 +187,31 @@ def ir_para_reclamacoes():
 def toggle_emissao_submenu():
     st.session_state.emissao_submenu_expanded = not st.session_state.get('emissao_submenu_expanded', False)
     st.session_state.comune_submenu_expanded = False # Fecha outro submenu
+    # Define a página principal e subpágina padrão ao abrir/fechar
+    if st.session_state.emissao_submenu_expanded:
+        st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+        # Mantém a subpágina atual se já estiver em uma subpágina de Emissões
+        if st.session_state.get('pagina_atual') != 'Emissões Brasileiras':
+             st.session_state.emissao_subpagina = 'Visão Geral'
+    # Se fechar, não muda a página atual
+# --- FIM NOVO ---
+
+# --- NOVO: Funções on_click para sub-botões Emissões ---
+def ir_para_emissao_visao_geral():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Visão Geral'
+
+def ir_para_emissao_acompanhamento():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Acompanhamento'
+
+def ir_para_emissao_producao():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Produção'
+
+def ir_para_emissao_pendencias():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Pendências'
 # --- FIM NOVO ---
 
 # --- NOVO: Função para toggle e navegação do submenu Comune (Novo) ---
@@ -250,6 +274,81 @@ st.sidebar.button("Emissões Brasileiras", key="btn_cartorio_new",
             help="Módulo refatorado de emissões de cartórios brasileiros")
 # --- FIM ATUALIZADO ---
 
+# --- NOVO: CSS ÚNICO para TODOS os sub-botões (movido de dentro dos ifs) ---
+st.markdown("""
+<style>
+/* Base style para TODOS os sub-botões */
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]) {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0.25rem 0.5rem !important;
+    margin: 0 !important;
+    border-radius: 4px !important;
+    font-size: 0.9em !important;
+    text-align: left !important;
+    width: 100% !important;
+    display: block !important;
+    line-height: 1.4 !important;
+    font-weight: 400 !important;
+    color: #333 !important;
+    transition: background-color 0.1s ease, color 0.1s ease !important;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+/* Efeito Hover (para todos) */
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]):hover:not(:focus) {
+    color: #2563EB !important; /* Cor primária aproximada */
+    background-color: rgba(59, 130, 246, 0.08) !important; /* Cor primária clara aproximada */
+}
+/* Estilo ATIVO (primary) - apenas muda peso e cor */
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button[kind="primary"]:not([data-testid="stIconButton"]) {
+    font-weight: 600 !important;
+    color: #2563EB !important; /* Cor primária aproximada */
+    background: none !important;
+    border: none !important;
+}
+/* Garante que o foco não estrague o visual */
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]):focus {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+/* Recuo do container do botão */
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] {
+    margin-left: 15px !important;
+    padding: 0 !important;
+    margin-bottom: 2px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+# --- FIM CSS ÚNICO ---
+
+# --- MOVIDO: Bloco condicional para o submenu Emissões Brasileiras --- (Estava no lugar errado antes)
+if st.session_state.get('emissao_submenu_expanded', False):
+    with st.sidebar.container():
+        # CSS foi movido para fora
+        # st.markdown(""" <style> ... </style> """, unsafe_allow_html=True)
+
+        st.button("Visão Geral", key="subbtn_emissao_visao_geral",
+                    on_click=ir_para_emissao_visao_geral,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Visão Geral" else "secondary")
+        st.button("Acompanhamento", key="subbtn_emissao_acompanhamento",
+                    on_click=ir_para_emissao_acompanhamento,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Acompanhamento" else "secondary")
+        st.button("Produção", key="subbtn_emissao_producao",
+                    on_click=ir_para_emissao_producao,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Produção" else "secondary")
+        st.button("Pendências", key="subbtn_emissao_pendencias",
+                    on_click=ir_para_emissao_pendencias,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Pendências" else "secondary")
+# --- FIM MOVIDO ---
+
 st.sidebar.button("Comune Bitrix24", key="btn_comune", 
             on_click=ir_para_comune,
             use_container_width=True,
@@ -265,58 +364,8 @@ st.sidebar.button("Comune (Novo)", key="btn_comune_new",
 # --- NOVO: Bloco condicional para o submenu Comune (Novo) ---
 if st.session_state.get('comune_submenu_expanded', False):
     with st.sidebar.container():
-        # Reutilizar o mesmo CSS injetado dos sub-botões de Emissões
-        st.markdown("""
-        <style>
-        /* Base style para TODOS os sub-botões */
-        [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]) {
-            background: none !important;
-            border: none !important;
-            box-shadow: none !important;
-            padding: 0.25rem 0.5rem !important;
-            margin: 0 !important;
-            border-radius: 4px !important;
-            font-size: 0.9em !important;
-            text-align: left !important;
-            width: 100% !important;
-            display: block !important;
-            line-height: 1.4 !important;
-            font-weight: 400 !important;
-            color: #333 !important;
-            transition: background-color 0.1s ease, color 0.1s ease !important;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-        }
-        /* Efeito Hover (para todos) */
-        [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]):hover:not(:focus) {
-            /* Usando cores fixas aqui, pois não temos variáveis SCSS */
-            color: #2563EB !important; /* Cor primária aproximada */
-            background-color: rgba(59, 130, 246, 0.08) !important; /* Cor primária clara aproximada */
-        }
-        /* Estilo ATIVO (primary) - apenas muda peso e cor */
-        [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button[kind="primary"]:not([data-testid="stIconButton"]) {
-            font-weight: 600 !important;
-            color: #2563EB !important; /* Cor primária aproximada */
-            /* Garante que fundo e borda não voltem */
-            background: none !important;
-            border: none !important;
-        }
-        /* Garante que o foco não estrague o visual */
-        [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]):focus {
-            background: none !important;
-            border: none !important;
-            box-shadow: none !important;
-            /* outline: 2px solid rgba(59, 130, 246, 0.3) !important; */ /* Outline opcional */
-        }
-        /* Recuo do container do botão */
-        [data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_"] {
-            margin-left: 15px !important;
-            padding: 0 !important;
-            margin-bottom: 2px !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+        # CSS foi movido para fora
+        # st.markdown(""" <style> ... </style> """, unsafe_allow_html=True)
 
         # Botões diretamente dentro do container da sidebar
         st.button("Visão Geral", key="subbtn_comune_visao_geral",
