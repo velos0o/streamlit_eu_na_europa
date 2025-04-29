@@ -490,9 +490,17 @@ def _carregar_coordenadas_mapa_normalizadas():
     e retorna um DataFrame.
     Assume a presença dos arquivos 'comuni.csv' e 'coordinate.csv' na pasta 'comuni-italiani-main/dati/'.
     """
-    # Caminhos relativos para os arquivos CSV
+    # Caminhos relativos para os arquivos CSV - Ajustado para ser mais robusto
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    base_path = os.path.join(script_dir, '..', '..', 'comuni-italiani-main', 'dati')
+    # Assumindo que 'comuni-italiani-main' está na raiz do projeto, que está dois níveis acima de 'views/comune_new'
+    project_root = os.path.abspath(os.path.join(script_dir, '..', '..')) 
+    base_path = os.path.join(project_root, 'comuni-italiani-main', 'dati') 
+    
+    # Verificar se o diretório base existe para dar um feedback melhor em caso de erro
+    if not os.path.isdir(base_path):
+        st.error(f"Erro Crítico: O diretório base de dados '{base_path}' não foi encontrado. Verifique a estrutura do projeto.")
+        return pd.DataFrame()
+
     comuni_path = os.path.join(base_path, 'comuni.csv')
     coords_path = os.path.join(base_path, 'coordinate.csv')
 
