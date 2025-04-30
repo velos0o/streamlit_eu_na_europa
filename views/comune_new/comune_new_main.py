@@ -54,6 +54,11 @@ def show_comune_new():
     if subpagina_selecionada == "Visão Geral":
         exibir_visao_geral_comune(df_comune)
     elif subpagina_selecionada == "Tempo de Solicitação":
+        # --- DEBUG PRINT ---
+        print("--- Debug: Colunas em df_comune antes de exibir_tempo_solicitacao ---")
+        print(df_comune.columns.tolist())
+        print("---------------------------------------------------------------------")
+        # --- FIM DEBUG PRINT ---
         exibir_tempo_solicitacao(df_comune)
         
     # --- NOVA LÓGICA PARA RENDERIZAR MAPAS ---

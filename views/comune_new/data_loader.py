@@ -613,28 +613,32 @@ def load_comune_data(force_reload: bool = False) -> pd.DataFrame:
             # Adicionar colunas de localização se existirem
             'UF_CRM_12_ENDERECO_DO_COMUNE': str, # Comune Principal
             'UF_CRM_12_1722881735827': str, # Comune (Fallback)
-            'UF_CRM_12_1743015702671': str  # Provincia
+            'UF_CRM_12_1743015702671': str, # Provincia
+            # --- ALTERADO CAMPO DE DATA PARA COMUNE 3 ---
+            'UF_CRM_12_DATA_SOLICITACAO': str # Data Solicitação Comune 3 (NOVO CAMPO)
         }
         colunas_presentes = df_items.columns.tolist()
         df_final = pd.DataFrame()
 
         for col, tipo_esperado in colunas_essenciais.items():
             if col not in colunas_presentes:
-                # Tratar colunas de localização como opcionais para o merge
+                # Tratar colunas de localização E data específica como opcionais AQUI,
+                # mas a lógica em tempo_solicitacao.py tratará a ausência da data Comune 3.
                 if col.startswith('UF_CRM_12'): 
-                     st.warning(f"[DataLoader ComuneNovo] Aviso: Coluna de localização '{col}' não encontrada.")
-                     df_items[col] = "Não Especificado" # Criar coluna vazia para evitar erros
+                     st.warning(f"[DataLoader ComuneNovo] Aviso: Coluna '{col}' não encontrada nos dados do Bitrix.")
+                     df_items[col] = pd.NA # Criar coluna com NA para evitar erros downstream, mas permitir verificação
                 else:
+                    # Colunas realmente essenciais (ID, STAGE_ID, CREATED_TIME) causam erro se ausentes
                     st.error(f"Coluna essencial '{col}' não encontrada nos dados do Bitrix para Comune (Novo).")
                     return pd.DataFrame()
             
-            # Copiar a coluna para o df_final (ou a coluna criada se faltava localização)
-            if col in df_items.columns:
-                df_final[col] = df_items[col]
-            else: # Caso de localização que foi criada
-                 df_final[col] = df_items[col]
+            # Copiar a coluna para o df_final (ou a coluna criada se faltava)
+            # Se a coluna não estava presente e foi criada com NA, copiará NA.
+            df_final[col] = df_items[col]
 
-            # Tratar tipo (exceto para colunas de localização que serão normalizadas depois)
+            # Tratar tipo (exceto para colunas UF_CRM que precisam de tratamento especial ou são string)
+            # NÃO tentar converter a coluna de data Comune 3 para datetime aqui, pois pode ter formatos variados
+            # ou ser string. A conversão será feita em tempo_solicitacao.py.
             if not col.startswith('UF_CRM_12'):
                 try:
                     if tipo_esperado == 'datetime64[ns]':
@@ -646,15 +650,19 @@ def load_comune_data(force_reload: bool = False) -> pd.DataFrame:
                 except Exception as e:
                     st.error(f"Erro ao converter coluna '{col}' para o tipo {tipo_esperado}: {e}")
                     return pd.DataFrame()
-        
-        # Adicionar outras colunas úteis (opcional)
-        outras_colunas = ['TITLE', 'ASSIGNED_BY_ID', 'CATEGORY_ID']
+            # Se for UF_CRM_12 (localização ou data Comune 3), manter como objeto/string por enquanto.
+
+        # Adicionar outras colunas úteis (opcional) - Certificar que não adicionamos a data Comune 3 duas vezes
+        outras_colunas = ['TITLE', 'ASSIGNED_BY_ID', 'CATEGORY_ID'] 
         for col in outras_colunas:
-            if col in colunas_presentes:
+             # Verificar se a coluna existe nos dados originais E ainda não está no df_final (caso já fosse 'essencial')
+            if col in colunas_presentes and col not in df_final.columns: 
                 df_final[col] = df_items[col]
-            else:
-                st.warning(f"[DataLoader ComuneNovo] Coluna opcional '{col}' não encontrada.")
-                df_final[col] = pd.NA
+            elif col not in colunas_presentes:
+                 st.warning(f"[DataLoader ComuneNovo] Coluna opcional '{col}' não encontrada.")
+                 # Criar com NA se não existir e não estiver já no df_final
+                 if col not in df_final.columns: 
+                      df_final[col] = pd.NA
 
         # --- 4. Normalizar Nomes de Localização --- 
         col_comune_principal = 'UF_CRM_12_ENDERECO_DO_COMUNE'
