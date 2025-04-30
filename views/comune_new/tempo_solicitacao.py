@@ -9,7 +9,7 @@ from .visao_geral import simplificar_nome_estagio_comune
 def exibir_tempo_solicitacao(df_comune):
     """
     Exibe a análise do tempo de solicitação (em dias) para os processos de Comune,
-    agrupado por faixas de tempo e com filtro por nome (TITLE).
+    agrupado por faixas de tempo e com filtros por Categoria (CATEGORY_ID) e Nome (TITLE).
     """
     st.subheader("Análise de Tempo de Solicitação")
 
@@ -21,8 +21,9 @@ def exibir_tempo_solicitacao(df_comune):
     coluna_data_criacao = 'CREATED_TIME'
     coluna_titulo = 'TITLE' # Coluna para busca por família/nome
     coluna_estagio = 'STAGE_ID' # Coluna original do estágio
+    coluna_categoria = 'CATEGORY_ID' # Coluna para filtro de categoria
 
-    colunas_necessarias = [coluna_data_criacao, coluna_titulo, coluna_estagio]
+    colunas_necessarias = [coluna_data_criacao, coluna_titulo, coluna_estagio, coluna_categoria]
     colunas_ausentes = [col for col in colunas_necessarias if col not in df_comune.columns]
     if colunas_ausentes:
         st.error(f"Colunas necessárias não encontradas: {', '.join(colunas_ausentes)}.")
@@ -48,14 +49,80 @@ def exibir_tempo_solicitacao(df_comune):
         st.warning("Nenhum processo com tempo de criação válido encontrado.")
         return
 
+    # --- Mapeamento e Filtro por Categoria (CATEGORY_ID) ---
+    categorias_map = {
+        22: "Comune 1",
+        58: "Comune 2",
+        60: "Comune 3"
+    }
+    categorias_nomes = list(categorias_map.values())
+    categorias_ids = list(categorias_map.keys())
+    
+    # Verificar se a coluna CATEGORY_ID existe e é numérica
+    if coluna_categoria in df_processar.columns:
+        df_processar[coluna_categoria] = pd.to_numeric(df_processar[coluna_categoria], errors='coerce')
+        df_processar = df_processar.dropna(subset=[coluna_categoria]) # Remover linhas com categoria inválida
+        df_processar[coluna_categoria] = df_processar[coluna_categoria].astype(int) # Garantir que é inteiro
+
+        # Filtrar pelos IDs existentes no mapeamento
+        df_processar_filtrado_cat_existente = df_processar[df_processar[coluna_categoria].isin(categorias_ids)]
+
+        if not df_processar_filtrado_cat_existente.empty:
+            categorias_selecionadas_nomes = st.multiselect(
+                "Filtrar por Categoria:",
+                options=categorias_nomes,
+                default=["Comune 1", "Comune 3"], # Padrão: Comune 1 e 3
+                key="filtro_categoria_tempo"
+            )
+
+            if categorias_selecionadas_nomes:
+                # Mapear nomes selecionados de volta para IDs
+                ids_selecionados = [k for k, v in categorias_map.items() if v in categorias_selecionadas_nomes]
+                # Filtrar o DataFrame pelos IDs selecionados
+                df_processar_filtrado = df_processar_filtrado_cat_existente[df_processar_filtrado_cat_existente[coluna_categoria].isin(ids_selecionados)]
+            else:
+                # Se nada for selecionado, mostrar dados de todas as categorias mapeadas (ou poderia mostrar vazio)
+                df_processar_filtrado = df_processar_filtrado_cat_existente.copy() 
+                st.info("Nenhuma categoria selecionada. Exibindo dados de todas as categorias mapeadas.")
+        else:
+            st.warning(f"Nenhum processo encontrado para as categorias mapeadas: {', '.join(categorias_nomes)}.")
+            df_processar_filtrado = pd.DataFrame(columns=df_processar.columns) # DataFrame vazio para evitar erros
+    else:
+        st.warning(f"Coluna '{coluna_categoria}' não encontrada ou inválida. Não é possível aplicar o filtro de categoria.")
+        df_processar_filtrado = df_processar.copy() # Continuar sem filtro de categoria se a coluna não existir
+
     # --- Filtro por Nome (TITLE) ---
     termo_busca_titulo = st.text_input("Buscar por Nome/Família (Título):", key="busca_titulo_tempo")
     
-    df_filtrado = df_processar.copy()
+    # Aplicar o filtro de título SOBRE o DataFrame já filtrado por categoria
+    df_filtrado = df_processar_filtrado.copy()
     if termo_busca_titulo:
         termo_busca_titulo = termo_busca_titulo.strip()
         # Filtrar usando str.contains (case-insensitive)
         df_filtrado = df_filtrado[df_filtrado[coluna_titulo].str.contains(termo_busca_titulo, case=False, na=False)]
+
+    # --- Contagens Totais (Após filtros aplicados) ---
+    with st.container(border=True):
+        st.markdown("##### Contagem de Processos - Filtro Aplicado")
+        total_geral = len(df_filtrado)
+        total_comune1 = 0
+        total_comune3 = 0
+
+        # Calcular contagens específicas apenas se a coluna de categoria existir e o df não estiver vazio
+        if coluna_categoria in df_filtrado.columns and not df_filtrado.empty:
+            contagem_categorias = df_filtrado[coluna_categoria].value_counts()
+            total_comune1 = contagem_categorias.get(22, 0) # 22 é o ID de Comune 1
+            total_comune3 = contagem_categorias.get(60, 0) # 60 é o ID de Comune 3
+
+        col_cont1, col_cont2, col_cont3 = st.columns(3)
+        with col_cont1:
+            st.metric("Total Comune 1", total_comune1)
+        with col_cont2:
+            st.metric("Total Comune 3", total_comune3)
+        with col_cont3:
+            st.metric("Total Geral Filtrado", total_geral)
+
+    st.write("\n") # Adiciona um espaço entre os containers
 
     if df_filtrado.empty:
         st.info("Nenhum processo encontrado para o termo de busca.")
@@ -64,23 +131,22 @@ def exibir_tempo_solicitacao(df_comune):
         # st.stop()
         
     # --- Métricas Resumo (Calculadas sobre dados filtrados pela busca) --- 
-    st.markdown("##### Métricas de Tempo (Dias) - Filtro Aplicado")
-    if not df_filtrado.empty:
-        med_tempo_medio = df_filtrado['TEMPO_DIAS'].mean()
-        med_tempo_mediana = df_filtrado['TEMPO_DIAS'].median()
-        med_tempo_max = df_filtrado['TEMPO_DIAS'].max()
-    else:
-        med_tempo_medio, med_tempo_mediana, med_tempo_max = 0, 0, 0
+    with st.container(border=True):
+        st.markdown("##### Métricas de Tempo (Dias) - Filtro Aplicado")
+        if not df_filtrado.empty:
+            med_tempo_medio = df_filtrado['TEMPO_DIAS'].mean()
+            med_tempo_mediana = df_filtrado['TEMPO_DIAS'].median()
+            med_tempo_max = df_filtrado['TEMPO_DIAS'].max()
+        else:
+            med_tempo_medio, med_tempo_mediana, med_tempo_max = 0, 0, 0
 
-    col_met1, col_met2, col_met3 = st.columns(3)
-    with col_met1:
-        st.metric("Tempo Médio", f"{med_tempo_medio:.1f}")
-    with col_met2:
-        st.metric("Tempo Mediano", f"{med_tempo_mediana:.1f}")
-    with col_met3:
-        st.metric("Tempo Máximo", f"{med_tempo_max:.0f}")
-
-    st.markdown("---")
+        col_met1, col_met2, col_met3 = st.columns(3)
+        with col_met1:
+            st.metric("Tempo Médio", f"{med_tempo_medio:.1f}")
+        with col_met2:
+            st.metric("Tempo Mediano", f"{med_tempo_mediana:.1f}")
+        with col_met3:
+            st.metric("Tempo Máximo", f"{med_tempo_max:.0f}")
 
     # --- Criação das Faixas de Tempo --- 
     bins = [-1, 30, 60, 100, 120, 160, 180, 200, 220, 240, float('inf')] # -1 para incluir 0
