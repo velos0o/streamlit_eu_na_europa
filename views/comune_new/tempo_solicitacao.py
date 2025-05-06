@@ -48,6 +48,26 @@ def exibir_tempo_solicitacao(df_comune):
         st.warning("Não há processos de Comune 1 ou Comune 3 nos dados fornecidos.")
         return
 
+    # --- Exclusão de Estágios ---
+    estagios_excluidos = [
+        "DT1052_22:UC_2QZ8S2",  # PENDENTE
+        "DT1052_22:UC_E1VKYT",  # PESQUISA NÃO FINALIZADA
+        "DT1052_22:UC_MVS02R",  # DEVOLUTIVA EMISSOR
+        "DT1052_22:CLIENT",     # ENTREGUE PDF
+        "DT1052_22:NEW",        # SOLICITAR
+        "DT1052_22:FAIL",       # CANCELADO
+        "DT1052_22:SUCCESS",    # DOCUMENTO FISICO ENTREGUE
+        "DT1052_22:UC_A9UEMO"   # Novo estágio a ser excluído
+    ]
+    if coluna_estagio in df_processar.columns:
+        df_processar = df_processar[~df_processar[coluna_estagio].isin(estagios_excluidos)]
+        if df_processar.empty:
+            st.warning("Não há processos de Comune 1 ou Comune 3 após a exclusão dos estágios especificados.")
+            return
+    else:
+        st.warning(f"Coluna de estágio '{coluna_estagio}' não encontrada para aplicar o filtro de exclusão de estágios.")
+    # --- Fim da Exclusão de Estágios ---
+
     # Garantir que a coluna ID é adequada para merge
     df_processar[coluna_id] = df_processar[coluna_id].astype(str)
 
@@ -188,106 +208,90 @@ def exibir_tempo_solicitacao(df_comune):
         if not df_calculado.empty: # Só mostra a info se havia dados calculados
             st.info("Nenhuma categoria selecionada.")
 
+    # df_filtrado_cat contém os dados após o filtro de categoria.
+    # Métricas, contagens e gráfico usarão este df.
+    df_para_metricas_e_grafico = df_filtrado_cat.copy()
 
-    # Filtro por Nome (TITLE) sobre o resultado do filtro de categoria
-    termo_busca_titulo = st.text_input("Buscar por Nome/Família (Título):", key="busca_titulo_tempo_new")
-    df_filtrado = df_filtrado_cat.copy() # Começa com o resultado do filtro de categoria
-
-    if termo_busca_titulo and not df_filtrado.empty:
-        termo_busca_titulo = termo_busca_titulo.strip()
-        df_filtrado = df_filtrado[df_filtrado[coluna_titulo].str.contains(termo_busca_titulo, case=False, na=False)]
-
-
-    # --- Contagens Totais (Após filtros aplicados) ---
+    # --- Contagens Totais (Após filtro de CATEGORIA) ---
     with st.container(border=True):
-        st.markdown("##### Contagem de Processos - Filtro Aplicado")
-        total_geral = len(df_filtrado)
-        total_comune1 = 0
-        total_comune3 = 0
+        st.markdown("##### Contagem de Processos - Filtro de Categoria Aplicado")
+        total_geral_cat = len(df_para_metricas_e_grafico)
+        total_comune1_cat = 0
+        total_comune3_cat = 0
 
-        if not df_filtrado.empty:
-            contagem_categorias = df_filtrado[coluna_categoria].value_counts()
-            total_comune1 = contagem_categorias.get(22, 0)
-            total_comune3 = contagem_categorias.get(60, 0)
+        if not df_para_metricas_e_grafico.empty:
+            contagem_categorias_cat = df_para_metricas_e_grafico[coluna_categoria].value_counts()
+            total_comune1_cat = contagem_categorias_cat.get(22, 0)
+            total_comune3_cat = contagem_categorias_cat.get(60, 0)
 
         col_cont1, col_cont2, col_cont3 = st.columns(3)
         with col_cont1:
-            st.metric("Total Comune 1", total_comune1)
+            st.metric("Total Comune 1 (Categoria)", total_comune1_cat)
         with col_cont2:
-            st.metric("Total Comune 3", total_comune3)
+            st.metric("Total Comune 3 (Categoria)", total_comune3_cat)
         with col_cont3:
-            st.metric("Total Geral Filtrado", total_geral)
+            st.metric("Total Geral (Categoria)", total_geral_cat)
 
     st.write("\n") # Espaço
 
-    if df_filtrado.empty and (ids_selecionados or termo_busca_titulo):
-        st.info("Nenhum processo encontrado para os filtros aplicados.")
-        # Para aqui para não mostrar métricas/gráficos vazios sem necessidade
-        # Se quiser mostrar vazio, comente o st.stop()
-        st.stop() # Para a execução aqui se não há dados para mostrar
-    elif df_filtrado.empty and not df_calculado.empty :
-         # Caso onde há dados calculados, mas filtros não selecionaram nada
-         st.info("Selecione categorias ou ajuste a busca para ver os resultados.")
-         st.stop()
-    # Se df_calculado estava vazio desde o início, a mensagem já foi dada antes
+    # Condições de parada baseadas APENAS no filtro de categoria para métricas e gráfico
+    if df_para_metricas_e_grafico.empty:
+        if ids_selecionados: # Categorias foram selecionadas, mas resultou em vazio
+            st.info("Nenhum processo encontrado para as categorias selecionadas. Ajuste os filtros de categoria.")
+        # Se nenhuma categoria foi selecionada e df_calculado tinha dados, a msg "Nenhuma categoria selecionada." já apareceu.
+        # Se df_calculado estava vazio, a mensagem inicial já cobriu.
+        st.stop() # Para aqui se não há dados para mostrar nas métricas/gráficos.
 
 
-    # --- Métricas Resumo (Calculadas sobre dados filtrados) ---
+    # --- Métricas Resumo (Calculadas sobre dados filtrados por CATEGORIA) ---
     with st.container(border=True):
-        st.markdown("##### Métricas de Tempo (Dias) - Filtro Aplicado")
-        # Recalcular métricas com base no df_filtrado final
-        if not df_filtrado.empty:
-            med_tempo_medio = df_filtrado['TEMPO_DIAS'].mean()
-            med_tempo_mediana = df_filtrado['TEMPO_DIAS'].median()
-            med_tempo_max = df_filtrado['TEMPO_DIAS'].max()
+        st.markdown("##### Métricas de Tempo (Dias) - Filtro de Categoria Aplicado")
+        if not df_para_metricas_e_grafico.empty:
+            med_tempo_medio_cat = df_para_metricas_e_grafico['TEMPO_DIAS'].mean()
+            med_tempo_mediana_cat = df_para_metricas_e_grafico['TEMPO_DIAS'].median()
+            med_tempo_max_cat = df_para_metricas_e_grafico['TEMPO_DIAS'].max()
         else:
-            # Isso não deveria acontecer por causa do st.stop() acima, mas por segurança:
-            med_tempo_medio, med_tempo_mediana, med_tempo_max = 0, 0, 0
+            med_tempo_medio_cat, med_tempo_mediana_cat, med_tempo_max_cat = 0, 0, 0
 
         col_met1, col_met2, col_met3 = st.columns(3)
         with col_met1:
-            st.metric("Tempo Médio", f"{med_tempo_medio:.1f}")
+            st.metric("Tempo Médio (Categoria)", f"{med_tempo_medio_cat:.1f}")
         with col_met2:
-            st.metric("Tempo Mediano", f"{med_tempo_mediana:.1f}")
+            st.metric("Tempo Mediano (Categoria)", f"{med_tempo_mediana_cat:.1f}")
         with col_met3:
-            st.metric("Tempo Máximo", f"{med_tempo_max:.0f}")
+            st.metric("Tempo Máximo (Categoria)", f"{med_tempo_max_cat:.0f}")
 
-    # --- Criação das Faixas de Tempo ---
+    # --- Criação das Faixas de Tempo (baseado em filtro de CATEGORIA) ---
     bins = [-1, 30, 60, 100, 120, 160, 180, 200, 220, 240, float('inf')]
     labels = ['0-30', '31-60', '61-100', '101-120', '121-160', '161-180', '181-200', '201-220', '221-240', '241+']
 
-    # Aplicar faixas ao df_filtrado
-    if not df_filtrado.empty:
-        # Certificar que TEMPO_DIAS é numérico antes de cortar
-        df_filtrado['TEMPO_DIAS'] = pd.to_numeric(df_filtrado['TEMPO_DIAS'], errors='coerce')
-        df_filtrado_com_tempo = df_filtrado.dropna(subset=['TEMPO_DIAS'])
+    if not df_para_metricas_e_grafico.empty:
+        df_para_metricas_e_grafico['TEMPO_DIAS'] = pd.to_numeric(df_para_metricas_e_grafico['TEMPO_DIAS'], errors='coerce')
+        df_com_tempo_cat = df_para_metricas_e_grafico.dropna(subset=['TEMPO_DIAS'])
         
-        if not df_filtrado_com_tempo.empty:
-            df_filtrado['FAIXA_TEMPO'] = pd.cut(df_filtrado_com_tempo['TEMPO_DIAS'], bins=bins, labels=labels, right=True)
-            contagem_por_faixa = df_filtrado.groupby('FAIXA_TEMPO', observed=False).size().reset_index(name='CONTAGEM')
+        if not df_com_tempo_cat.empty:
+            df_para_metricas_e_grafico['FAIXA_TEMPO'] = pd.cut(df_com_tempo_cat['TEMPO_DIAS'], bins=bins, labels=labels, right=True)
+            contagem_por_faixa_cat = df_para_metricas_e_grafico.groupby('FAIXA_TEMPO', observed=False).size().reset_index(name='CONTAGEM')
         else:
-             # Caso onde TEMPO_DIAS era NaN para todos no df_filtrado (improvável, mas seguro)
-             contagem_por_faixa = pd.DataFrame({'FAIXA_TEMPO': labels, 'CONTAGEM': [0]*len(labels)})
+             contagem_por_faixa_cat = pd.DataFrame({'FAIXA_TEMPO': labels, 'CONTAGEM': [0]*len(labels)})
     else:
-        # Se df_filtrado estava vazio
-        contagem_por_faixa = pd.DataFrame({'FAIXA_TEMPO': labels, 'CONTAGEM': [0]*len(labels)})
+        contagem_por_faixa_cat = pd.DataFrame({'FAIXA_TEMPO': labels, 'CONTAGEM': [0]*len(labels)})
 
-    # Garantir a ordem correta das faixas mesmo se vazio
-    contagem_por_faixa['FAIXA_TEMPO'] = pd.Categorical(contagem_por_faixa['FAIXA_TEMPO'], categories=labels, ordered=True)
-    contagem_por_faixa = contagem_por_faixa.sort_values('FAIXA_TEMPO')
+    contagem_por_faixa_cat['FAIXA_TEMPO'] = pd.Categorical(contagem_por_faixa_cat['FAIXA_TEMPO'], categories=labels, ordered=True)
+    contagem_por_faixa_cat = contagem_por_faixa_cat.sort_values('FAIXA_TEMPO')
 
 
-    # --- Gráfico de Barras por Faixa de Tempo ---
-    st.markdown("##### Distribuição por Faixa de Tempo (Dias)")
+    # --- Gráfico de Barras por Faixa de Tempo (baseado em filtro de CATEGORIA) ---
+    st.markdown("##### Distribuição por Faixa de Tempo (Dias) - Filtro de Categoria Aplicado")
     cor_barra = '#3B82F6'
 
     try:
         fig = px.bar(
-            contagem_por_faixa,
+            contagem_por_faixa_cat,
             x='FAIXA_TEMPO',
             y='CONTAGEM',
             text='CONTAGEM',
-            title="Número de Processos por Faixa de Tempo",
+            title="Número de Processos por Faixa de Tempo (Categoria)",
             labels={'FAIXA_TEMPO': 'Faixa de Tempo (Dias)', 'CONTAGEM': 'Nº Processos'}
         )
         fig.update_traces(
@@ -310,45 +314,76 @@ def exibir_tempo_solicitacao(df_comune):
     except Exception as e:
         st.error(f"Erro ao gerar o gráfico de barras: {e}")
 
-    # --- Tabela com Processos mais Antigos (Filtrada) ---
+    # --- Filtro por Nome/Família (Título) - POSICIONADO ANTES DA TABELA ---
     st.markdown("---")
-    st.markdown("##### Detalhes dos Processos Exibidos (Top 10 Mais Antigos)")
-    if not df_filtrado.empty:
-        df_top10_antigos = df_filtrado.nlargest(10, 'TEMPO_DIAS').copy()
+    termo_busca_titulo_tabela = st.text_input(
+        "Buscar por Nome/Família (Título) na tabela abaixo:",
+        key="busca_titulo_tabela_tempo_new" # Nova chave ou certificar que a antiga foi removida
+    )
+    
+    # Aplicar filtro de nome ao df_para_metricas_e_grafico para obter df_para_tabela
+    df_para_tabela = df_para_metricas_e_grafico.copy() 
 
-        # Adicionar nome legível do estágio
-        if coluna_estagio in df_top10_antigos.columns:
-             try:
-                 df_top10_antigos['Estágio Legível'] = df_top10_antigos[coluna_estagio].apply(simplificar_nome_estagio_comune)
-             except KeyError: # Caso a coluna exista mas a função falhe por algum motivo
-                 df_top10_antigos['Estágio Legível'] = "Erro estágio"
-        else:
-            df_top10_antigos['Estágio Legível'] = "N/A"
+    if termo_busca_titulo_tabela and not df_para_tabela.empty:
+        termo_busca_titulo_tabela = termo_busca_titulo_tabela.strip()
+        df_para_tabela = df_para_tabela[
+            df_para_tabela[coluna_titulo].str.contains(termo_busca_titulo_tabela, case=False, na=False)
+        ]
+    
+    # --- Tabela com Processos Exibidos (Filtrados por Categoria e Nome) ---
+    st.markdown("##### Detalhes dos Processos Exibidos (Filtrados por Categoria e Nome)")
+    
+    if df_para_tabela.empty:
+        if termo_busca_titulo_tabela:
+            st.info(f"Nenhum processo encontrado para '{termo_busca_titulo_tabela}' com as categorias selecionadas.")
+        elif not df_para_metricas_e_grafico.empty : # Havia dados de categoria, mas busca por nome vazia não deve limpar tudo
+             st.caption("Todos os processos para as categorias selecionadas estão listados abaixo. Digite um Nome/Família para refinar a busca.")
+             # Neste caso, df_para_tabela é igual a df_para_metricas_e_grafico, então a tabela mostrará os dados de categoria.
+        # else: # df_para_metricas_e_grafico estava vazio, já paramos antes com st.stop()
+            # Não é necessário st.caption aqui pois já houve st.stop()
             
-        # Adicionar a coluna de Data de Início usada no cálculo
-        # A coluna DATA_INICIO foi criada durante o processamento
-        if 'DATA_INICIO' not in df_top10_antigos.columns:
-             # Se por algum motivo não existir (ex: só havia erros), criar vazia
-              df_top10_antigos['DATA_INICIO'] = pd.NaT 
+    # Mostrar a tabela mesmo que esteja vazia após a busca por nome,
+    # ou se a busca por nome estiver vazia (mostrando todos os resultados do filtro de categoria).
+    # A mensagem acima já informa o usuário sobre o estado.
 
-        # Selecionar colunas relevantes
-        # Usar DATA_INICIO ao invés de coluna_data_criacao_original
-        colunas_exibir = [coluna_id, coluna_titulo, 'DATA_INICIO', 'TEMPO_DIAS', 'FAIXA_TEMPO', 'Estágio Legível']
-        colunas_exibir = [col for col in colunas_exibir if col in df_top10_antigos.columns] # Garantir que existem
+    # Ordenar df_para_tabela para exibição (mais antigos primeiro)
+    df_exibir_completo = df_para_tabela.sort_values(by='TEMPO_DIAS', ascending=False).copy()
 
-        if not colunas_exibir:
-            st.warning("Não foi possível encontrar colunas para exibir na tabela.")
-        else:
-            st.dataframe(
-                df_top10_antigos[colunas_exibir],
-                use_container_width=True,
-                column_config={
-                    # Renomear DATA_INICIO para algo mais genérico na exibição
-                    "DATA_INICIO": st.column_config.DateColumn("Data Início Cálculo", format="DD/MM/YYYY"),
-                    "TEMPO_DIAS": st.column_config.NumberColumn("Tempo (Dias)"),
-                    "FAIXA_TEMPO": st.column_config.TextColumn("Faixa Tempo"),
-                    "Estágio Legível": st.column_config.TextColumn("Estágio")
-                }
-            )
+    # Adicionar nome legível do estágio
+    if coluna_estagio in df_exibir_completo.columns:
+            try:
+                df_exibir_completo['Estágio Legível'] = df_exibir_completo[coluna_estagio].apply(simplificar_nome_estagio_comune)
+            except KeyError: 
+                df_exibir_completo['Estágio Legível'] = "Erro estágio"
     else:
-         st.caption("Nenhum processo para exibir na tabela com os filtros atuais.") 
+        df_exibir_completo['Estágio Legível'] = "N/A"
+        
+    if 'DATA_INICIO' not in df_exibir_completo.columns:
+            df_exibir_completo['DATA_INICIO'] = pd.NaT 
+
+    colunas_exibir = [coluna_id, coluna_titulo, 'DATA_INICIO', 'TEMPO_DIAS', 'FAIXA_TEMPO', 'Estágio Legível']
+    colunas_exibir_existentes = [col for col in colunas_exibir if col in df_exibir_completo.columns]
+
+    if not df_exibir_completo.empty and colunas_exibir_existentes:
+        st.dataframe(
+            df_exibir_completo[colunas_exibir_existentes], 
+            use_container_width=True,
+            column_config={
+                "DATA_INICIO": st.column_config.DateColumn("Data Início Cálculo", format="DD/MM/YYYY"),
+                "TEMPO_DIAS": st.column_config.NumberColumn("Tempo (Dias)"),
+                "FAIXA_TEMPO": st.column_config.TextColumn("Faixa Tempo"),
+                "Estágio Legível": st.column_config.TextColumn("Estágio")
+            }
+        )
+    elif not df_para_metricas_e_grafico.empty and not termo_busca_titulo_tabela :
+        # Se havia dados de categoria e a busca está vazia, mas por algum motivo df_exibir_completo está vazio (ex. erro colunas)
+        # Isso é um fallback, a lógica acima com st.caption já deve ter coberto
+        st.caption("A tabela está vazia. Verifique os filtros ou a disponibilidade de dados.")
+    elif df_para_metricas_e_grafico.empty:
+        # Não deve chegar aqui por causa do st.stop() anterior, mas é uma segurança.
+        st.info("Não há dados de categoria para exibir na tabela.")
+
+    # A última mensagem "Nenhum processo para exibir na tabela com os filtros atuais."
+    # é coberta pelas condições acima.
+    # else:
+    #      st.caption("Nenhum processo para exibir na tabela com os filtros atuais.") 
