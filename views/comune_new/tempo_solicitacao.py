@@ -141,6 +141,45 @@ def exibir_tempo_solicitacao(df_comune):
     # --- Combinar Resultados Válidos ---
     df_calculado = pd.concat([df_comune1_calculado, df_comune3_calculado], ignore_index=True)
 
+    # --- FILTRO ADICIONAL POR NOME DE ESTÁGIO LEGÍVEL ---
+    if not df_calculado.empty:
+        if coluna_estagio in df_calculado.columns:
+            try:
+                # Adiciona o nome legível do estágio.
+                # A função simplificar_nome_estagio_comune é importada de .visao_geral
+                df_calculado['Estágio Legível'] = df_calculado[coluna_estagio].apply(simplificar_nome_estagio_comune)
+
+                # Nomes dos estágios a serem excluídos (normalizados para minúsculas)
+                # Inclui "negativa" e outros nomes fornecidos pelo usuário
+                nomes_estagios_excluidos = [
+                    "entregue pdf",
+                    "negativa",
+                    "devolutiva emissor", # Corrigido typo de "devolulitva"
+                    "pendente",
+                    "pesquisa não finalizada", # Removido '#' e normalizado
+                    "solicitar",              # Removido '#' e normalizado
+                    "cancelado",              # Removido '#' e normalizado
+                    "documento fisico entregue" # Removido '#' e normalizado. Atenção à grafia exata (ex: com ou sem acento) que deve corresponder à saída de simplificar_nome_estagio_comune após lower()
+                ]
+                # Normaliza os nomes para minúsculas para comparação
+                nomes_estagios_excluidos_lower = [name.lower().strip() for name in nomes_estagios_excluidos]
+
+                # Filtra para remover os processos nos estágios especificados
+                # Converte a coluna 'Estágio Legível' para string e minúsculas antes de comparar
+                # Garante que 'Estágio Legível' não seja NaN antes de aplicar .str.lower()
+                condicao_filtro = ~(
+                    df_calculado['Estágio Legível'].notna() &
+                    df_calculado['Estágio Legível'].astype(str).str.lower().isin(nomes_estagios_excluidos_lower)
+                )
+                df_calculado = df_calculado[condicao_filtro]
+
+            except Exception as e:
+                st.warning(f"Erro ao aplicar filtro adicional por nome de estágio: {e}. Os resultados podem não refletir esta exclusão.")
+                # Continuar sem este filtro específico se houver um problema, mas avisar o usuário.
+        else:
+            st.warning(f"Coluna '{coluna_estagio}' não encontrada em df_calculado para aplicar filtro por nome de estágio.")
+    # --- FIM DO FILTRO ADICIONAL ---
+
     if df_calculado.empty and df_comune3_erros.empty:
          st.warning("Nenhum processo de Comune 1 ou 3 pôde ser processado para análise de tempo (verifique fontes de dados e colunas).")
          return
@@ -350,13 +389,14 @@ def exibir_tempo_solicitacao(df_comune):
     df_exibir_completo = df_para_tabela.sort_values(by='TEMPO_DIAS', ascending=False).copy()
 
     # Adicionar nome legível do estágio
-    if coluna_estagio in df_exibir_completo.columns:
-            try:
-                df_exibir_completo['Estágio Legível'] = df_exibir_completo[coluna_estagio].apply(simplificar_nome_estagio_comune)
-            except KeyError: 
-                df_exibir_completo['Estágio Legível'] = "Erro estágio"
-    else:
-        df_exibir_completo['Estágio Legível'] = "N/A"
+    if 'Estágio Legível' not in df_exibir_completo.columns: # Coluna deve ter sido criada antes em df_calculado
+        if coluna_estagio in df_exibir_completo.columns:
+             try:
+                 df_exibir_completo['Estágio Legível'] = df_exibir_completo[coluna_estagio].apply(simplificar_nome_estagio_comune)
+             except KeyError: 
+                 df_exibir_completo['Estágio Legível'] = "Erro estágio"
+        else:
+            df_exibir_completo['Estágio Legível'] = "N/A"
         
     if 'DATA_INICIO' not in df_exibir_completo.columns:
             df_exibir_completo['DATA_INICIO'] = pd.NaT 
