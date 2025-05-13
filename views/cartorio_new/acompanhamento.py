@@ -37,17 +37,20 @@ def exibir_acompanhamento(df_cartorio):
     coluna_nome_familia = 'UF_CRM_34_NOME_FAMILIA'  # ATUALIZADO para o novo campo SPA
     coluna_id_requerente = 'UF_CRM_34_ID_REQUERENTE' # ATUALIZADO para o novo campo SPA
     coluna_data_venda_familia = 'DATA_VENDA_FAMILIA' # Adicionado para filtro
-    colunas_requeridas = ['ID', 'STAGE_ID', coluna_nome_familia, coluna_id_requerente, coluna_data_venda_familia]
+    coluna_responsavel = 'ASSIGNED_BY_NAME' # Coluna do responsável (ASSUMIDO)
+    colunas_requeridas = ['ID', 'STAGE_ID', coluna_nome_familia, coluna_id_requerente, coluna_data_venda_familia, coluna_responsavel]
     colunas_faltantes = [col for col in colunas_requeridas if col not in df_cartorio.columns]
 
     if colunas_faltantes:
         # Ajustar a mensagem de erro para a nova coluna de data
-        cols_necessarias_origem = [c for c in colunas_faltantes if c != coluna_data_venda_familia]
+        cols_necessarias_origem = [c for c in colunas_faltantes if c not in [coluna_data_venda_familia, coluna_responsavel]]
         msg_erro = ""
         if cols_necessarias_origem:
              msg_erro += f"Erro: As seguintes colunas são necessárias e não foram encontradas nos dados originais: {', '.join(cols_necessarias_origem)}. Verifique o data_loader. "
         if coluna_data_venda_familia in colunas_faltantes:
-             msg_erro += f"Erro: A coluna '{coluna_data_venda_familia}' (necessária para o filtro de data) não foi encontrada. Verifique o merge no data_loader."
+             msg_erro += f"Erro: A coluna '{coluna_data_venda_familia}' (necessária para o filtro de data) não foi encontrada. Verifique o merge no data_loader. "
+        if coluna_responsavel in colunas_faltantes: # Adicionar verificação do responsável
+             msg_erro += f"Erro: A coluna '{coluna_responsavel}' (necessária para o responsável) não foi encontrada. Verifique o data_loader."
         
         # Adicionar espaço entre as mensagens se ambas existirem
         msg_erro = msg_erro.strip() # Remover espaços extras no início/fim
@@ -61,6 +64,8 @@ def exibir_acompanhamento(df_cartorio):
 
     # 1. Garantir tipo correto para ID Requerente (já feito no loader, mas confirmando)
     df[coluna_id_requerente] = df[coluna_id_requerente].fillna('Req. Desconhecido').astype(str)
+    # Tratar responsável Nulo (antes da agregação)
+    df[coluna_responsavel] = df[coluna_responsavel].fillna('Desconhecido').astype(str)
     
     # Coluna Data Venda Família (do data_loader) - Garantir Datetime
     if coluna_data_venda_familia not in df.columns: # Redundante pela verificação acima, mas seguro
@@ -86,7 +91,9 @@ def exibir_acompanhamento(df_cartorio):
         total_requerentes=(coluna_id_requerente, pd.Series.nunique),
         concluidas=('CONCLUIDA', 'sum'),
         # Usar 'first' aqui é seguro porque data_venda_familia já foi agregada no loader
-        data_venda_familia=(coluna_data_venda_familia, 'first') 
+        data_venda_familia=(coluna_data_venda_familia, 'first'),
+        # Pegar o primeiro responsável encontrado para a família
+        responsavel=(coluna_responsavel, 'first')
     ).reset_index()
 
     # Calcular Percentual de Conclusão
@@ -263,10 +270,11 @@ def exibir_acompanhamento(df_cartorio):
     df_tabela = df_filtrado_agrupado.rename(columns={
         coluna_nome_familia: 'Nome da Família',
         'total_certidoes': 'Total Certidões',
-        'total_requerentes': 'Total Requerentes', 
+        'total_requerentes': 'Total Requerentes',
         'concluidas': 'Concluídas',
         'percentual_conclusao': '% Conclusão',
-        'data_venda_familia': 'Data Venda' # Renomear coluna de data
+        'data_venda_familia': 'Data Venda', # Renomear coluna de data
+        'responsavel': 'Responsável' # Renomear coluna de responsável
     })
 
     # Ordenar a tabela final (opcional, pode escolher outra coluna)
@@ -289,7 +297,8 @@ def exibir_acompanhamento(df_cartorio):
     colunas_exibicao = [
         'Nome da Família',
         'Data Venda', # Adicionada
-        'Total Requerentes', 
+        'Total Requerentes',
+        'Responsável', # Adicionada
         'Total Certidões',
         'Concluídas',
         '% Conclusão'
@@ -297,6 +306,9 @@ def exibir_acompanhamento(df_cartorio):
     # Remover 'Data Venda' se a coluna não existir no df_tabela final (caso raro de erro no loader)
     if 'Data Venda' not in df_tabela.columns:
         colunas_exibicao.remove('Data Venda')
+    # Remover 'Responsável' se a coluna não existir
+    if 'Responsável' not in df_tabela.columns:
+        colunas_exibicao.remove('Responsável')
 
     # Configuração dinâmica das colunas
     column_config_dict = {
@@ -316,6 +328,12 @@ def exibir_acompanhamento(df_cartorio):
         ),
     }
     
+    # Adicionar configuração para responsável se a coluna for exibida
+    if 'Responsável' in colunas_exibicao:
+        column_config_dict['Responsável'] = st.column_config.TextColumn(
+            label="Responsável"
+        )
+
     # Adicionar configuração para data de venda se a coluna for exibida
     if 'Data Venda' in colunas_exibicao:
         column_config_dict['Data Venda'] = st.column_config.DateColumn(

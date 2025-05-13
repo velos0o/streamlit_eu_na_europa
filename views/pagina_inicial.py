@@ -234,20 +234,30 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
                 grouped_by_requerente = emissoes_df.groupby(cols_req[0])
                 if grouped_by_requerente.ngroups > 0:
                     for id_req, grupo in grouped_by_requerente:
-                        nome_req_disp = grupo[cols_req[1]].iloc[0] if not grupo[cols_req[1]].empty else "Req. Desconhecido"
+                        nome_req_bruto = grupo[cols_req[1]].iloc[0] if not grupo[cols_req[1]].empty else "Req. Desconhecido"
                         posicao_arvore = grupo[cols_req[4]].iloc[0] if not grupo[cols_req[4]].empty else "N/D"
-                        
-                        if id_req == 'ID Requerente N/D': 
-                            nome_req_disp = grupo[cols_req[1]].iloc[0] if not grupo[cols_req[1]].empty else "Req. (ID N/D)"
-                        
+
+                        if id_req == 'ID Requerente N/D':
+                            nome_req_bruto = grupo[cols_req[1]].iloc[0] if not grupo[cols_req[1]].empty else "Req. (ID N/D)"
+
+                        # --- Limpar prefixos do nome ---
+                        nome_limpo = str(nome_req_bruto) # Garantir que é string
+                        prefixes_to_remove = ["NASCIMENTO - ", "CASAMENTO - ", "ÓBITO - "]
+                        for prefix in prefixes_to_remove:
+                            if nome_limpo.startswith(prefix):
+                                nome_limpo = nome_limpo[len(prefix):]
+                                break # Remover apenas o primeiro prefixo encontrado
+                        nome_req_disp = nome_limpo.strip() # Nome final limpo
+                        # --- Fim da limpeza ---
+
                         cert_status = {v: 'Dispensado' for k, v in map_tipo_certidao.items() if v}
                         for _, row in grupo.iterrows():
                             tipo_l = map_tipo_certidao.get(str(row[cols_req[2]]).upper())
                             if tipo_l: cert_status[tipo_l] = row[cols_req[3]] if cert_status[tipo_l] == 'Dispensado' or row[cols_req[3]] != 'Dispensado' else cert_status[tipo_l]
-                        
+
                         # Incluir a posição na árvore nos dados a serem exibidos
                         requerentes_data_list_of_dicts.append({
-                            'Requerente': nome_req_disp, 
+                            'Requerente': nome_req_disp, # Usar o nome limpo
                             'Posição': posicao_arvore,
                             **cert_status
                         })
