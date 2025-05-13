@@ -8,6 +8,7 @@ import gspread
 from google.oauth2 import service_account
 import os
 import traceback
+from utils.secrets_helper import get_google_credentials
 
 def show_higienizacao_checklist():
     """
@@ -33,23 +34,14 @@ def show_higienizacao_checklist():
     def load_data():
         # Configurar credenciais e acessar a planilha
         try:
-            # Caminho para o arquivo de credenciais
-            credentials_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 
-                                        "views", "cartorio_new", "chaves", "leitura-planilhas-459604-84a6f83793a3.json")
-            
-            # Verificar se o arquivo de credenciais existe
-            if not os.path.exists(credentials_path):
-                st.error(f"Arquivo de credenciais não encontrado")
-                return pd.DataFrame()
-            
-            # Configurar credenciais
+            # Obter credenciais usando o helper de secrets
             try:
-                credentials = service_account.Credentials.from_service_account_file(
-                    credentials_path,
-                    scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-                )
+                credentials = get_google_credentials()
+                if not credentials:
+                    st.error("Não foi possível obter as credenciais do Google.")
+                    return pd.DataFrame()
             except Exception as e:
-                st.error(f"Erro ao configurar credenciais: {str(e)}")
+                st.error(f"Erro ao obter credenciais: {str(e)}")
                 return pd.DataFrame()
             
             # Criar cliente gspread
