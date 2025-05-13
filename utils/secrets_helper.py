@@ -78,11 +78,37 @@ def get_google_credentials():
                 if "google" in st.secrets and "sheets" in st.secrets["google"]:
                     print("[DEBUG] Tentando usar formato alternativo: st.secrets[\"google\"][\"sheets\"]")
                     try:
+                        # Extrair e verificar a private_key
+                        private_key = st.secrets["google"]["sheets"]["private_key"]
+                        
+                        # Debug para mostrar a forma da private_key
+                        print(f"[DEBUG] Tamanho da private_key: {len(private_key)} caracteres")
+                        print(f"[DEBUG] Primeiros 30 caracteres: {private_key[:30]}...")
+                        
+                        # Certificar que a private_key está formatada corretamente
+                        # Às vezes o Streamlit não preserva as quebras de linha corretamente
+                        if "-----BEGIN PRIVATE KEY-----" in private_key and "-----END PRIVATE KEY-----" in private_key:
+                            # Remover quebras de linha existentes
+                            private_key_content = private_key.replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").replace("\n", "").strip()
+                            
+                            # Reconstruir com o formato correto
+                            private_key_formatted = "-----BEGIN PRIVATE KEY-----\n"
+                            # Adicionar quebras de linha a cada 64 caracteres
+                            for i in range(0, len(private_key_content), 64):
+                                private_key_formatted += private_key_content[i:i+64] + "\n"
+                            private_key_formatted += "-----END PRIVATE KEY-----\n"
+                            
+                            # Substituir a chave original
+                            print("[DEBUG] Private key reformatada para garantir quebras de linha corretas")
+                        else:
+                            private_key_formatted = private_key
+                            print("[DEBUG] Private key mantida como está (não contém os marcadores padrão)")
+                            
                         credentials_dict = {
                             "type": st.secrets["google"]["sheets"]["type"],
                             "project_id": st.secrets["google"]["sheets"]["project_id"],
                             "private_key_id": st.secrets["google"]["sheets"]["private_key_id"],
-                            "private_key": st.secrets["google"]["sheets"]["private_key"],
+                            "private_key": private_key_formatted,  # Usar a versão formatada
                             "client_email": st.secrets["google"]["sheets"]["client_email"],
                             "client_id": st.secrets["google"]["sheets"]["client_id"],
                             "auth_uri": st.secrets["google"]["sheets"]["auth_uri"],
@@ -101,6 +127,11 @@ def get_google_credentials():
                         return credentials
                     except Exception as e:
                         print(f"[ERRO] Falha ao criar credenciais do formato alternativo: {str(e)}")
+                        # Adicionar mais detalhes para debug
+                        if "private_key" in str(e).lower() or "padding" in str(e).lower():
+                            print("[DEBUG] Erro parece estar relacionado à formatação da private_key.")
+                            print("[DEBUG] Verifique se a private_key nos secrets está formatada corretamente com as quebras de linha adequadas.")
+                            print("[DEBUG] A private_key deve estar formatada com: -----BEGIN PRIVATE KEY-----\\n...conteúdo...\\n-----END PRIVATE KEY-----")
                         # Continuar para método de arquivo local
         else:
             print("[DEBUG] st.secrets NÃO existe neste ambiente")

@@ -39,8 +39,8 @@ def load_conclusao_data(start_date=None, end_date=None):
         # Pega todos os dados da planilha como lista de listas
         all_values = sheet.get_all_values()
 
-        # << DEBUG: Imprimir os cabeçalhos lidos da linha 2 (índice 1) >>
-        # print("Cabeçalhos lidos da Planilha:", all_values[1]) # Removido ou comentado
+        # Imprimir os cabeçalhos lidos da linha 2 (índice 1) para debug
+        print("[DEBUG] Cabeçalhos da planilha:", all_values[1])
         df = pd.DataFrame(all_values[2:], columns=all_values[1]) # Usa linha 2 como cabeçalho, dados a partir da linha 3
 
         # Verifica se as colunas esperadas existem após carregar com cabeçalho correto
@@ -53,21 +53,88 @@ def load_conclusao_data(start_date=None, end_date=None):
             'status',
             'MOTIVO HIGIENIZAÇÃO \nDEVOLVIDA (LUCAS)'
         ]
+        
+        # Funções auxiliares para encontrar colunas independente de maiúsculas/minúsculas
+        def encontrar_coluna_similar(nome_coluna_procurada, todas_colunas):
+            """Busca coluna por similaridade, ignorando maiúsculas/minúsculas e acentos"""
+            # Versão exata
+            if nome_coluna_procurada in todas_colunas:
+                return nome_coluna_procurada
+                
+            # Versão insensível a maiúsculas/minúsculas
+            nome_lower = nome_coluna_procurada.lower()
+            for col in todas_colunas:
+                if col.lower() == nome_lower:
+                    print(f"[DEBUG] Coluna '{nome_coluna_procurada}' encontrada como '{col}' (case-insensitive)")
+                    return col
+                    
+            # Versão que procura substring
+            for col in todas_colunas:
+                if nome_lower in col.lower():
+                    print(f"[DEBUG] Coluna '{nome_coluna_procurada}' encontrada como substring em '{col}'")
+                    return col
+            
+            # Algumas variações comuns de nome para 'data'
+            if nome_coluna_procurada == 'data':
+                for alternativa in ['data conclusão', 'data_conclusao', 'dt', 'date', 'data conclusao']:
+                    for col in todas_colunas:
+                        if alternativa in col.lower():
+                            print(f"[DEBUG] Coluna 'data' encontrada na alternativa '{col}'")
+                            return col
+            
+            return None
+                
+        # Mapeamento das colunas encontradas para os nomes padrão
+        colunas_encontradas = {}
+        colunas_ausentes = []
+        
+        print("[DEBUG] Verificando colunas da planilha...")
         for coluna in colunas_necessarias:
-            if coluna not in df.columns:
-                print(f"Erro: Coluna '{coluna}' não encontrada na planilha.")
+            coluna_encontrada = encontrar_coluna_similar(coluna, df.columns)
+            if coluna_encontrada:
+                colunas_encontradas[coluna_encontrada] = coluna  # Mapeia nome real -> nome padrão
+            else:
+                colunas_ausentes.append(coluna)
+                print(f"[AVISO] Coluna '{coluna}' não encontrada na planilha, nem versões similares.")
+        
+        if colunas_ausentes:
+            print(f"[ERRO] Colunas ausentes: {colunas_ausentes}")
+            print("[DEBUG] Todas as colunas disponíveis na planilha:", list(df.columns))
+            # Se faltam colunas essenciais como 'responsavel' e 'mesa', não podemos continuar
+            if 'responsavel' in colunas_ausentes or 'mesa' in colunas_ausentes:
+                print("[ERRO] Colunas responsavel e/ou mesa ausentes, não é possível continuar.")
                 return None
-
-        # Seleciona e renomeia as colunas conforme solicitado
+            # Se apenas 'data' estiver ausente, podemos criar uma coluna padrão
+            if 'data' in colunas_ausentes and len(colunas_ausentes) == 1:
+                print("[AVISO] Criando coluna 'data' padrão com data atual")
+                df['data'] = datetime.now().strftime('%Y-%m-%d')
+                colunas_encontradas['data'] = 'data'
+                colunas_ausentes.remove('data')
+        
+        # Se ainda temos colunas ausentes, podemos criar colunas vazias para elas
+        for coluna in colunas_ausentes:
+            print(f"[AVISO] Criando coluna vazia para '{coluna}'")
+            df[coluna] = None
+            colunas_encontradas[coluna] = coluna
+        
+        # Seleciona e renomeia as colunas encontradas
+        # Atualizar o dicionário de colunas para usar os nomes encontrados -> nomes padrão
         colunas_selecionadas = {
-            'data': 'data',
-            'responsavel': 'responsavel',
-            'nome da família': 'nome_familia',
-            'id da família': 'id_familia',
-            'mesa': 'mesa',
-            'status': 'status',
-            'MOTIVO HIGIENIZAÇÃO \nDEVOLVIDA (LUCAS)': 'motivo_devolucao'
+            col_encontrada: (
+                'data' if col_padrao == 'data' else
+                'responsavel' if col_padrao == 'responsavel' else
+                'nome_familia' if col_padrao == 'nome da família' else
+                'id_familia' if col_padrao == 'id da família' else
+                'mesa' if col_padrao == 'mesa' else
+                'status' if col_padrao == 'status' else
+                'motivo_devolucao'
+            )
+            for col_encontrada, col_padrao in colunas_encontradas.items()
         }
+        
+        print("[DEBUG] Mapeamento final de colunas:", colunas_selecionadas)
+        
+        # Selecionar apenas as colunas encontradas e renomear
         df = df[list(colunas_selecionadas.keys())].rename(columns=colunas_selecionadas)
 
         # --- TRATAMENTO ID FAMILIA (Planilha) ---
