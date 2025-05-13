@@ -123,6 +123,7 @@ def get_random_animation():
         os.path.join(os.getcwd(), animation_file),  # Caminho absoluto no diretório atual
         os.path.join(os.path.dirname(__file__), "..", animation_file),  # Um nível acima do utils
         os.path.join(os.path.dirname(__file__), "..", "assets", animation_file),  # Na pasta assets
+        os.path.join(os.path.dirname(__file__), "..", "assets", "animations", animation_file),  # Na pasta assets/animations
     ]
     
     # Tentar cada caminho
