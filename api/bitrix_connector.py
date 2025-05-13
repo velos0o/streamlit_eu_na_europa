@@ -29,34 +29,22 @@ def get_credentials():
     """
     try:
         # Verificar se estamos em ambiente Streamlit Cloud
-        if hasattr(st, 'secrets'):
-            # Primeiro, tenta acessar a estrutura bitrix
-            if 'bitrix' in st.secrets:
-                token = st.secrets.bitrix.get('webhoook_token')
-                url = st.secrets.bitrix.get('bitrix_url')
-            # Se não encontrar, tenta acessar diretamente as chaves (compatibilidade)
-            else:
-                token = st.secrets.get('BITRIX_TOKEN')
-                url = st.secrets.get('BITRIX_URL')
+        if hasattr(st, 'secrets') and 'BITRIX_TOKEN' in st.secrets:
+            token = st.secrets.BITRIX_TOKEN
+            url = st.secrets.BITRIX_URL
         else:
             # Usar variáveis de ambiente locais
             token = os.getenv('BITRIX_TOKEN')
             url = os.getenv('BITRIX_URL')
     except Exception as e:
         # Se ocorrer qualquer erro ao tentar acessar secrets, usar variáveis de ambiente
-        print(f"Erro ao acessar secrets: {e}")
         token = os.getenv('BITRIX_TOKEN')
         url = os.getenv('BITRIX_URL')
     
     # Retornar valores padrão se não encontrados
     if not token or not url:
-        # Em ambiente de produção, deve gerar erro em vez de usar valores padrão
-        if os.getenv('ENVIRONMENT') == 'production':
-            raise ValueError("Credenciais do Bitrix24 não encontradas no ambiente de produção")
-        else:
-            print("AVISO: Usando credenciais padrão de desenvolvimento. NÃO USE EM PRODUÇÃO!")
-            token = "dummy_token"  # Token fake para desenvolvimento
-            url = "https://example.bitrix24.com"  # URL fake para desenvolvimento
+        token = "RuUSETRkbFD3whitfgMbioX8qjLgcdPubr"  # Token padrão - substitua em produção
+        url = "https://eunaeuropacidadania.bitrix24.com.br"  # URL padrão - substitua em produção
     
     return token, url
 

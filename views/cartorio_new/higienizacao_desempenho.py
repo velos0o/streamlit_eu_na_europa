@@ -5,7 +5,6 @@ from views.cartorio_new.data_loader import carregar_dados_cartorio # Importar da
 from datetime import datetime, timedelta
 import re # Para extrair ID da opção do selectbox
 import numpy as np # Para operações numéricas
-import os # Para verificar se o arquivo existe
 
 def exibir_higienizacao_desempenho():
     """
@@ -52,38 +51,9 @@ def exibir_higienizacao_desempenho():
         spinner_message = f"Carregando dados de conclusão entre {start_date_to_load.strftime('%d/%m/%Y')} e {end_date_to_load.strftime('%d/%m/%Y')}..."
     
     with st.spinner(spinner_message):
-        # Tentar carregar dados da planilha Google
         df_conclusao_raw = load_conclusao_data(start_date=start_date_to_load, end_date=end_date_to_load)
-        
-        # Verificar se df_conclusao_raw está vazio (falha ao carregar)
-        if df_conclusao_raw.empty:
-            # Tentar carregar dados locais como fallback
-            st.warning("Não foi possível carregar os dados da planilha Google. Tentando usar dados locais...")
-            try:
-                # Verificar se temos um arquivo CSV local para usar
-                local_data_path = os.path.join("data", "conclusao_higienizacao_local.csv")
-                if os.path.exists(local_data_path):
-                    df_conclusao_raw = pd.read_csv(local_data_path)
-                    st.success("Dados locais carregados com sucesso!")
-                    
-                    # Converter colunas de data se necessário
-                    if 'data' in df_conclusao_raw.columns:
-                        df_conclusao_raw['data'] = pd.to_datetime(df_conclusao_raw['data'], errors='coerce')
-                        
-                    # Aplicar filtro de data se necessário
-                    if start_date_to_load and end_date_to_load and 'data' in df_conclusao_raw.columns:
-                        start_datetime = datetime.combine(start_date_to_load, datetime.min.time())
-                        end_datetime = datetime.combine(end_date_to_load, datetime.max.time())
-                        df_filtrado = df_conclusao_raw.dropna(subset=['data']).copy()
-                        mask = (df_filtrado['data'] >= start_datetime) & (df_filtrado['data'] <= end_datetime)
-                        df_conclusao_raw = df_filtrado[mask]
-                else:
-                    st.error("Arquivo de dados locais não encontrado.")
-                    # Criar um DataFrame vazio com as colunas esperadas
-                    df_conclusao_raw = pd.DataFrame()
-            except Exception as e:
-                st.error(f"Erro ao carregar dados locais: {str(e)}")
-                df_conclusao_raw = pd.DataFrame()
+        if df_conclusao_raw is None:
+             df_conclusao_raw = pd.DataFrame() # Continuar com DF vazio
 
         # Garantir colunas mesmo se vazio
         colunas_planilha_esperadas = ['responsavel', 'mesa', 'id_familia', 'nome_familia', 'higienizacao_exito', 'higienizacao_incompleta', 'higienizacao_tratadas']
@@ -93,59 +63,15 @@ def exibir_higienizacao_desempenho():
 
         # Selecionar colunas necessárias (incluindo nome_familia agora)
         colunas_planilha = ['responsavel', 'mesa', 'id_familia', 'nome_familia', 'higienizacao_exito', 'higienizacao_incompleta', 'higienizacao_tratadas']
-        # Filtrar para selecionar apenas as colunas que existem
-        colunas_existentes = [col for col in colunas_planilha if col in df_conclusao_raw.columns]
-        df_conclusao_raw = df_conclusao_raw[colunas_existentes].copy()
-        
-        # Remover linhas sem ID somente se a coluna existir
-        if 'id_familia' in df_conclusao_raw.columns:
-            df_conclusao_raw = df_conclusao_raw.dropna(subset=['id_familia']) # Remover linhas sem ID
-
-    # Adicionar um botão para salvar dados locais para uso futuro
-    if not df_conclusao_raw.empty:
-        col1, col2 = st.columns([3, 1])
-        with col2:
-            if st.button("📥 Salvar dados localmente", help="Salva os dados atuais em um arquivo local para uso futuro"):
-                try:
-                    # Criar diretório 'data' se não existir
-                    os.makedirs("data", exist_ok=True)
-                    # Salvar em CSV
-                    local_data_path = os.path.join("data", "conclusao_higienizacao_local.csv")
-                    df_conclusao_raw.to_csv(local_data_path, index=False)
-                    st.success(f"Dados salvos com sucesso em {local_data_path}")
-                except Exception as e:
-                    st.error(f"Erro ao salvar dados: {str(e)}")
+        df_conclusao_raw = df_conclusao_raw[colunas_planilha].copy()
+        df_conclusao_raw = df_conclusao_raw.dropna(subset=['id_familia']) # Remover linhas sem ID
 
     # 2. Dados do Bitrix (Funil Emissões 1098)
     with st.spinner("Carregando dados de emissões do Bitrix..."):
         df_cartorio = carregar_dados_cartorio()
-        if df_cartorio is None or df_cartorio.empty:
+        if df_cartorio is None:
             df_cartorio = pd.DataFrame() # Continuar com DF vazio
             st.warning("Não foi possível carregar os dados de emissões do Bitrix.")
-            
-            # Tentar carregar dados locais como fallback
-            try:
-                local_cartorio_path = os.path.join("data", "emissoes_bitrix_local.csv")
-                if os.path.exists(local_cartorio_path):
-                    df_cartorio = pd.read_csv(local_cartorio_path)
-                    st.success("Dados locais de emissões carregados com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao carregar dados locais de emissões: {str(e)}")
-
-    # Adicionar botão para salvar dados de emissões localmente
-    if not df_cartorio.empty:
-        col1, col2 = st.columns([3, 1])
-        with col2:
-            if st.button("📥 Salvar emissões localmente", help="Salva os dados de emissões em um arquivo local para uso futuro"):
-                try:
-                    # Criar diretório 'data' se não existir
-                    os.makedirs("data", exist_ok=True)
-                    # Salvar em CSV
-                    local_cartorio_path = os.path.join("data", "emissoes_bitrix_local.csv")
-                    df_cartorio.to_csv(local_cartorio_path, index=False)
-                    st.success(f"Dados de emissões salvos com sucesso em {local_cartorio_path}")
-                except Exception as e:
-                    st.error(f"Erro ao salvar dados de emissões: {str(e)}")
 
     # --- Widgets de Filtro por Família --- 
     col_filtros1, col_filtros2 = st.columns(2)

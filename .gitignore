@@ -25,7 +25,6 @@ ENV/
 # Arquivos do sistema operacional
 .DS_Store
 Thumbs.db
-desktop.ini
 
 # Arquivos de configuração específicos
 .streamlit/secrets.toml
@@ -34,7 +33,6 @@ desktop.ini
 
 # Arquivos de log
 *.log
-logs/
 
 # Arquivos de chaves e credenciais
 **/*.key
@@ -77,7 +75,6 @@ htmlcov/
 *.log
 temp/
 tmp/
-*.tmp
 
 # Arquivos do sistema
 .DS_Store
@@ -95,17 +92,4 @@ Thumbs.db
 # Arquivos de build
 dist/
 build/
-*.egg-info/
-
-# Exceções para arquivos de exemplo que devem ser versionados
-# Descomente conforme necessário
-# !example_data.csv
-# !requirements.txt
-
-# Arquivos de dados sensíveis
-*.csv
-*.xlsx
-*.xls
-*.db
-*.sqlite
-*.sqlite3 
+*.egg-info/ 
