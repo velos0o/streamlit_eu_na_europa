@@ -13,48 +13,121 @@ def get_google_credentials():
     Returns:
         google.oauth2.service_account.Credentials: Credenciais de serviço do Google
     """
+    # Definir escopos necessários para planilhas e drive
+    SCOPES = ['https://spreadsheets.google.com/feeds', 
+              'https://www.googleapis.com/auth/drive',
+              'https://www.googleapis.com/auth/spreadsheets']
+              
     try:
-        # Verificar se há secrets configurados no Streamlit
-        if "gcp_service_account" in st.secrets:
-            # Criar dicionário de credenciais a partir dos secrets
-            credentials_dict = {
-                "type": st.secrets["gcp_service_account"]["type"],
-                "project_id": st.secrets["gcp_service_account"]["project_id"],
-                "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
-                "private_key": st.secrets["gcp_service_account"]["private_key"],
-                "client_email": st.secrets["gcp_service_account"]["client_email"],
-                "client_id": st.secrets["gcp_service_account"]["client_id"],
-                "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
-                "token_uri": st.secrets["gcp_service_account"]["token_uri"],
-                "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
-                "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"]
-                # "universe_domain" pode ou não estar presente, adicionando condicionalmente
-            }
-            if "universe_domain" in st.secrets["gcp_service_account"]:
-                credentials_dict["universe_domain"] = st.secrets["gcp_service_account"]["universe_domain"]
+        # DEBUG: Verificar se há secrets disponíveis
+        if hasattr(st, 'secrets'):
+            print("[DEBUG] st.secrets existe")
             
-            print("[INFO] Usando credenciais do Google armazenadas nos secrets do Streamlit (via gcp_service_account)")
-            return service_account.Credentials.from_service_account_info(credentials_dict)
-        
-        # Tentar encontrar arquivo de credenciais local (apenas para desenvolvimento)
-        else:
-            # Lista de possíveis caminhos para o arquivo de credenciais
-            possible_paths = [
-                "views/cartorio_new/chaves/leitura-planilhas-459604-84a6f83793a3.json",
-                "chaves/leitura-planilhas-459604-84a6f83793a3.json",
-                ".streamlit/chaves/leitura-planilhas-459604-84a6f83793a3.json"
-            ]
+            # DEBUG: Listar as chaves disponíveis em st.secrets
+            print(f"[DEBUG] Chaves em st.secrets: {list(st.secrets.keys() if hasattr(st.secrets, 'keys') else ['<não é um dicionário>'])}")
             
-            # Verificar cada caminho
-            for path in possible_paths:
-                if os.path.exists(path):
-                    print(f"[AVISO] Usando arquivo local de credenciais: {path}")
-                    print("[AVISO] Recomendamos migrar para Streamlit Secrets em produção!")
-                    return service_account.Credentials.from_service_account_file(path)
-            
-            # Se chegou aqui, não encontrou credenciais
-            raise FileNotFoundError("Arquivo de credenciais do Google não encontrado")
+            # Verificar se há secrets configurados no Streamlit
+            if "gcp_service_account" in st.secrets:
+                print("[DEBUG] gcp_service_account encontrado em st.secrets")
                 
+                # DEBUG: Verificar as chaves dentro de gcp_service_account
+                gcp_keys = list(st.secrets["gcp_service_account"].keys()) if hasattr(st.secrets["gcp_service_account"], 'keys') else ['<não é um dicionário>']
+                print(f"[DEBUG] Chaves em gcp_service_account: {gcp_keys}")
+                
+                # Verificar se tem as chaves mínimas necessárias
+                chaves_necessarias = ["type", "project_id", "private_key", "client_email"]
+                chaves_faltantes = [k for k in chaves_necessarias if k not in gcp_keys]
+                
+                if chaves_faltantes:
+                    print(f"[ERRO] Chaves faltantes em gcp_service_account: {chaves_faltantes}")
+                    raise ValueError(f"Credenciais incompletas. Faltam as chaves: {chaves_faltantes}")
+                
+                # Criar dicionário de credenciais a partir dos secrets
+                try:
+                    credentials_dict = {
+                        "type": st.secrets["gcp_service_account"]["type"],
+                        "project_id": st.secrets["gcp_service_account"]["project_id"],
+                        "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+                        "private_key": st.secrets["gcp_service_account"]["private_key"],
+                        "client_email": st.secrets["gcp_service_account"]["client_email"],
+                        "client_id": st.secrets["gcp_service_account"]["client_id"],
+                        "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+                        "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+                        "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
+                        "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"]
+                    }
+                    if "universe_domain" in st.secrets["gcp_service_account"]:
+                        credentials_dict["universe_domain"] = st.secrets["gcp_service_account"]["universe_domain"]
+                    
+                    print("[INFO] Usando credenciais do Google armazenadas nos secrets do Streamlit (via gcp_service_account)")
+                    
+                    # Criar credenciais com os escopos apropriados
+                    credentials = service_account.Credentials.from_service_account_info(
+                        credentials_dict, 
+                        scopes=SCOPES
+                    )
+                    return credentials
+                    
+                except Exception as e:
+                    print(f"[ERRO] Falha ao criar credenciais a partir de st.secrets[\"gcp_service_account\"]: {str(e)}")
+                    raise e
+            else:
+                print("[DEBUG] gcp_service_account NÃO encontrado em st.secrets")
+                
+                # Ver se temos secrets de outro formato (google.sheets por exemplo)
+                if "google" in st.secrets and "sheets" in st.secrets["google"]:
+                    print("[DEBUG] Tentando usar formato alternativo: st.secrets[\"google\"][\"sheets\"]")
+                    try:
+                        credentials_dict = {
+                            "type": st.secrets["google"]["sheets"]["type"],
+                            "project_id": st.secrets["google"]["sheets"]["project_id"],
+                            "private_key_id": st.secrets["google"]["sheets"]["private_key_id"],
+                            "private_key": st.secrets["google"]["sheets"]["private_key"],
+                            "client_email": st.secrets["google"]["sheets"]["client_email"],
+                            "client_id": st.secrets["google"]["sheets"]["client_id"],
+                            "auth_uri": st.secrets["google"]["sheets"]["auth_uri"],
+                            "token_uri": st.secrets["google"]["sheets"]["token_uri"],
+                            "auth_provider_x509_cert_url": st.secrets["google"]["sheets"]["auth_provider_x509_cert_url"],
+                            "client_x509_cert_url": st.secrets["google"]["sheets"]["client_x509_cert_url"]
+                        }
+                        if "universe_domain" in st.secrets["google"]["sheets"]:
+                            credentials_dict["universe_domain"] = st.secrets["google"]["sheets"]["universe_domain"]
+                        
+                        print("[INFO] Usando credenciais do Google armazenadas em formato alternativo (google.sheets)")
+                        credentials = service_account.Credentials.from_service_account_info(
+                            credentials_dict, 
+                            scopes=SCOPES
+                        )
+                        return credentials
+                    except Exception as e:
+                        print(f"[ERRO] Falha ao criar credenciais do formato alternativo: {str(e)}")
+                        # Continuar para método de arquivo local
+        else:
+            print("[DEBUG] st.secrets NÃO existe neste ambiente")
+            
+        # Tentar encontrar arquivo de credenciais local (apenas para desenvolvimento)
+        print("[DEBUG] Tentando usar arquivo de credenciais local")
+        # Lista de possíveis caminhos para o arquivo de credenciais
+        possible_paths = [
+            "views/cartorio_new/chaves/leitura-planilhas-459604-84a6f83793a3.json",
+            "chaves/leitura-planilhas-459604-84a6f83793a3.json",
+            ".streamlit/chaves/leitura-planilhas-459604-84a6f83793a3.json"
+        ]
+        
+        # Verificar cada caminho
+        for path in possible_paths:
+            if os.path.exists(path):
+                print(f"[INFO] Usando arquivo local de credenciais: {path}")
+                print("[AVISO] Recomendamos migrar para Streamlit Secrets em produção!")
+                return service_account.Credentials.from_service_account_file(
+                    path,
+                    scopes=SCOPES
+                )
+        
+        # Se chegou aqui, não encontrou credenciais
+        print("[ERRO] Nenhuma credencial encontrada (nem secrets nem arquivo local)")
+        raise FileNotFoundError("Arquivo de credenciais do Google não encontrado e st.secrets não configurado corretamente")
+            
     except Exception as e:
         print(f"[ERRO] Falha ao obter credenciais do Google: {str(e)}")
         st.error(f"Erro ao carregar credenciais do Google. Verifique se as secrets estão configuradas corretamente.")
