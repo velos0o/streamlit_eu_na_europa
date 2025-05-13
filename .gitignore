@@ -52,6 +52,9 @@ views/cartorio_new/chaves/
 **/keys/
 **/credentials/
 
+# Adicionar exceção para o arquivo específico de credenciais
+!views/cartorio_new/chaves/leitura-planilhas-459604-84a6f83793a3.json
+
 # Arquivos temporários de migração de credenciais
 temp_secrets_*.toml
 
@@ -92,9 +95,4 @@ Thumbs.db
 # Arquivos de build
 dist/
 build/
-*.egg-info/
-
-# Google Cloud Service Account Keys
-views/cartorio_new/chaves/*.json
-*.pem
-*-key.json 
+*.egg-info/ 
