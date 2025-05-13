@@ -30,47 +30,123 @@ def get_google_credentials():
     """
     try:
         # Verificar se há secrets configurados no Streamlit
-        if "google" in st.secrets and "sheets" in st.secrets["google"]:
-            # Criar dicionário de credenciais a partir dos secrets
-            credentials_dict = {
-                "type": st.secrets["google"]["sheets"]["type"],
-                "project_id": st.secrets["google"]["sheets"]["project_id"],
-                "private_key_id": st.secrets["google"]["sheets"]["private_key_id"],
-                "private_key": st.secrets["google"]["sheets"]["private_key"],
-                "client_email": st.secrets["google"]["sheets"]["client_email"],
-                "client_id": st.secrets["google"]["sheets"]["client_id"],
-                "auth_uri": st.secrets["google"]["sheets"]["auth_uri"],
-                "token_uri": st.secrets["google"]["sheets"]["token_uri"],
-                "auth_provider_x509_cert_url": st.secrets["google"]["sheets"]["auth_provider_x509_cert_url"],
-                "client_x509_cert_url": st.secrets["google"]["sheets"]["client_x509_cert_url"],
-                "universe_domain": st.secrets["google"]["sheets"]["universe_domain"] 
-            }
+        if hasattr(st, 'secrets'):
+            print("[DEBUG] Secrets do Streamlit disponíveis")
             
-            print("[INFO] Usando credenciais do Google armazenadas nos secrets do Streamlit")
-            return service_account.Credentials.from_service_account_info(credentials_dict)
+            # Verificar se a seção google existe
+            if "google" in st.secrets:
+                print("[DEBUG] Seção 'google' encontrada nos secrets")
+                
+                # Verificar se a subseção sheets existe
+                if "sheets" in st.secrets["google"]:
+                    print("[DEBUG] Subseção 'sheets' encontrada nos secrets")
+                    
+                    # Listar as chaves disponíveis para diagnóstico
+                    available_keys = list(st.secrets["google"]["sheets"].keys())
+                    print(f"[DEBUG] Chaves disponíveis em google.sheets: {available_keys}")
+                    
+                    # Verificar se as chaves necessárias existem
+                    required_keys = ["type", "project_id", "private_key_id", "private_key", 
+                                    "client_email", "client_id", "auth_uri", "token_uri", 
+                                    "auth_provider_x509_cert_url", "client_x509_cert_url"]
+                    
+                    missing_keys = [key for key in required_keys if key not in available_keys]
+                    if missing_keys:
+                        print(f"[ERRO] Chaves ausentes em google.sheets: {missing_keys}")
+                        raise KeyError(f"Chaves obrigatórias ausentes: {missing_keys}")
+                    
+                    # Criar dicionário de credenciais a partir dos secrets
+                    credentials_dict = {}
+                    for key in required_keys:
+                        value = st.secrets["google"]["sheets"][key]
+                        credentials_dict[key] = value
+                    
+                    # Adicionar universe_domain se disponível
+                    if "universe_domain" in available_keys:
+                        credentials_dict["universe_domain"] = st.secrets["google"]["sheets"]["universe_domain"]
+                    else:
+                        # Usar valor padrão se não existir
+                        credentials_dict["universe_domain"] = "googleapis.com"
+                    
+                    print("[INFO] Usando credenciais do Google armazenadas nos secrets do Streamlit")
+                    return service_account.Credentials.from_service_account_info(credentials_dict)
+                else:
+                    print("[ERRO] Subseção 'sheets' não encontrada nos secrets")
+            else:
+                print("[ERRO] Seção 'google' não encontrada nos secrets")
+        else:
+            print("[DEBUG] Secrets do Streamlit não disponíveis")
+            
+        # FALLBACK: Tentativa alternativa de acessar como dict
+        print("[DEBUG] Tentando acesso alternativo aos secrets")
+        try:
+            if hasattr(st, 'secrets') and isinstance(st.secrets, dict) and 'google' in st.secrets:
+                google_section = st.secrets['google']
+                
+                if isinstance(google_section, dict) and 'sheets' in google_section:
+                    sheets_section = google_section['sheets']
+                    
+                    if isinstance(sheets_section, dict):
+                        print("[DEBUG] Acessando secrets como dicionário")
+                        
+                        # Criar dict de credenciais manualmente
+                        credentials_dict = {
+                            "type": sheets_section.get("type", "service_account"),
+                            "project_id": sheets_section.get("project_id", ""),
+                            "private_key_id": sheets_section.get("private_key_id", ""),
+                            "private_key": sheets_section.get("private_key", ""),
+                            "client_email": sheets_section.get("client_email", ""),
+                            "client_id": sheets_section.get("client_id", ""),
+                            "auth_uri": sheets_section.get("auth_uri", "https://accounts.google.com/o/oauth2/auth"),
+                            "token_uri": sheets_section.get("token_uri", "https://oauth2.googleapis.com/token"),
+                            "auth_provider_x509_cert_url": sheets_section.get("auth_provider_x509_cert_url", "https://www.googleapis.com/oauth2/v1/certs"),
+                            "client_x509_cert_url": sheets_section.get("client_x509_cert_url", ""),
+                            "universe_domain": sheets_section.get("universe_domain", "googleapis.com")
+                        }
+                        
+                        # Verificar se as chaves críticas existem
+                        if not credentials_dict["private_key"] or not credentials_dict["client_email"]:
+                            print("[ERRO] Credenciais críticas ausentes (private_key ou client_email)")
+                            raise ValueError("Credenciais críticas ausentes")
+                            
+                        print("[INFO] Usando credenciais do Google via acesso alternativo")
+                        return service_account.Credentials.from_service_account_info(credentials_dict)
+        except Exception as fallback_error:
+            print(f"[ERRO] Falha no acesso alternativo aos secrets: {str(fallback_error)}")
         
         # Tentar encontrar arquivo de credenciais local (apenas para desenvolvimento)
-        else:
-            # Lista de possíveis caminhos para o arquivo de credenciais
-            possible_paths = [
-                "views/cartorio_new/chaves/leitura-planilhas-459604-84a6f83793a3.json",
-                "chaves/leitura-planilhas-459604-84a6f83793a3.json",
-                ".streamlit/chaves/leitura-planilhas-459604-84a6f83793a3.json"
-            ]
+        print("[DEBUG] Tentando encontrar arquivo de credenciais local")
+        possible_paths = [
+            "views/cartorio_new/chaves/leitura-planilhas-459604-84a6f83793a3.json",
+            "chaves/leitura-planilhas-459604-84a6f83793a3.json",
+            ".streamlit/chaves/leitura-planilhas-459604-84a6f83793a3.json"
+        ]
+        
+        # Verificar cada caminho
+        for path in possible_paths:
+            full_path = os.path.join(get_project_root(), path)
+            print(f"[DEBUG] Verificando existência do arquivo: {full_path}")
             
-            # Verificar cada caminho
-            for path in possible_paths:
-                if os.path.exists(path):
-                    print(f"[AVISO] Usando arquivo local de credenciais: {path}")
-                    print("[AVISO] Recomendamos migrar para Streamlit Secrets em produção!")
-                    return service_account.Credentials.from_service_account_file(path)
-            
-            # Se chegou aqui, não encontrou credenciais
-            raise FileNotFoundError("Arquivo de credenciais do Google não encontrado")
+            if os.path.exists(full_path):
+                print(f"[AVISO] Usando arquivo local de credenciais: {full_path}")
+                print("[AVISO] Recomendamos migrar para Streamlit Secrets em produção!")
+                return service_account.Credentials.from_service_account_file(full_path)
+        
+        # Se chegou aqui, não encontrou credenciais
+        print("[ERRO] Nenhuma fonte de credenciais Google encontrada")
+        raise FileNotFoundError("Arquivo de credenciais do Google não encontrado e secrets não configurados")
                 
     except Exception as e:
         print(f"[ERRO] Falha ao obter credenciais do Google: {str(e)}")
+        import traceback
+        print(f"[DEBUG] Traceback completo: {traceback.format_exc()}")
         st.error(f"Erro ao carregar credenciais do Google. Verifique se as secrets estão configuradas corretamente.")
+        
+        # Em desenvolvimento, permite continuar com um erro mais suave
+        if os.getenv('ENVIRONMENT') != 'production':
+            print("[AVISO] Ambiente de desenvolvimento detectado - retornando None")
+            return None
+            
         raise e
 
 def migrate_json_to_secrets():
