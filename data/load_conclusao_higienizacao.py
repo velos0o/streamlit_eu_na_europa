@@ -1,10 +1,8 @@
 import gspread
-# from oauth2client.service_account import ServiceAccountCredentials # Não mais necessário diretamente aqui
-from google.oauth2 import service_account # Usar a biblioteca recomendada
+from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import os
 from datetime import datetime
-import streamlit as st # Adicionado para usar st.secrets
 
 def load_conclusao_data(start_date=None, end_date=None):
     """
@@ -20,26 +18,24 @@ def load_conclusao_data(start_date=None, end_date=None):
                           por responsável e mesa, ou None em caso de erro.
     """
     try:
-        # Define o escopo
+        # Define o escopo e o caminho para o arquivo de credenciais
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        
-        # ---- Obter credenciais do Streamlit Secrets ----
-        try:
-            # Assumindo que o segredo se chama "gcp_service_account" e contém o JSON como um dicionário
-            # Se o segredo for uma string JSON, use json.loads(st.secrets["gcp_service_account"])
-            creds_dict = st.secrets["gcp_service_account"] 
-            creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=scope)
-            client = gspread.authorize(creds)
-            print("[INFO] Credenciais do Google Cloud carregadas via st.secrets.")
-        except KeyError:
-            st.error("Erro: Segredo 'gcp_service_account' não encontrado nas configurações do Streamlit.")
-            print("[ERRO] Segredo 'gcp_service_account' não encontrado em st.secrets.")
-            return None
-        except Exception as e:
-            st.error(f"Erro ao carregar/autorizar credenciais do Google via st.secrets: {e}")
-            print(f"[ERRO] Falha ao carregar/autorizar credenciais do Google via st.secrets: {e}")
-            return None
-        # ---- Fim da obtenção de credenciais ----
+        # O caminho precisa ser relativo à raiz do projeto onde o script será executado (main.py)
+        creds_path = os.path.join('views', 'cartorio_new', 'chaves', 'leitura-planilhas-459604-84a6f83793a3.json')
+
+        if not os.path.exists(creds_path):
+            print(f"Erro: Arquivo de credenciais não encontrado em {creds_path}")
+            # Tenta caminho alternativo relativo ao script atual (menos ideal)
+            alt_creds_path = os.path.join(os.path.dirname(__file__), '..', 'views', 'cartorio_new', 'chaves', 'leitura-planilhas-459604-84a6f83793a3.json')
+            if os.path.exists(alt_creds_path):
+                 creds_path = alt_creds_path
+                 print(f"Usando caminho alternativo: {creds_path}")
+            else:
+                print(f"Erro: Arquivo de credenciais também não encontrado em {alt_creds_path}")
+                return None
+
+        creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+        client = gspread.authorize(creds)
 
         # Abre a planilha pelo URL fornecido
         sheet_url = "https://docs.google.com/spreadsheets/d/1mOQY1Rc22KnjJDlB054G0ZvWV_l5v5SIRoMBJllRZQ0/edit#gid=0"

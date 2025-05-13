@@ -8,7 +8,6 @@ import gspread
 from google.oauth2 import service_account
 import os
 import traceback
-import json
 
 def show_higienizacao_checklist():
     """
@@ -34,47 +33,38 @@ def show_higienizacao_checklist():
     def load_data():
         # Configurar credenciais e acessar a planilha
         try:
-            # ---- Obter credenciais do Streamlit Secrets ----
+            # Caminho para o arquivo de credenciais
+            credentials_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 
+                                        "views", "cartorio_new", "chaves", "leitura-planilhas-459604-84a6f83793a3.json")
+            
+            # Verificar se o arquivo de credenciais existe
+            if not os.path.exists(credentials_path):
+                st.error(f"Arquivo de credenciais não encontrado")
+                return pd.DataFrame()
+            
+            # Configurar credenciais
             try:
-                # Tenta carregar como dicionário primeiro (melhor prática)
-                creds_info = st.secrets["gcp_service_account"]
-                if isinstance(creds_info, str):
-                    # Se for string, tenta decodificar como JSON
-                    try:
-                        creds_info = json.loads(creds_info)
-                        print("[INFO] Credenciais do Google Cloud carregadas via st.secrets (string JSON decodificada).")
-                    except json.JSONDecodeError:
-                        st.error("Erro: O segredo 'gcp_service_account' é uma string, mas não é um JSON válido.")
-                        print("[ERRO] Segredo 'gcp_service_account' não é JSON válido.")
-                        return pd.DataFrame()
-                else:
-                    print("[INFO] Credenciais do Google Cloud carregadas via st.secrets (dicionário).")
-                
-                scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-                credentials = service_account.Credentials.from_service_account_info(creds_info, scopes=scope)
-                gc = gspread.authorize(credentials)
-                
-            except KeyError:
-                st.error("Erro: Segredo 'gcp_service_account' não encontrado nas configurações do Streamlit.")
-                print("[ERRO] Segredo 'gcp_service_account' não encontrado em st.secrets.")
-                return pd.DataFrame()
+                credentials = service_account.Credentials.from_service_account_file(
+                    credentials_path,
+                    scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+                )
             except Exception as e:
-                st.error(f"Erro ao carregar/autorizar credenciais do Google via st.secrets: {e}")
-                print(f"[ERRO] Falha ao carregar/autorizar credenciais do Google via st.secrets: {e}")
+                st.error(f"Erro ao configurar credenciais: {str(e)}")
                 return pd.DataFrame()
-            # ---- Fim da obtenção de credenciais ----
+            
+            # Criar cliente gspread
+            try:
+                gc = gspread.authorize(credentials)
+            except Exception as e:
+                st.error(f"Erro ao autorizar gspread: {str(e)}")
+                return pd.DataFrame()
             
             # Abrir a planilha por URL
             try:
                 sheet_url = "https://docs.google.com/spreadsheets/d/1mOQY1Rc22KnjJDlB054G0ZvWV_l5v5SIRoMBJllRZQ0"
                 sh = gc.open_by_url(sheet_url)
-            except gspread.exceptions.APIError as e:
-                st.error(f"Erro ao acessar a planilha: {e}. Verifique as permissões da conta de serviço.")
-                print(f"[ERRO] APIError ao abrir planilha: {e}")
-                return pd.DataFrame()
             except Exception as e:
                 st.error(f"Erro ao abrir planilha: {str(e)}")
-                print(f"[ERRO] Erro genérico ao abrir planilha: {str(e)}")
                 return pd.DataFrame()
             
             # Selecionar a primeira aba (índice 0)
