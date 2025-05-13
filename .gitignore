@@ -92,4 +92,9 @@ Thumbs.db
 # Arquivos de build
 dist/
 build/
-*.egg-info/ 
+*.egg-info/
+
+# Google Cloud Service Account Keys
+views/cartorio_new/chaves/*.json
+*.pem
+*-key.json 
