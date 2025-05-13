@@ -1,8 +1,10 @@
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import os
 from datetime import datetime
+
+# Importar a função de obter credenciais do helper
+from utils.secrets_helper import get_google_credentials
 
 def load_conclusao_data(start_date=None, end_date=None):
     """
@@ -18,24 +20,17 @@ def load_conclusao_data(start_date=None, end_date=None):
                           por responsável e mesa, ou None em caso de erro.
     """
     try:
-        # Define o escopo e o caminho para o arquivo de credenciais
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # O caminho precisa ser relativo à raiz do projeto onde o script será executado (main.py)
-        creds_path = os.path.join('views', 'cartorio_new', 'chaves', 'leitura-planilhas-459604-84a6f83793a3.json')
-
-        if not os.path.exists(creds_path):
-            print(f"Erro: Arquivo de credenciais não encontrado em {creds_path}")
-            # Tenta caminho alternativo relativo ao script atual (menos ideal)
-            alt_creds_path = os.path.join(os.path.dirname(__file__), '..', 'views', 'cartorio_new', 'chaves', 'leitura-planilhas-459604-84a6f83793a3.json')
-            if os.path.exists(alt_creds_path):
-                 creds_path = alt_creds_path
-                 print(f"Usando caminho alternativo: {creds_path}")
-            else:
-                print(f"Erro: Arquivo de credenciais também não encontrado em {alt_creds_path}")
+        # Obter credenciais usando o helper
+        try:
+            credentials = get_google_credentials()
+            if credentials is None:
+                print("Erro: Não foi possível obter as credenciais do Google via helper.")
                 return None
+        except Exception as e:
+            print(f"Erro ao obter credenciais via helper: {str(e)}")
+            return None
 
-        creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
-        client = gspread.authorize(creds)
+        client = gspread.authorize(credentials)
 
         # Abre a planilha pelo URL fornecido
         sheet_url = "https://docs.google.com/spreadsheets/d/1mOQY1Rc22KnjJDlB054G0ZvWV_l5v5SIRoMBJllRZQ0/edit#gid=0"
