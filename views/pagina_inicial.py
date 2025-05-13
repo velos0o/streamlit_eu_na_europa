@@ -199,6 +199,31 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
     # (Lógica de processamento de emissões, agora incluindo a posição na árvore)
     requerentes_data_list_of_dicts = []
     processamento_emissoes_ok = False
+    # Mapeamento de STAGE_NAME (normalizado para maiúsculas) para Categoria do Relatório
+    # Esta definição é crucial e será usada na nova lógica de resumo.
+    map_stage_to_relatorio = {
+        # Brasileiras Pendências
+        "AGUARDANDO CERTIDÃO": "Brasileiras Pendências",
+        "BUSCA - CRC": "Brasileiras Pendências",
+        "DEVOLUTIVA BUSCA - CRC": "Brasileiras Pendências",
+        "APENAS ASS. REQ CLIENTE P/MONTAGEMA": "Brasileiras Pendências",
+        "MONTAGEM REQUERIMENTO CARTÓRIO": "Brasileiras Pendências",
+        "SOLICITAR CARTÓRIO DE ORIGEM": "Brasileiras Pendências",
+        "SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE": "Brasileiras Pendências",
+        "DEVOLUÇÃO ADM": "Brasileiras Pendências",
+        "DEVOLVIDO REQUERIMENTO": "Brasileiras Pendências",
+        # Brasileiras Pesquisas
+        "PESQUISA - BR": "Brasileiras Pesquisas",
+        # Brasileiras Solicitadas
+        "AGUARDANDO CARTÓRIO ORIGEM": "Brasileiras Solicitadas",
+        # Pasta C/Emissão Concluída
+        "CERTIDÃO EMITIDA": "Pasta C/Emissão Concluída",
+        "CERTIDÃO ENTREGUE": "Pasta C/Emissão Concluída",
+        # Brasileiras Dispensada (Usado para filtrar df_emissoes_ativas, não diretamente no resumo_status_categorias)
+        "SOLICITAÇÃO DUPLICADA": "Brasileiras Dispensada",
+        "CANCELADO": "Brasileiras Dispensada"
+    }
+
     if emissoes_df is not None and not emissoes_df.empty:
         col_stage_para_simplificar = None
         if 'STAGE_ID' in emissoes_df.columns: col_stage_para_simplificar = 'STAGE_ID'
@@ -207,6 +232,12 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
             try:
                 emissoes_df['STAGE_NAME_LEGIVEL'] = emissoes_df[col_stage_para_simplificar].apply(simplificar_nome_estagio)
                 processamento_emissoes_ok = True
+                # DEBUG ADICIONADO
+                print("\n[DEBUG ANTES DO LOOP DE REQUERENTES] Primeiras 20 linhas de emissoes_df com STAGE_NAME_LEGIVEL:")
+                if not emissoes_df.empty and col_stage_para_simplificar in emissoes_df.columns :
+                    print(emissoes_df[['TITLE', 'UF_CRM_34_TIPO_DE_CERTIDAO', col_stage_para_simplificar, 'STAGE_NAME_LEGIVEL']].head(20))
+                else:
+                    print("[DEBUG ANTES DO LOOP DE REQUERENTES] emissoes_df vazio ou coluna de stage ausente.")
             except Exception: emissoes_df['STAGE_NAME_LEGIVEL'] = emissoes_df[col_stage_para_simplificar]; processamento_emissoes_ok = True
         else: processamento_emissoes_ok = False
         if processamento_emissoes_ok:
@@ -270,13 +301,11 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
         def ordem_posicao(item):
             posicao = item.get('Posição', '').upper()
             if posicao == 'ITALIANO': return 1
-            # Normalizar para "FAMILIAR", considerando que pode estar salvo como "FAMILIA" no banco
             elif posicao in ['FAMILIAR', 'FAMILIA']: 
-                # Normalizar a exibição para FAMILIAR
                 item['Posição'] = 'FAMILIAR'
                 return 2
             elif posicao == 'REQUERENTE': return 3
-            else: return 4  # Outros casos ficam por último
+            else: return 4
         
         requerentes_data_list_of_dicts.sort(key=ordem_posicao)
 
@@ -284,46 +313,36 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
     html_ficha_completa += "<div class='ficha-secao dados-consolidado-tabela-secao'>"
     html_ficha_completa += "<table class='ficha-info-tabela' style='width:100%; border-collapse:collapse; border:1px solid #ddd;'>"
     
-    # Estilo comum para todas as células
     td_style = "border:1px solid #ddd; padding:8px;"
     td_label_style = f"{td_style} color:#0070F2; font-weight:bold; width:20%;"
     td_data_style = f"{td_style} width:30%;"
     
-    # Dados Principais (sem título explícito de seção, mas topo da ficha)
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Nome da Família:</td><td style='{td_data_style}'>{nome_familia}</td><td style='{td_label_style}'>ID da Família:</td><td style='{td_data_style}'>{id_familia}</td></tr>"
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Data de Venda:</td><td style='{td_data_style}'>{data_venda}</td><td style='{td_label_style}'>ADM Responsável:</td><td style='{td_data_style}'>{adm_responsavel}</td></tr>"
 
-    # Seção PROCURAÇÃO - Título atua como divisor
     html_ficha_completa += f"<tr><td colspan='4' class='td-titulo-secao' style='background-color:#e0e0e0; border:1px solid #ddd; padding:8px;'><h4 class='ficha-sub-titulo titulo-secao-ficha' style='color:#0070F2; text-align:center; margin:5px 0;'>PROCURAÇÃO</h4></td></tr>"
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Detalhes Procuração:</td><td colspan='3' style='{td_style}'>{procuracao_detalhes}</td></tr>" 
 
-    # Seção COMUNE - Título atua como divisor
     html_ficha_completa += f"<tr><td colspan='4' class='td-titulo-secao' style='background-color:#e0e0e0; border:1px solid #ddd; padding:8px;'><h4 class='ficha-sub-titulo titulo-secao-ficha' style='color:#0070F2; text-align:center; margin:5px 0;'>COMUNE</h4></td></tr>"
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Etapa Comune:</td><td style='{td_data_style}'>{etapa_comune}</td><td style='{td_label_style}'>Data Solicitação Comune:</td><td style='{td_data_style}'>{data_solicitacao_comune}</td></tr>"
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Prazo Comune:</td><td style='{td_data_style}'>{prazo_comune}</td><td style='{td_label_style}'></td><td style='{td_data_style}'></td></tr>"
 
-    # Seção DOCUMENTAÇÃO E SERVIÇOS - Título atua como divisor
     html_ficha_completa += f"<tr><td colspan='4' class='td-titulo-secao' style='background-color:#e0e0e0; border:1px solid #ddd; padding:8px;'><h4 class='ficha-sub-titulo titulo-secao-ficha' style='color:#0070F2; text-align:center; margin:5px 0;'>DOCUMENTAÇÃO E SERVIÇOS</h4></td></tr>"
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Análise Documental:</td><td style='{td_data_style}'>{analise_doc}</td><td style='{td_label_style}'>Tradução:</td><td style='{td_data_style}'>{traducao}</td></tr>"
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Apostilamento:</td><td style='{td_data_style}'>{apostilamento}</td><td style='{td_label_style}'>Drive:</td><td style='{td_data_style}'>{drive_display}</td></tr>"
 
-    # Seção DETALHES - Título atua como divisor
     html_ficha_completa += f"<tr><td colspan='4' class='td-titulo-secao' style='background-color:#e0e0e0; border:1px solid #ddd; padding:8px;'><h4 class='ficha-sub-titulo titulo-secao-ficha' style='color:#0070F2; text-align:center; margin:5px 0;'>DETALHES</h4></td></tr>"
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Qnt. Familiares:</td><td style='{td_data_style}'>{qnt_familiares}</td><td style='{td_label_style}'>Qnt. Requerentes:</td><td style='{td_data_style}'>{qnt_requerentes}</td></tr>"
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Emissões (Status Geral):</td><td style='{td_data_style}'>{emissoes_status_geral}</td><td style='{td_label_style}'></td><td style='{td_data_style}'></td></tr>"
 
-    # Seção STATUS EMISSÕES BRASILEIRAS (CARTÓRIOS - SPA 1098) - Título atua como divisor
     html_ficha_completa += f"<tr><td colspan='4' class='td-titulo-secao' style='background-color:#e0e0e0; border:1px solid #ddd; padding:8px;'><h4 class='ficha-sub-titulo titulo-secao-ficha' style='color:#0070F2; text-align:center; margin:5px 0;'>STATUS EMISSÕES BRASILEIRAS</h4></td></tr>"
     
-    # Definir estilo para célula vazia na mensagem de ausência de emissões
     empty_cell_style = "text-align:center; border:1px solid #ddd; padding:8px; font-style:italic; color:#666;"
     
     if processamento_emissoes_ok and requerentes_data_list_of_dicts:
-        # Tabela interna para as emissões (dentro de uma única célula que ocupa toda a largura)
         html_ficha_completa += f"<tr><td colspan='4' style='padding:0; border:0;'>"
         html_ficha_completa += "<table style='width:100%; border-collapse:collapse; border:1px solid #ddd;'>"
         
-        # Cabeçalho da tabela de emissões
         html_ficha_completa += "<tr class='emissoes-header-row'>"
         html_ficha_completa += "<th style='color:#0070F2; width:15%; text-align:center; border:1px solid #ddd; padding:8px; background-color:#f5f5f5;'>Posição</th>"
         html_ficha_completa += "<th style='color:#0070F2; width:25%; text-align:center; border:1px solid #ddd; padding:8px; background-color:#f5f5f5;'>Requerente</th>"
@@ -332,20 +351,6 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
         html_ficha_completa += "<th style='color:#0070F2; width:20%; text-align:center; border:1px solid #ddd; padding:8px; background-color:#f5f5f5;'>Óbito</th>"
         html_ficha_completa += "</tr>"
         
-        # Inicializar contadores para o resumo
-        resumo_status = {
-            'EMITIDA': 0,
-            'CERTIDÃO ENTREGUE': 0,
-            'PESQUISA BR': 0, 
-            'DEVOLUÇÃO ADM': 0,
-            'MONTAGEM REQUERIMENTO': 0,
-            'AGUARDANDO CARTÓRIO DE ORIGEM': 0,
-            'SOLICITAR CARTÓRIO DE ORIGEM': 0,
-            'OUTROS': 0
-        }
-        total_certidoes = 0
-        
-        # Linhas de dados
         for req_data in requerentes_data_list_of_dicts:
             html_ficha_completa += "<tr class='emissoes-data-row'>"
             html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{req_data['Posição']}</td>"
@@ -354,58 +359,80 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
             html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{req_data['Casamento']}</td>"
             html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{req_data['Óbito']}</td>"
             html_ficha_completa += "</tr>"
-            
-            # Contabilizar status para resumo
-            for tipo_cert in ['Nascimento', 'Casamento', 'Óbito']:
-                status = req_data.get(tipo_cert, 'Dispensado')
-                if status != 'Dispensado':
-                    total_certidoes += 1
-                    status_upper = status.upper()
-                    if 'EMITIDA' in status_upper:
-                        resumo_status['EMITIDA'] += 1
-                    elif 'CERTIDÃO ENTREGUE' in status_upper or 'CERTIDAO ENTREGUE' in status_upper:
-                        resumo_status['CERTIDÃO ENTREGUE'] += 1
-                    elif 'PESQUISA' in status_upper and 'BR' in status_upper:
-                        resumo_status['PESQUISA BR'] += 1
-                    elif 'DEVOLUÇÃO ADM' in status_upper or 'DEVOLUCAO ADM' in status_upper:
-                        resumo_status['DEVOLUÇÃO ADM'] += 1
-                    elif 'MONTAGEM' in status_upper or 'REQUERIMENTO' in status_upper:
-                        resumo_status['MONTAGEM REQUERIMENTO'] += 1
-                    elif 'AGUARDANDO' in status_upper and 'CARTÓRIO' in status_upper:
-                        resumo_status['AGUARDANDO CARTÓRIO DE ORIGEM'] += 1
-                    elif 'SOLICITAR' in status_upper and 'CARTÓRIO' in status_upper:
-                        resumo_status['SOLICITAR CARTÓRIO DE ORIGEM'] += 1
-                    else:
-                        resumo_status['OUTROS'] += 1
-            
+        
         html_ficha_completa += "</table>"
         html_ficha_completa += "</td></tr>"
         
-        # Adicionar seção de resumo após a listagem detalhada
+        # --- NOVA LÓGICA PARA POPULAR resumo_status_categorias --- 
+        # 1. Definir df_emissoes_ativas (usando emissoes_df que é o df_emissoes_filtradas com STAGE_NAME_LEGIVEL)
+        df_emissoes_ativas = pd.DataFrame() 
+        total_certidoes_reais_para_exibicao = 0
+
+        if emissoes_df is not None and not emissoes_df.empty and 'STAGE_NAME_LEGIVEL' in emissoes_df.columns:
+            status_de_dispensa_reais = ["SOLICITAÇÃO DUPLICADA", "CANCELADO"] # Status que indicam dispensa real
+            # Garante que estamos comparando strings com strings e lidando com NaNs em STAGE_NAME_LEGIVEL
+            emissoes_df_valid_stages = emissoes_df[pd.notna(emissoes_df['STAGE_NAME_LEGIVEL'])].copy()
+            emissoes_df_valid_stages['STAGE_NAME_LEGIVEL_UPPER'] = emissoes_df_valid_stages['STAGE_NAME_LEGIVEL'].astype(str).str.upper()
+            
+            df_emissoes_ativas = emissoes_df_valid_stages[
+                ~emissoes_df_valid_stages['STAGE_NAME_LEGIVEL_UPPER'].isin(status_de_dispensa_reais)
+            ].copy()
+            total_certidoes_reais_para_exibicao = len(df_emissoes_ativas)
+
+        elif emissoes_df is not None and not emissoes_df.empty: # Fallback se STAGE_NAME_LEGIVEL não existir ou for problemático
+            df_emissoes_ativas = emissoes_df.copy() 
+            total_certidoes_reais_para_exibicao = len(df_emissoes_ativas)
+
+        # 2. Reinicializar e popular resumo_status_categorias com base em df_emissoes_ativas
+        # Usando o map_stage_to_relatorio definido anteriormente
+        resumo_status_categorias_temp = { # Renomeado para evitar conflito de escopo se existir antes
+            'Brasileiras Pendências': 0,
+            'Brasileiras Pesquisas': 0,
+            'Brasileiras Solicitadas': 0,
+            'Pasta C/Emissão Concluída': 0,
+            # 'Brasileiras Dispensada': 0, # Não incluímos aqui, pois df_emissoes_ativas já as exclui
+            'Outros': 0
+        }
+
+        if not df_emissoes_ativas.empty:
+            for _idx, certidao_ativa_row in df_emissoes_ativas.iterrows():
+                status_legivel = certidao_ativa_row['STAGE_NAME_LEGIVEL']
+                categoria_para_resumo = 'Outros' # Default
+                if pd.notna(status_legivel) and str(status_legivel).strip() != "":
+                    status_legivel_upper = str(status_legivel).upper()
+                    categoria_para_resumo = map_stage_to_relatorio.get(status_legivel_upper, 'Outros')
+                
+                if categoria_para_resumo in resumo_status_categorias_temp:
+                    resumo_status_categorias_temp[categoria_para_resumo] += 1
+                else:
+                    # Se a categoria do mapa (ex: "Brasileiras Dispensada") não estiver em resumo_status_categorias_temp,
+                    # ela será contada como 'Outros'. Isso é correto, pois estamos contando apenas ativas.
+                    resumo_status_categorias_temp['Outros'] += 1
+        
+        # Atribuir o resultado calculado ao nome da variável que o HTML do resumo espera
+        resumo_status_categorias = resumo_status_categorias_temp
+        # --- FIM DA NOVA LÓGICA --- 
+
         html_ficha_completa += f"<tr><td colspan='4' class='td-titulo-secao' style='background-color:#e0e0e0; border:1px solid #ddd; padding:8px;'><h4 class='ficha-sub-titulo titulo-secao-ficha' style='color:#0070F2; text-align:center; margin:5px 0;'>RESUMO EMISSÕES</h4></td></tr>"
         
-        # Tabela de resumo
         html_ficha_completa += f"<tr><td colspan='4' style='padding:0; border:0;'>"
         html_ficha_completa += "<table style='width:100%; border-collapse:collapse; border:1px solid #ddd;'>"
         
-        # Cabeçalho da tabela de resumo
         html_ficha_completa += "<tr class='resumo-header-row'>"
         html_ficha_completa += "<th style='color:#0070F2; width:30%; text-align:center; border:1px solid #ddd; padding:8px; background-color:#f5f5f5;'>Status</th>"
         html_ficha_completa += "<th style='color:#0070F2; width:20%; text-align:center; border:1px solid #ddd; padding:8px; background-color:#f5f5f5;'>Quantidade</th>"
         html_ficha_completa += "</tr>"
         
-        # Linhas de dados do resumo
-        for status, quantidade in resumo_status.items():
-            if quantidade > 0 or status == 'OUTROS':  # Mostrar apenas status não vazios e 'OUTROS' mesmo se zero
+        for status, quantidade in resumo_status_categorias.items():
+            if quantidade > 0 or status == 'Outros': 
                 html_ficha_completa += "<tr class='resumo-data-row'>"
                 html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px; font-weight:bold;'>{status}</td>"
                 html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{quantidade}</td>"
                 html_ficha_completa += "</tr>"
         
-        # Linha de total
         html_ficha_completa += "<tr class='resumo-total-row' style='background-color:#f0f0f0;'>"
         html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px; font-weight:bold;'>TOTAL</td>"
-        html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px; font-weight:bold;'>{total_certidoes}</td>"
+        html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px; font-weight:bold;'>{total_certidoes_reais_para_exibicao}</td>"
         html_ficha_completa += "</tr>"
         
         html_ficha_completa += "</table>"
@@ -620,6 +647,8 @@ def show_pagina_inicial():
                         if familia_selecionada_option != "Selecione...":
                             # Extrair o ID da família da opção selecionada
                             id_familia_selecionada = familia_selecionada_option.split(" - ")[0]
+                            # DEBUG ADICIONADO
+                            print(f"[DEBUG FILTRO EMISSOES] ID da Família Selecionada para filtrar emissões: '{id_familia_selecionada}' (Tipo: {type(id_familia_selecionada)})")
                             
                             # Obter os dados da família selecionada
                             familia_selecionada_data = resultados_busca_df[
@@ -635,6 +664,16 @@ def show_pagina_inicial():
                                 df_emissoes_filtradas = df_cartorio_completo[
                                     df_cartorio_completo[campo_ligacao_emissoes] == id_familia_selecionada
                                 ].copy()
+                            # DEBUG ADICIONADO
+                            print(f"[DEBUG FILTRO EMISSOES] Número de emissões encontradas para a família ID '{id_familia_selecionada}': {len(df_emissoes_filtradas)}")
+                            if not df_emissoes_filtradas.empty:
+                                print("[DEBUG FILTRO EMISSOES] Primeiras 5 emissões filtradas (colunas relevantes):")
+                                print(df_emissoes_filtradas[['TITLE', 'UF_CRM_34_ID_REQUERENTE', 'STAGE_ID', 'UF_CRM_34_ID_FAMILIA']].head())
+                            else:
+                                print(f"[DEBUG FILTRO EMISSOES] Nenhuma emissão encontrada para o ID de família '{id_familia_selecionada}'. Verifique se este ID existe na coluna 'UF_CRM_34_ID_FAMILIA' do df_cartorio_completo.")
+                                if df_cartorio_completo is not None and not df_cartorio_completo.empty and 'UF_CRM_34_ID_FAMILIA' in df_cartorio_completo.columns:
+                                    print("[DEBUG FILTRO EMISSOES] Alguns IDs de família presentes em df_cartorio_completo['UF_CRM_34_ID_FAMILIA']:")
+                                    print(df_cartorio_completo['UF_CRM_34_ID_FAMILIA'].unique()[:20]) # Mostra até 20 IDs únicos
                             
                             st.success(f"Família selecionada: {familia_selecionada_data.get(campo_busca_familia_principal, '')}")
                 else:

@@ -151,40 +151,43 @@ def exibir_higienizacao_desempenho():
     """, unsafe_allow_html=True)
     st.markdown("--- ") # Separador antes da tabela principal
 
-    # --- Mapeamento de Estágios Bitrix --- 
+    # --- Mapeamento de Estágios Bitrix ---
     mapeamento_stages = {
-        # Casa Verde (92)
+        # CASA VERDE (Funil DT1098_92)
         'DT1098_92:NEW': 'Brasileiras Pendências',
         'DT1098_92:UC_P6PYHW': 'Brasileiras Pesquisas',
-        'DT1098_92:PREPARATION': 'Brasileiras Pendências',
-        'DT1098_92:UC_XBTHZ7': 'Brasileiras Pendências',
-        'DT1098_92:CLIENT': 'Brasileiras Pendências',
-        'DT1098_92:UC_ZWO7BI': 'Brasileiras Pendências',
-        'DT1098_92:UC_83ZGKS': 'Brasileiras Pendências',
-        'DT1098_92:UC_6TECYL': 'Brasileiras Pendências',
-        'DT1098_92:UC_MUJP1P': 'Brasileiras Solicitadas',
-        'DT1098_92:UC_EYBGVD': 'Brasileiras Pendências',
-        'DT1098_92:UC_KC335Q': 'Brasileiras Pendências',
-        'DT1098_92:UC_5LWUTX': 'Pasta C/Emissão Concluída',
-        'DT1098_92:FAIL': 'Brasileiras Dispensada',
-        'DT1098_92:UC_Z24IF7': 'Brasileiras Dispensada',
-        'DT1098_92:SUCCESS': 'Pasta C/Emissão Concluída',
-        # Tatuapé (94)
+        'DT1098_92:PREPARATION': 'Brasileiras Pendências', # BUSCA - CRC
+        'DT1098_92:UC_XBTHZ7': 'Brasileiras Pendências', # DEVOLUTIVA BUSCA - CRC
+        'DT1098_92:CLIENT': 'Brasileiras Pendências', # APENAS ASS. REQ CLIENTE P/MONTAGEMA
+        'DT1098_92:UC_ZWO7BI': 'Brasileiras Pendências', # MONTAGEM REQUERIMENTO CARTÓRIO
+        'DT1098_92:UC_83ZGKS': 'Brasileiras Pendências', # SOLICITAR CARTÓRIO DE ORIGEM
+        'DT1098_92:UC_6TECYL': 'Brasileiras Pendências', # SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE
+        'DT1098_92:UC_MUJP1P': 'Brasileiras Solicitadas', # AGUARDANDO CARTÓRIO ORIGEM
+        'DT1098_92:UC_EYBGVD': 'Brasileiras Pendências', # DEVOLUÇÃO ADM
+        'DT1098_92:UC_KC335Q': 'Brasileiras Pendências', # DEVOLVIDO REQUERIMENTO
+        'DT1098_92:UC_5LWUTX': 'Brasileiras Emitida', # CERTIDÃO EMITIDA
+        'DT1098_92:FAIL': 'Brasileiras Dispensada', # SOLICITAÇÃO DUPLICADA
+        'DT1098_92:UC_Z24IF7': 'Brasileiras Dispensada', # CANCELADO
+        'DT1098_92:UC_U10R0R': 'Brasileiras Dispensada', # CERTIDÃO DISPENSADA (NOVO)
+        'DT1098_92:SUCCESS': 'Brasileiras Emitida', # CERTIDÃO ENTREGUE
+
+        # TATUAPÉ (Funil DT1098_94)
         'DT1098_94:NEW': 'Brasileiras Pendências',
         'DT1098_94:UC_4YE2PI': 'Brasileiras Pesquisas',
-        'DT1098_94:PREPARATION': 'Brasileiras Pendências',
-        'DT1098_94:CLIENT': 'Brasileiras Pendências',
-        'DT1098_94:UC_IQ4WFA': 'Brasileiras Pendências',
-        'DT1098_94:UC_UZHXWF': 'Brasileiras Pendências',
-        'DT1098_94:UC_DH38EI': 'Brasileiras Pendências',
-        'DT1098_94:UC_X9UE60': 'Brasileiras Pendências',
-        'DT1098_94:UC_IXCAA5': 'Brasileiras Solicitadas',
-        'DT1098_94:UC_VS8YKI': 'Brasileiras Pendências',
-        'DT1098_94:UC_M6A09E': 'Brasileiras Pendências',
-        'DT1098_94:UC_K4JS04': 'Pasta C/Emissão Concluída',
-        'DT1098_94:FAIL': 'Brasileiras Dispensada',
-        'DT1098_94:UC_MGTPX0': 'Brasileiras Dispensada',
-        'DT1098_94:SUCCESS': 'Pasta C/Emissão Concluída'
+        'DT1098_94:PREPARATION': 'Brasileiras Pendências', # BUSCA - CRC
+        'DT1098_94:CLIENT': 'Brasileiras Pendências', # DEVOLUTIVA BUSCA - CRC (Mapeado para o stage name, não o que está na tabela do usuário, verificar) -> CORRIGIDO: APENAS ASS. REQ CLIENTE P/MONTAGEMA
+        'DT1098_94:UC_IQ4WFA': 'Brasileiras Pendências', # APENAS ASS. REQ CLIENTE P/MONTAGEMA (Estava como CLIENT, corrigido)
+        'DT1098_94:UC_UZHXWF': 'Brasileiras Pendências', # MONTAGEM REQUERIMENTO CARTÓRIO
+        'DT1098_94:UC_DH38EI': 'Brasileiras Pendências', # SOLICITAR CARTÓRIO DE ORIGEM
+        'DT1098_94:UC_X9UE60': 'Brasileiras Pendências', # SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE
+        'DT1098_94:UC_IXCAA5': 'Brasileiras Solicitadas', # AGUARDANDO CARTÓRIO ORIGEM
+        'DT1098_94:UC_VS8YKI': 'Brasileiras Pendências', # DEVOLUÇÃO ADM
+        'DT1098_94:UC_M6A09E': 'Brasileiras Pendências', # DEVOLVIDO REQUERIMENTO
+        'DT1098_94:UC_K4JS04': 'Brasileiras Emitida', # CERTIDÃO EMITIDA
+        'DT1098_94:FAIL': 'Brasileiras Dispensada', # SOLICITAÇÃO DUPLICADA
+        'DT1098_94:UC_MGTPX0': 'Brasileiras Dispensada', # CANCELADO
+        'DT1098_94:UC_L3JFKO': 'Brasileiras Dispensada', # CERTIDÃO DISPENSADA (NOVO)
+        'DT1098_94:SUCCESS': 'Brasileiras Emitida' # CERTIDÃO ENTREGUE
     }
     col_id_familia_bitrix = 'UF_CRM_34_ID_FAMILIA'
 
@@ -193,22 +196,64 @@ def exibir_higienizacao_desempenho():
         df_cartorio['CATEGORIA_EMISSAO'] = df_cartorio['STAGE_ID'].map(mapeamento_stages).fillna('Categoria Desconhecida')
         # Contar as ocorrências de cada categoria por família
         df_bitrix_agg = pd.crosstab(df_cartorio[col_id_familia_bitrix], df_cartorio['CATEGORIA_EMISSAO'])
+        
         # Renomear colunas para evitar conflitos e garantir nomes desejados
-        novas_colunas_bitrix = [
+        # 'Pasta C/Emissão Concluída' será calculada depois.
+        categorias_bitrix_contagem = [
             'Brasileiras Pendências', 'Brasileiras Pesquisas', 'Brasileiras Solicitadas',
-            'Brasileiras Emitidas', 'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
+            'Brasileiras Emitida', 'Brasileiras Dispensada'
+            # 'Categoria Desconhecida' será somada a pendências ou tratada à parte se necessário
         ]
-        # Adicionar colunas faltantes com 0
-        for col in novas_colunas_bitrix:
+        # Adicionar colunas faltantes com 0 nas contagens
+        for col in categorias_bitrix_contagem:
             if col not in df_bitrix_agg.columns:
                  df_bitrix_agg[col] = 0
-        df_bitrix_agg = df_bitrix_agg[novas_colunas_bitrix] # Garantir ordem e seleção
+        
+        # Se houver 'Categoria Desconhecida', somar a 'Brasileiras Pendências' ou tratar
+        if 'Categoria Desconhecida' in df_bitrix_agg.columns:
+            if 'Brasileiras Pendências' in df_bitrix_agg.columns:
+                df_bitrix_agg['Brasileiras Pendências'] += df_bitrix_agg['Categoria Desconhecida']
+            else:
+                df_bitrix_agg['Brasileiras Pendências'] = df_bitrix_agg['Categoria Desconhecida']
+            df_bitrix_agg = df_bitrix_agg.drop(columns=['Categoria Desconhecida'], errors='ignore')
+
+        df_bitrix_agg = df_bitrix_agg.reindex(columns=categorias_bitrix_contagem, fill_value=0) # Garantir ordem e seleção
+        
+        # Calcular 'Pasta C/Emissão Concluída'
+        # Total de certidões ativas = Pendentes + Pesquisas + Solicitadas + Emitidas
+        df_bitrix_agg['TOTAL_ATIVAS'] = df_bitrix_agg['Brasileiras Pendências'] + \
+                                        df_bitrix_agg['Brasileiras Pesquisas'] + \
+                                        df_bitrix_agg['Brasileiras Solicitadas'] + \
+                                        df_bitrix_agg['Brasileiras Emitida']
+        
+        # 'Pasta C/Emissão Concluída' é 1 se TOTAL_ATIVAS > 0 e TOTAL_ATIVAS == Brasileiras Emitida
+        df_bitrix_agg['Pasta C/Emissão Concluída'] = np.where(
+            (df_bitrix_agg['TOTAL_ATIVAS'] > 0) & (df_bitrix_agg['TOTAL_ATIVAS'] == df_bitrix_agg['Brasileiras Emitida']),
+            1,
+            0
+        )
+        df_bitrix_agg = df_bitrix_agg.drop(columns=['TOTAL_ATIVAS']) # Remover coluna auxiliar
         df_bitrix_agg = df_bitrix_agg.reset_index() # Transformar índice (id_familia) em coluna
+        
+        # Definir a lista final de colunas esperadas do Bitrix após o cálculo
+        novas_colunas_bitrix = [
+            'Brasileiras Pendências', 'Brasileiras Pesquisas', 'Brasileiras Solicitadas',
+            'Brasileiras Emitida', 'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
+        ]
+
     else:
         st.info("Não foi possível agregar dados de emissão do Bitrix.")
         # Criar DataFrame vazio com as colunas esperadas para o merge
-        colunas_esperadas_bitrix = [col_id_familia_bitrix] + novas_colunas_bitrix
-        df_bitrix_agg = pd.DataFrame(columns=colunas_esperadas_bitrix)
+        colunas_esperadas_bitrix_vazio = [col_id_familia_bitrix] + [
+            'Brasileiras Pendências', 'Brasileiras Pesquisas', 'Brasileiras Solicitadas',
+            'Brasileiras Emitida', 'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
+        ]
+        df_bitrix_agg = pd.DataFrame(columns=colunas_esperadas_bitrix_vazio)
+        # Definir 'novas_colunas_bitrix' mesmo no else para consistência
+        novas_colunas_bitrix = [
+            'Brasileiras Pendências', 'Brasileiras Pesquisas', 'Brasileiras Solicitadas',
+            'Brasileiras Emitida', 'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
+        ]
 
     # --- Merge: Planilha + Dados Bitrix Agregados --- 
     df_merged = pd.merge(
@@ -245,7 +290,7 @@ def exibir_higienizacao_desempenho():
         'Brasileiras Pendências': 'sum',
         'Brasileiras Pesquisas': 'sum',
         'Brasileiras Solicitadas': 'sum',
-        'Brasileiras Emitidas': 'sum',
+        'Brasileiras Emitida': 'sum',
         'Pasta C/Emissão Concluída': 'sum',
         'Brasileiras Dispensada': 'sum'
     }
@@ -274,7 +319,7 @@ def exibir_higienizacao_desempenho():
     colunas_contagem_todas = [
         'HIGINIZAÇÃO COM ÊXITO', 'HIGINIZAÇÃO INCOMPLETA', 'HIGINIZAÇÃO TRATADAS',
         'Brasileiras Pendências', 'Brasileiras Pesquisas', 'Brasileiras Solicitadas',
-        'Brasileiras Emitidas', 'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
+        'Brasileiras Emitida', 'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
     ]
     for col in colunas_contagem_todas:
          if col in df_final.columns: # Verifica se a coluna existe antes de preencher
@@ -288,7 +333,7 @@ def exibir_higienizacao_desempenho():
         'HIGINIZAÇÃO COM ÊXITO', 'HIGINIZAÇÃO INCOMPLETA', 'HIGINIZAÇÃO TRATADAS',
         # Novas colunas
         'Brasileiras Pendências', 'Brasileiras Pesquisas', 'Brasileiras Solicitadas',
-        'Brasileiras Emitidas', 'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
+        'Brasileiras Emitida', 'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
     ]
     df_final = df_final[ordem_colunas]
 
