@@ -15,23 +15,25 @@ def get_google_credentials():
     """
     try:
         # Verificar se há secrets configurados no Streamlit
-        if "google" in st.secrets and "sheets" in st.secrets["google"]:
+        if "gcp_service_account" in st.secrets:
             # Criar dicionário de credenciais a partir dos secrets
             credentials_dict = {
-                "type": st.secrets["google"]["sheets"]["type"],
-                "project_id": st.secrets["google"]["sheets"]["project_id"],
-                "private_key_id": st.secrets["google"]["sheets"]["private_key_id"],
-                "private_key": st.secrets["google"]["sheets"]["private_key"],
-                "client_email": st.secrets["google"]["sheets"]["client_email"],
-                "client_id": st.secrets["google"]["sheets"]["client_id"],
-                "auth_uri": st.secrets["google"]["sheets"]["auth_uri"],
-                "token_uri": st.secrets["google"]["sheets"]["token_uri"],
-                "auth_provider_x509_cert_url": st.secrets["google"]["sheets"]["auth_provider_x509_cert_url"],
-                "client_x509_cert_url": st.secrets["google"]["sheets"]["client_x509_cert_url"],
-                "universe_domain": st.secrets["google"]["sheets"]["universe_domain"] 
+                "type": st.secrets["gcp_service_account"]["type"],
+                "project_id": st.secrets["gcp_service_account"]["project_id"],
+                "private_key_id": st.secrets["gcp_service_account"]["private_key_id"],
+                "private_key": st.secrets["gcp_service_account"]["private_key"],
+                "client_email": st.secrets["gcp_service_account"]["client_email"],
+                "client_id": st.secrets["gcp_service_account"]["client_id"],
+                "auth_uri": st.secrets["gcp_service_account"]["auth_uri"],
+                "token_uri": st.secrets["gcp_service_account"]["token_uri"],
+                "auth_provider_x509_cert_url": st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
+                "client_x509_cert_url": st.secrets["gcp_service_account"]["client_x509_cert_url"]
+                # "universe_domain" pode ou não estar presente, adicionando condicionalmente
             }
+            if "universe_domain" in st.secrets["gcp_service_account"]:
+                credentials_dict["universe_domain"] = st.secrets["gcp_service_account"]["universe_domain"]
             
-            print("[INFO] Usando credenciais do Google armazenadas nos secrets do Streamlit")
+            print("[INFO] Usando credenciais do Google armazenadas nos secrets do Streamlit (via gcp_service_account)")
             return service_account.Credentials.from_service_account_info(credentials_dict)
         
         # Tentar encontrar arquivo de credenciais local (apenas para desenvolvimento)
