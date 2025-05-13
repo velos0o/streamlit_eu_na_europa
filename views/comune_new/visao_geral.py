@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 import os
+import re # Adicionado para usar regex na extração
 
 # Obter o diretório do arquivo atual
 _VISAO_GERAL_COMUNE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,6 +33,7 @@ def exibir_visao_geral_comune(df_original):
     coluna_data = 'CREATED_TIME'
     coluna_estagio = 'STAGE_ID'
     coluna_estagio_legivel = 'STAGE_NAME_LEGIVEL' # Nova coluna usada para filtro
+    coluna_category_id = 'CATEGORY_ID' # Nova coluna para o ID da categoria
 
     # --- Verificação Colunas Essenciais ---
     colunas_necessarias = [coluna_data, coluna_estagio]
@@ -39,6 +41,23 @@ def exibir_visao_geral_comune(df_original):
     if colunas_ausentes:
         st.error(f"Erro: As seguintes colunas essenciais não foram encontradas: {', '.join(colunas_ausentes)}. Verifique o carregamento dos dados.")
         st.caption(f"Colunas disponíveis: {list(df_original.columns)}")
+        return
+
+    # --- Extrair Category ID ---
+    def extrair_category_id(stage_id):
+        if pd.isna(stage_id):
+            return None
+        match = re.search(r'DT1052_(\d+):', str(stage_id))
+        if match:
+            return match.group(1)
+        return None # Ou 'Desconhecido' se preferir
+
+    if coluna_estagio in df_original.columns:
+        df_original[coluna_category_id] = df_original[coluna_estagio].apply(extrair_category_id)
+        # Remover linhas onde category_id não pôde ser extraído (opcional, mas recomendado)
+        # df_original = df_original.dropna(subset=[coluna_category_id])
+    else:
+        st.error(f"Erro: Coluna '{coluna_estagio}' necessária para extrair o Category ID não encontrada.")
         return
 
     # Calcular nomes legíveis dos estágios ANTES dos filtros
@@ -54,6 +73,7 @@ def exibir_visao_geral_comune(df_original):
     data_inicio = None
     data_fim = None
     estagios_selecionados = [] # Inicializar lista vazia para filtro de estágio
+    categorias_selecionadas = [] # Inicializar lista vazia para filtro de category_id
 
     # --- Expander para Filtros ---
     with st.expander("Filtros", expanded=True):
@@ -83,7 +103,20 @@ def exibir_visao_geral_comune(df_original):
         with col_f1_data_fim:
             data_fim = st.date_input("Até:", value=max_date, min_value=min_date, max_value=max_date, key="data_fim_comune", label_visibility="collapsed", disabled=not aplicar_filtro_data)
 
-        # Linha 2: Filtro de Estágio
+        # Linha 2: Filtro de Category ID
+        st.markdown("#### Filtro por Categoria (ID)")
+        # Obter lista única de category_ids válidos (não nulos)
+        lista_categorias_unicas = sorted([cat_id for cat_id in df_original[coluna_category_id].unique() if pd.notna(cat_id)])
+
+        categorias_selecionadas = st.multiselect(
+            "Selecione os IDs das categorias:",
+            options=lista_categorias_unicas,
+            default=[], # Por padrão, nenhum selecionado (mostra todos)
+            key="filtro_category_id_visao_geral",
+            help="Se nenhum ID for selecionado, todos serão exibidos."
+        )
+
+        # Linha 3: Filtro de Estágio (movido para baixo)
         st.markdown("#### Filtro por Estágio")
         # Obter a lista única de estágios legíveis do DataFrame original
         lista_estagios_unicos = sorted(df_original[coluna_estagio_legivel].unique())
@@ -122,6 +155,11 @@ def exibir_visao_geral_comune(df_original):
             st.error(f"Erro ao aplicar filtro de data: {e}")
             # Considerar parar ou usar o df sem filtro de data
             df = df_original.copy() # Reverter para original em caso de erro
+
+    # Filtro Category ID (se alguma opção foi selecionada)
+    if categorias_selecionadas: # Se a lista não estiver vazia
+        df = df[df[coluna_category_id].isin(categorias_selecionadas)].copy()
+        st.info(f"Filtrando por {len(categorias_selecionadas)} IDs de categoria selecionados.")
 
     # Filtro Estágio (se alguma opção foi selecionada)
     if estagios_selecionados: # Se a lista não estiver vazia

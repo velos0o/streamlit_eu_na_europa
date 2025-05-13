@@ -47,7 +47,7 @@ def exibir_visao_geral(df_original):
     # --- Definição Nomes Colunas --- 
     coluna_cartorio = 'NOME_CARTORIO' 
     coluna_data = 'CREATED_TIME'
-    coluna_nome_familia = 'UF_CRM_12_1722882763189' # << NOVA COLUNA FAMILIA
+    coluna_nome_familia = 'UF_CRM_34_NOME_FAMILIA' # ATUALIZADO para o novo campo SPA
     
     # --- Verificação Colunas Essenciais --- 
     if coluna_cartorio not in df_original.columns:
@@ -189,9 +189,9 @@ def exibir_visao_geral(df_original):
         total_casa_verde = 0
         total_tatuape = 0
     else:
-        # Contar diretamente os IDs 16 e 34 na coluna CATEGORY_ID do df filtrado
-        total_casa_verde = (df['CATEGORY_ID'] == 16).sum()
-        total_tatuape = (df['CATEGORY_ID'] == 34).sum()
+        # Contar diretamente os IDs 92 e 94 na coluna CATEGORY_ID do df filtrado
+        total_casa_verde = (df['CATEGORY_ID'] == 92).sum() # ATUALIZADO para novo ID
+        total_tatuape = (df['CATEGORY_ID'] == 94).sum()  # ATUALIZADO para novo ID
             
     # Remover loop anterior
     # total_casa_verde = 0
@@ -348,82 +348,71 @@ def simplificar_nome_estagio(nome):
     # Mapeamento Atualizado com base na descrição do usuário e categorias
     # Simplificando nomes para serem mais curtos nos cards
     mapeamento = {
-        # SUCESSO -> VERDE
-        'DT1052_16:SUCCESS': 'Entregue',
-        'DT1052_34:SUCCESS': 'Entregue',
-        'SUCCESS': 'Entregue',
-        'DT1052_16:UC_JRGCW3': 'Física Entregue',
-        'DT1052_34:UC_84B1S2': 'Física Entregue',
-        'UC_JRGCW3': 'Física Entregue',
-        'UC_84B1S2': 'Física Entregue',
-        'DT1052_16:CLIENT': 'Emitida (Cliente)',
-        'DT1052_34:CLIENT': 'Emitida (Cliente)',
-        'DT1052_34:UC_D0RG5P': 'Emitida (Cliente)',
-        'CLIENT': 'Emitida (Cliente)',
-        'UC_D0RG5P': 'Emitida (Cliente)',
-
-        # EM ANDAMENTO -> Amarelo
-        'DT1052_16:UC_7F0WK2': 'Ass. Req. Cliente',
-        'DT1052_34:UC_HN9GMI': 'Ass. Req. Cliente',
-        'UC_7F0WK2': 'Ass. Req. Cliente',
-        'UC_HN9GMI': 'Ass. Req. Cliente',
-        'DT1052_16:NEW': 'Aguard. Certidão',
-        'DT1052_34:NEW': 'Aguard. Certidão',
-        'NEW': 'Aguard. Certidão',
-        'DT1052_16:UC_HYO7L2': 'Devolutiva Busca',
-        'DT1052_34:UC_5LAJNY': 'Devolutiva Busca',
-        'UC_HYO7L2': 'Devolutiva Busca',
-        'UC_5LAJNY': 'Devolutiva Busca',
-        'DT1052_16:UC_IWZBMO': 'Solic. Cart. Origem',
-        'DT1052_34:UC_8L5JUS': 'Solic. Cart. Origem',
-        'UC_IWZBMO': 'Solic. Cart. Origem',
-        'UC_8L5JUS': 'Solic. Cart. Origem',
-        'DT1052_16:UC_KXHDOQ': 'Aguard. Cart. Origem',
-        'DT1052_34:UC_6KOYL5': 'Aguard. Cart. Origem',
-        'UC_KXHDOQ': 'Aguard. Cart. Origem',
-        'UC_6KOYL5': 'Aguard. Cart. Origem',
-        'DT1052_16:UC_RJC2DD': 'PRIO2 - Busca CRC',
-        'DT1052_34:UC_RJC2DD': 'PRIO2 - Busca CRC',
-        'UC_RJC2DD': 'PRIO2 - Busca CRC',
-        'K85YX7': 'PRIO2 - Busca CRC', 
-        'DT1052_16:PREPARATION': 'Montagem Req.',
-        'DT1052_34:PREPARATION': 'Montagem Req.',
-        'PREPARATION': 'Montagem Req.',
-        'DT1052_16:UC_8EGMU7': 'Cart. Origem Prior.',
-        'UC_8EGMU7': 'Cart. Origem Prior.',
-        'DT1052_16:UC_QRZ6JG': 'Busca CRC',
-        'DT1052_34:UC_68BLQ7': 'Busca CRC',
-        'UC_QRZ6JG': 'Busca CRC',
-        'UC_68BLQ7': 'Busca CRC',
-        'DT1052_16:UC_K85YX7': 'Solic. C. Origem Prior.',
-        'DT1052_34:UC_K85YX7': 'Solic. C. Origem Prior.',
-        'UC_K85YX7': 'Solic. C. Origem Prior.',
-
-        # FALHA -> VERMELHO
-        'DT1052_16:FAIL': 'Devolução ADM',
-        'DT1052_34:FAIL': 'Devolução ADM',
-        'FAIL': 'Devolução ADM',
-        'DT1052_16:UC_R5UEXF': 'Dev. ADM Verif.',
-        'DT1052_34:UC_Z3J98J': 'Dev. ADM Verif.',
-        'UC_R5UEXF': 'Dev. ADM Verif.',
-        'UC_Z3J98J': 'Dev. ADM Verif.',
-        'DT1052_16:UC_UG0UDZ': 'Solic. Duplicada',
-        'DT1052_34:UC_LF04SU': 'Solic. Duplicada',
-        'UC_UG0UDZ': 'Solic. Duplicada',
-        'UC_LF04SU': 'Solic. Duplicada',
-        'DT1052_16:UC_XM32IE': 'Sem Dados Busca',
-        'DT1052_34:UC_XM32IE': 'Sem Dados Busca',
-        'UC_XM32IE': 'Sem Dados Busca',
-        'DT1052_16:UC_P61ZVH': 'Devolvido Req.',
-        'DT1052_34:UC_2BAINE': 'Devolvido Req.',
-        'UC_P61ZVH': 'Devolvido Req.',
-        'UC_2BAINE': 'Devolvido Req.',
-        'DT1052_16:UC_7L6CGJ': 'Cancelado',
-        'DT1052_34:UC_7L6CGJ': 'Cancelado',
-        'UC_7L6CGJ': 'Cancelado',
-        'DT1052_16:UC_3LJ0KG': 'Não Trabalhar',
-        'DT1052_34:UC_3LJ0KG': 'Não Trabalhar',
-        'UC_3LJ0KG': 'Não Trabalhar',
+        # SPA - Type ID 1098 STAGES
+        'DT1098_92:NEW': 'AGUARDANDO CERTIDÃO',
+        'DT1098_94:NEW': 'AGUARDANDO CERTIDÃO',
+        'DT1098_92:UC_P6PYHW': 'PESQUISA - BR',
+        'DT1098_94:UC_4YE2PI': 'PESQUISA - BR',
+        'DT1098_92:PREPARATION': 'BUSCA - CRC',
+        'DT1098_94:PREPARATION': 'BUSCA - CRC',
+        'DT1098_92:UC_XBTHZ7': 'DEVOLUTIVA BUSCA - CRC',
+        'DT1098_94:CLIENT': 'DEVOLUTIVA BUSCA - CRC', # Nota: CLIENT em Tatuapé é Devolutiva Busca CRC
+        'DT1098_92:CLIENT': 'APENAS ASS. REQ CLIENTE P/MONTAGEM',
+        'DT1098_94:UC_IQ4WFA': 'APENAS ASS. REQ CLIENTE P/MONTAGEM',
+        'DT1098_92:UC_ZWO7BI': 'MONTAGEM REQUERIMENTO CARTÓRIO',
+        'DT1098_94:UC_UZHXWF': 'MONTAGEM REQUERIMENTO CARTÓRIO',
+        'DT1098_92:UC_83ZGKS': 'SOLICITAR CARTÓRIO DE ORIGEM',
+        'DT1098_94:UC_DH38EI': 'SOLICITAR CARTÓRIO DE ORIGEM',
+        'DT1098_92:UC_6TECYL': 'SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE',
+        'DT1098_94:UC_X9UE60': 'SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE',
+        'DT1098_92:UC_MUJP1P': 'AGUARDANDO CARTÓRIO ORIGEM',
+        'DT1098_94:UC_IXCAA5': 'AGUARDANDO CARTÓRIO ORIGEM',
+        'DT1098_92:UC_EYBGVD': 'DEVOLUÇÃO ADM',
+        'DT1098_94:UC_VS8YKI': 'DEVOLUÇÃO ADM',
+        'DT1098_92:UC_KC335Q': 'DEVOLVIDO REQUERIMENTO',
+        'DT1098_94:UC_M6A09E': 'DEVOLVIDO REQUERIMENTO',
+        'DT1098_92:UC_5LWUTX': 'CERTIDÃO EMITIDA',
+        'DT1098_94:UC_K4JS04': 'CERTIDÃO EMITIDA',
+        'DT1098_92:FAIL': 'SOLICITAÇÃO DUPLICADA',
+        'DT1098_94:FAIL': 'SOLICITAÇÃO DUPLICADA',
+        'DT1098_92:UC_Z24IF7': 'CANCELADO',
+        'DT1098_94:UC_MGTPX0': 'CANCELADO',
+        'DT1098_92:SUCCESS': 'CERTIDÃO ENTREGUE',
+        'DT1098_94:SUCCESS': 'CERTIDÃO ENTREGUE',
+        'DT1098_92:UC_U10R0R': 'CERTIDÃO DISPENSADA', # NOVO
+        'DT1098_94:UC_L3JFKO': 'CERTIDÃO DISPENSADA', # NOVO
+        # Manter mapeamentos genéricos caso algum STAGE_ID venha sem prefixo DT1098_XX:
+        'NEW': 'AGUARDANDO CERTIDÃO',
+        'UC_P6PYHW': 'PESQUISA - BR', # Casa Verde
+        'UC_4YE2PI': 'PESQUISA - BR', # Tatuapé
+        'PREPARATION': 'BUSCA - CRC',
+        'UC_XBTHZ7': 'DEVOLUTIVA BUSCA - CRC', # Casa Verde
+        # 'CLIENT' mapeado para dois nomes diferentes dependendo do cartório, 
+        # o mapeamento direto de 'CLIENT' se torna ambíguo aqui sem mais contexto.
+        # Idealmente, a lógica consideraria o CATEGORY_ID junto com STAGE_ID para desambiguar 'CLIENT'.
+        # Por ora, se 'CLIENT' vier sozinho, pode levar a um nome. Se vier prefixado, será correto.
+        # 'CLIENT': 'DEVOLUTIVA BUSCA - CRC' ou 'APENAS ASS. REQ CLIENTE P/MONTAGEM',
+        'UC_IQ4WFA': 'APENAS ASS. REQ CLIENTE P/MONTAGEM', # Tatuapé
+        'UC_ZWO7BI': 'MONTAGEM REQUERIMENTO CARTÓRIO', # Casa Verde
+        'UC_UZHXWF': 'MONTAGEM REQUERIMENTO CARTÓRIO', # Tatuapé
+        'UC_83ZGKS': 'SOLICITAR CARTÓRIO DE ORIGEM', # Casa Verde
+        'UC_DH38EI': 'SOLICITAR CARTÓRIO DE ORIGEM', # Tatuapé
+        'UC_6TECYL': 'SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE', # Casa Verde
+        'UC_X9UE60': 'SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE', # Tatuapé
+        'UC_MUJP1P': 'AGUARDANDO CARTÓRIO ORIGEM', # Casa Verde
+        'UC_IXCAA5': 'AGUARDANDO CARTÓRIO ORIGEM', # Tatuapé
+        'UC_EYBGVD': 'DEVOLUÇÃO ADM', # Casa Verde
+        'UC_VS8YKI': 'DEVOLUÇÃO ADM', # Tatuapé
+        'UC_KC335Q': 'DEVOLVIDO REQUERIMENTO', # Casa Verde
+        'UC_M6A09E': 'DEVOLVIDO REQUERIMENTO', # Tatuapé
+        'UC_5LWUTX': 'CERTIDÃO EMITIDA', # Casa Verde
+        'UC_K4JS04': 'CERTIDÃO EMITIDA', # Tatuapé
+        'FAIL': 'SOLICITAÇÃO DUPLICADA',
+        'UC_Z24IF7': 'CANCELADO', # Casa Verde
+        'UC_MGTPX0': 'CANCELADO', # Tatuapé
+        'SUCCESS': 'CERTIDÃO ENTREGUE',
+        'UC_U10R0R': 'CERTIDÃO DISPENSADA', # NOVO GENÉRICO
+        'UC_L3JFKO': 'CERTIDÃO DISPENSADA', # NOVO GENÉRICO
     }
 
     # Tentar encontrar no mapeamento completo
@@ -446,21 +435,20 @@ def simplificar_nome_estagio(nome):
 
 def categorizar_estagio(estagio_legivel):
     """ Categoriza o estágio simplificado em SUCESSO, EM ANDAMENTO ou FALHA. """
-    # Listas baseadas nos nomes simplificados e na descrição do usuário
+    # ATUALIZADO com base nos novos nomes de estágio do SPA
     sucesso = [
-        'Entregue', # Simplificado
-        'Física Entregue', # Simplificado
-        'Emitida (Cliente)' # Simplificado
+        'CERTIDÃO ENTREGUE',
+        'CERTIDÃO EMITIDA' # Considerado sucesso no contexto de etapas concluídas antes da entrega final
     ]
     falha = [
-        'Devolução ADM',
-        'Dev. ADM Verif.', # Simplificado
-        'Solic. Duplicada', # Simplificado
-        'Sem Dados Busca', # Simplificado
-        'Devolvido Req.', # Simplificado
-        'Cancelado',
-        'Não Trabalhar',
-        'Devolutiva Busca' # Nome simplificado correto
+        'DEVOLUÇÃO ADM',
+        'DEVOLVIDO REQUERIMENTO',
+        'SOLICITAÇÃO DUPLICADA',
+        'CANCELADO',
+        'DEVOLUTIVA BUSCA - CRC', # Se a devolutiva da busca significa que não encontrou, é uma falha de progresso.
+                                 # Se significa que a busca foi devolvida para correção, pode ser 'EM ANDAMENTO'. Precisa confirmar a semântica.
+                                 # Por ora, classificando como FALHA se impede o progresso direto.
+        'CERTIDÃO DISPENSADA', # NOVO - Classificado como FALHA
     ]
 
     if estagio_legivel in sucesso:

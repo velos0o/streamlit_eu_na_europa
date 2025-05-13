@@ -11,6 +11,7 @@ xlsxwriter==3.1.9        # Criação de arquivos Excel com formatação
 thefuzz==0.22.1          # Matching e comparação fuzzy de strings (forma principal)
 python-Levenshtein==0.27.1 # Dependência para acelerar o thefuzz
 unidecode==1.3.8         # Remoção de acentos de strings
+toml==0.10.2             # Manipulação de arquivos TOML (para secrets)
 
 # Bibliotecas para integração e comunicação externa
 gspread==6.2.0           # Acesso ao Google Sheets

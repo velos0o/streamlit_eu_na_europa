@@ -57,7 +57,6 @@ def _gerar_dados_simulados_reclamacoes():
     return df
 
 # Função para carregar dados da entidade 1086
-@st.cache_data(ttl=600) # Cache por 10 minutos, pode ser ajustado
 def carregar_dados_reclamacoes(force_reload=False, debug=DEBUG_MODE):
     """
     Carrega os dados da entidade 1086 (Reclamações) do Bitrix24

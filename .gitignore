@@ -25,9 +25,87 @@ ENV/
 # Arquivos do sistema operacional
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Arquivos de configuração específicos
 .streamlit/secrets.toml
+.streamlit/secrets*.toml
+!.streamlit/secrets.toml.example
 
 # Arquivos de log
-*.log 
+*.log
+logs/
+
+# Arquivos de chaves e credenciais
+**/*.key
+**/*.pem
+**/*.pfx
+**/*.p12
+**/*.jks
+**/*.keystore
+**/*.crt
+**/*.cer
+**/*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+views/cartorio_new/chaves/
+**/chaves/
+**/keys/
+**/credentials/
+
+# Arquivos temporários de migração de credenciais
+temp_secrets_*.toml
+
+# Ambiente virtual
+venv/
+.env
+.envrc
+.env.*
+!.env.example
+
+# Cache e temporários
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+*.log
+temp/
+tmp/
+*.tmp
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+*.swp
+*~
+._*
+
+# IDE e editores
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Arquivos de build
+dist/
+build/
+*.egg-info/
+
+# Exceções para arquivos de exemplo que devem ser versionados
+# Descomente conforme necessário
+# !example_data.csv
+# !requirements.txt
+
+# Arquivos de dados sensíveis
+*.csv
+*.xlsx
+*.xls
+*.db
+*.sqlite
+*.sqlite3 

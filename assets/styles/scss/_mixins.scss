@@ -1,8 +1,8 @@
-@use 'variables' as *;
+@import 'variables';
 
 // Mixin para tema escuro
 @mixin dark-mode {
-  body.dark & {
+  @at-root body.dark #{&} {
     @content;
   }
 }

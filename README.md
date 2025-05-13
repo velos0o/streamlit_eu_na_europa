@@ -46,6 +46,68 @@ Dashboard desenvolvido em Streamlit para análise de dados da operação Eu na E
 └── ... (outros arquivos e pastas de configuração)
 ```
 
+## Gerenciamento Seguro de Credenciais
+
+Este projeto utiliza o sistema de Secrets do Streamlit para gerenciar credenciais de forma segura.
+
+### Configuração para Desenvolvimento
+
+1. **Crie o arquivo de secrets local:**
+   ```bash
+   cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+   ```
+
+2. **Preencha as credenciais no arquivo secrets.toml:**
+   - Bitrix24 API
+   - Google Sheets/Drive
+   - Banco de dados
+   - Outras credenciais necessárias
+
+3. **Convertendo credenciais existentes:**
+   Para migrar credenciais JSON do Google para o formato do Streamlit:
+   ```bash
+   python utils/secrets_helper.py
+   ```
+   Esse utilitário ajudará você a converter o formato JSON para o formato TOML usado pelo Streamlit.
+
+### Uso em Produção
+
+1. **No Streamlit Cloud:**
+   - Navegue até Configurações > Secrets
+   - Cole o conteúdo do seu arquivo secrets.toml
+   - Nunca compartilhe essas informações
+
+2. **Em outros serviços de hospedagem:**
+   - Configure variáveis de ambiente seguindo a documentação do Streamlit
+
+### Como acessar as credenciais no código
+
+```python
+# Para acessar credenciais do Google
+from utils.secrets_helper import get_google_credentials
+
+credentials = get_google_credentials()
+```
+
+Para outras credenciais:
+```python
+import streamlit as st
+
+# Credenciais do Bitrix
+webhook_url = st.secrets["bitrix"]["webhook_url"]
+
+# Credenciais do banco de dados
+db_password = st.secrets["database"]["password"]
+```
+
+### Boas Práticas de Segurança
+
+- **NUNCA comite credenciais no Git**
+- Mantenha o arquivo `.streamlit/secrets.toml` no `.gitignore`
+- Não armazene chaves em arquivos de código-fonte
+- Rotacione credenciais regularmente
+- Use chaves de serviço com permissões limitadas
+
 ## Funcionalidades Implementadas
 
 O dashboard inclui as seguintes páginas (visualizações) e funcionalidades:
@@ -93,20 +155,12 @@ O dashboard inclui as seguintes páginas (visualizações) e funcionalidades:
     ```bash
     pip install -r requirements.txt
     ```
-4.  **Compile o SASS (se necessário):**
+4.  **Configure as credenciais conforme a seção "Gerenciamento Seguro de Credenciais"**
+5.  **Compile o SASS (se necessário):**
     Se houver alterações nos arquivos `.scss`, execute:
     ```bash
     python compile_sass.py
     ```
-5.  **Configure as variáveis de ambiente (se aplicável):**
-    - Verifique se existe um arquivo `.env` ou `.env.example`. Se existir, renomeie para `.env` e preencha as credenciais necessárias (ex: API do Bitrix24).
-      ```dotenv
-      # Exemplo:
-      # BITRIX_TOKEN=seu_token_bi_aqui
-      # BITRIX_URL=sua_url_base_bitrix_aqui
-      ```
-    - Alternativamente, configure como Secrets no Streamlit Cloud se for fazer deploy lá.
-
 6.  **Execute a aplicação:**
     ```bash
     streamlit run main.py

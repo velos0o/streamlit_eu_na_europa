@@ -9,6 +9,7 @@ from .visao_geral import exibir_visao_geral
 from .acompanhamento import exibir_acompanhamento
 from .producao import exibir_producao
 from .pendencias import exibir_pendencias
+from .higienizacao_desempenho import exibir_higienizacao_desempenho
 
 # Importar componente TOC - REMOVIDO
 # from components.table_of_contents import render_toc 
@@ -57,6 +58,8 @@ def show_cartorio_new():
         exibir_producao(df_cartorio)
     elif subpagina_selecionada == "Pendências":
         exibir_pendencias(df_cartorio)
+    elif subpagina_selecionada == "Higienização Desempenho":
+        exibir_higienizacao_desempenho()
     else:
         st.warning(f"Subpágina desconhecida: {subpagina_selecionada}")
 

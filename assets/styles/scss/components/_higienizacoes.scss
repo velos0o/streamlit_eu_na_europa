@@ -1,0 +1,137 @@
+// Estilos para a seção de Higienizações
+@use '../variables' as vars;
+@use '../mixins' as mix;
+
+.higienizacoes {
+  &__header {
+    margin-bottom: 2rem;
+    
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: vars.$primary;
+    }
+  }
+  
+  &__container {
+    background-color: #fff;
+    border-radius: 10px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    margin-bottom: 1.5rem;
+  }
+  
+  &__metrics {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    
+    .metric-card {
+      flex: 1;
+      min-width: 220px;
+      background: linear-gradient(to right, rgba(lighten(vars.$primary-light, 15%), 0.1), rgba(lighten(vars.$primary, 5%), 0.05));
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 0.5rem;
+      border-left: 4px solid vars.$primary;
+      
+      &__title {
+        font-size: 0.9rem;
+        color: vars.$gray-600;
+        margin-bottom: 0.5rem;
+      }
+      
+      &__value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: vars.$primary;
+      }
+      
+      &__change {
+        font-size: 0.8rem;
+        margin-top: 0.5rem;
+        
+        &--positive {
+          color: vars.$success;
+        }
+        
+        &--negative {
+          color: vars.$danger;
+        }
+      }
+    }
+  }
+  
+  &__tabs {
+    .stTabs {
+      [data-baseweb="tab-list"] {
+        background-color: #f9f9f9;
+        border-radius: 10px;
+        padding: 0.5rem;
+      }
+      
+      [data-baseweb="tab"] {
+        font-weight: 500;
+        
+        &[aria-selected="true"] {
+          background-color: vars.$primary;
+          color: white;
+          border-radius: 5px;
+        }
+      }
+    }
+  }
+  
+  &__checklist {
+    &-item {
+      display: flex;
+      align-items: center;
+      background-color: #f9f9f9;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.8rem;
+      
+      &:hover {
+        background-color: #f0f0f0;
+      }
+      
+      &-status {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        margin-right: 1rem;
+        
+        &--complete {
+          background-color: vars.$success;
+        }
+        
+        &--pending {
+          background-color: vars.$warning;
+        }
+        
+        &--overdue {
+          background-color: vars.$danger;
+        }
+      }
+      
+      &-content {
+        flex: 1;
+      }
+      
+      &-title {
+        font-weight: 600;
+        margin-bottom: 0.3rem;
+      }
+      
+      &-description {
+        font-size: 0.9rem;
+        color: vars.$gray-600;
+      }
+      
+      &-actions {
+        margin-left: 1rem;
+      }
+    }
+  }
+} 

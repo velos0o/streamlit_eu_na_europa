@@ -31,16 +31,16 @@ def load_data_cached(table_name: str, filters: dict | None = None):
 # @st.cache_data # Cache será aplicado na chamada de load_data_cached
 def load_data():
     """
-    Carrega dados do cartório (categorias 16 e 34) com filtro aplicado na API
+    Carrega dados do cartório (categorias 92 e 94 - SPA) com filtro aplicado na API
     e usando a função de carregamento cacheada.
     """
-    table_name = "crm_dynamic_items_1052"
+    table_name = "crm_dynamic_items_1098"  # Alterado para nova tabela SPA
     
-    # Preparar filtro para as categorias 16 e 34
+    # Preparar filtro para as categorias 92 e 94
     category_filter = {"dimensionsFilters": [[]]}
     category_filter["dimensionsFilters"][0].append({
         "fieldName": "CATEGORY_ID", 
-        "values": ["16", "34"], # Valores como string, conforme exemplo em carregar_dados_negocios
+        "values": ["92", "94"], # Alterado para novas categorias SPA
         "type": "INCLUDE", 
         "operator": "EQUALS"
     })
@@ -50,7 +50,7 @@ def load_data():
     
     # Se o DataFrame estiver vazio após filtro na API, retornar
     if df_items.empty:
-        st.warning(f"Nenhum dado encontrado para as categorias 16 ou 34 na tabela {table_name}.")
+        st.warning(f"Nenhum dado encontrado para as categorias 92 ou 94 na tabela {table_name}.") # Mensagem atualizada
         return pd.DataFrame()
     
     print(f"[DEBUG] Total de registros brutos recebidos da API (filtrados): {len(df_items)}")
@@ -69,11 +69,11 @@ def load_data():
         df_items['CATEGORY_ID'] = pd.to_numeric(df_items['CATEGORY_ID'], errors='coerce')
         df_items = df_items.dropna(subset=['CATEGORY_ID'])
         df_items['CATEGORY_ID'] = df_items['CATEGORY_ID'].astype('int64')
-        # Verificar se *apenas* 16 e 34 estão presentes após conversão
+        # Verificar se *apenas* 92 e 94 estão presentes após conversão
         categorias_presentes = df_items['CATEGORY_ID'].unique()
-        if not all(cat in [16, 34] for cat in categorias_presentes):
+        if not all(cat in [92, 94] for cat in categorias_presentes): # Alterado para novas categorias
             print(f"[WARN] Categorias inesperadas encontradas após filtro na API: {categorias_presentes}. Refiltrando localmente.")
-            df_items = df_items[df_items['CATEGORY_ID'].isin([16, 34])].copy()
+            df_items = df_items[df_items['CATEGORY_ID'].isin([92, 94])].copy() # Alterado para novas categorias
 
     except Exception as e:
         print(f"[DEBUG] Erro ao processar CATEGORY_ID pós-filtro: {str(e)}")
@@ -89,8 +89,8 @@ def load_data():
     
     # Adicionar nome do cartório
     df_items['NOME_CARTORIO'] = df_items['CATEGORY_ID'].map({
-        16: 'CARTÓRIO CASA VERDE',
-        34: 'CARTÓRIO TATUÁPE'
+        92: 'CARTÓRIO CASA VERDE',  # Alterado para nova categoria
+        94: 'CARTÓRIO TATUÁPE'   # Alterado para nova categoria
     })
     
     print(f"[DEBUG] Total final após processamento local: {len(df_items)}")
@@ -225,7 +225,7 @@ def carregar_dados_crm_deal_com_uf():
 # Não precisa cachear esta função diretamente
 def carregar_dados_cartorio():
     """
-    Carrega os dados dos cartórios (cat 16 e 34) usando cache e filtro na API,
+    Carrega os dados dos cartórios (cat 92 e 94 - SPA) usando cache e filtro na API,
     e faz o merge com os dados de negócio (cat 0) para obter a data de venda (DATE_CREATE).
 
     Returns:
@@ -266,16 +266,17 @@ def carregar_dados_cartorio():
 
                 # --- Verificações e Processamento Adicional no df_cartorio ---
                 
-                # Coluna ID Família Antigo (Usada para o merge)
-                col_id_familia_cartorio = 'UF_CRM_12_1723552666' 
+                # Coluna ID Família (Usada para o merge com dados de venda)
+                col_id_familia_cartorio = 'UF_CRM_34_ID_FAMILIA' # Alterado para novo campo SPA
                 if col_id_familia_cartorio not in df_cartorio.columns:
-                    print(f"[ERROR] Coluna chave '{col_id_familia_cartorio}' (ID Família - Antigo) não encontrada nos dados do cartório. Merge não pode ser realizado.")
+                    print(f"[ERROR] Coluna chave '{col_id_familia_cartorio}' (ID Família SPA) não encontrada nos dados do cartório. Merge não pode ser realizado.") # Mensagem atualizada
                     df_cartorio['DATA_VENDA'] = pd.NaT # Adiciona coluna vazia
                 else:
-                     # Garantir que a chave de merge seja string em ambos DFs
-                    df_cartorio[col_id_familia_cartorio] = df_cartorio[col_id_familia_cartorio].fillna('N/A').astype(str)
-                    df_deal_to_merge[col_id_familia_deal] = df_deal_to_merge[col_id_familia_deal].astype(str)
-                    
+                     # Garantir que a chave de merge seja string em ambos DFs E REMOVER ESPAÇOS
+                    df_cartorio[col_id_familia_cartorio] = df_cartorio[col_id_familia_cartorio].fillna('N/A').astype(str).str.strip()
+                    # Tratar também a coluna no df_deal_to_merge, caso não tenha sido feito antes
+                    df_deal_to_merge[col_id_familia_deal] = df_deal_to_merge[col_id_familia_deal].astype(str).str.strip()
+
                     # Realizar o merge
                     print(f"[INFO] Realizando merge entre Cartório ({len(df_cartorio)}) e Deals ({len(df_deal_to_merge)}) usando '{col_id_familia_cartorio}' e '{col_id_familia_deal}'")
                     df_cartorio = pd.merge(
@@ -298,9 +299,9 @@ def carregar_dados_cartorio():
         df = df_cartorio # Renomear de volta para 'df' para o resto do código
 
         # Verificar se as colunas UF_CRM_... existem agora na tabela principal
-        coluna_id_requerente = 'UF_CRM_12_1723552729'
+        coluna_id_requerente = 'UF_CRM_34_ID_REQUERENTE' # Alterado para novo campo SPA
         if coluna_id_requerente not in df.columns:
-            print(f"[WARN] Coluna {coluna_id_requerente} (ID Requerente - para contagem) não encontrada na tabela principal.")
+            print(f"[WARN] Coluna {coluna_id_requerente} (ID Requerente SPA - para contagem) não encontrada na tabela principal.") # Mensagem atualizada
             df[coluna_id_requerente] = 'Req. Desconhecido' # Valor padrão
         else:
             # Tratar como string e preencher NaNs para contagem nunique
@@ -309,9 +310,9 @@ def carregar_dados_cartorio():
             # print(f"[DEBUG] Coluna {coluna_id_requerente} (ID Requerente) processada.") # Comentado para reduzir log
         
         # Tratar a NOVA coluna de Nome da Família
-        coluna_nome_familia = 'UF_CRM_12_1722882763189'
+        coluna_nome_familia = 'UF_CRM_34_NOME_FAMILIA' # Alterado para novo campo SPA
         if coluna_nome_familia not in df.columns:
-            print(f"[WARN] Coluna {coluna_nome_familia} (Nome da Família) não encontrada na tabela principal.")
+            print(f"[WARN] Coluna {coluna_nome_familia} (Nome da Família SPA) não encontrada na tabela principal.") # Mensagem atualizada
             df[coluna_nome_familia] = 'Família Desconhecida' # Valor padrão
         else:
             # Preencher NaNs e converter para string, tratar espaços vazios
@@ -340,15 +341,15 @@ def carregar_dados_cartorio():
         else:
             print("[WARN] Coluna 'ID' não encontrada para checar duplicados.")
         
-        # 3. Garantir filtragem ESTRITA por categoria 16 e 34
-        df = df[df['CATEGORY_ID'].isin([16, 34])].copy()
+        # 3. Garantir filtragem ESTRITA por categoria 92 e 94
+        df = df[df['CATEGORY_ID'].isin([92, 94])].copy() # Alterado para novas categorias
         
-        # 4. Verificar e remover registros que não pertencem às categorias 16 e 34 (redundante)
-        registros_invalidos = ~df['CATEGORY_ID'].isin([16, 34])
+        # 4. Verificar e remover registros que não pertencem às categorias 92 e 94 (redundante)
+        registros_invalidos = ~df['CATEGORY_ID'].isin([92, 94]) # Alterado para novas categorias
         if registros_invalidos.any():
             n_invalidos = registros_invalidos.sum()
-            print(f"ATENÇÃO: Removidos {n_invalidos} registros com categorias diferentes de 16 e 34.")
-            df = df[df['CATEGORY_ID'].isin([16, 34])]
+            print(f"ATENÇÃO: Removidos {n_invalidos} registros com categorias diferentes de 92 e 94.") # Mensagem atualizada
+            df = df[df['CATEGORY_ID'].isin([92, 94])] # Alterado para novas categorias
         
         # 5. Verificar se há valores nulos em CATEGORY_ID
         nulos = df['CATEGORY_ID'].isna()
@@ -362,8 +363,8 @@ def carregar_dados_cartorio():
         if 'NOME_CARTORIO' not in df.columns:
              print("[INFO] Criando coluna NOME_CARTORIO.")
              df['NOME_CARTORIO'] = df['CATEGORY_ID'].map({
-                 16: 'CARTÓRIO CASA VERDE',
-                 34: 'CARTÓRIO TATUÁPE'
+                 92: 'CARTÓRIO CASA VERDE', # Alterado para nova categoria
+                 94: 'CARTÓRIO TATUÁPE'  # Alterado para nova categoria
              })
         
         # --- Cálculo da Data de Venda Agregada por Família ---
@@ -384,22 +385,29 @@ def carregar_dados_cartorio():
             df['DATA_VENDA_FAMILIA'] = pd.NaT
         
         # 7. Verificações finais de contagem
-        count_cat_16 = (df['CATEGORY_ID'] == 16).sum()
-        count_cat_34 = (df['CATEGORY_ID'] == 34).sum()
+        count_cat_92 = (df['CATEGORY_ID'] == 92).sum() # Alterado para nova categoria
+        count_cat_94 = (df['CATEGORY_ID'] == 94).sum() # Alterado para nova categoria
         total_registros = len(df)
         
-        if count_cat_16 + count_cat_34 != total_registros:
-            print(f"ERRO GRAVE: Inconsistência nas contagens! Total: {total_registros}, Soma categorias: {count_cat_16 + count_cat_34}")
+        if count_cat_92 + count_cat_94 != total_registros: # Verificação atualizada
+            print(f"ERRO GRAVE: Inconsistência nas contagens! Total: {total_registros}, Soma categorias: {count_cat_92 + count_cat_94}") # Mensagem atualizada
             # Última tentativa de correção
-            df = df[df['CATEGORY_ID'].isin([16, 34])].copy()
+            df = df[df['CATEGORY_ID'].isin([92, 94])].copy() # Alterado para novas categorias
             # Recontar após correção
-            count_cat_16 = (df['CATEGORY_ID'] == 16).sum()
-            count_cat_34 = (df['CATEGORY_ID'] == 34).sum()
+            count_cat_92 = (df['CATEGORY_ID'] == 92).sum() # Alterado para nova categoria
+            count_cat_94 = (df['CATEGORY_ID'] == 94).sum() # Alterado para nova categoria
             total_registros = len(df)
-            if count_cat_16 + count_cat_34 != total_registros:
+            if count_cat_92 + count_cat_94 != total_registros: # Verificação atualizada
                  print("❌ ERRO CRÍTICO: Inconsistência nas contagens persiste.")
             
-        print(f"Dados do cartório carregados e processados: {total_registros} registros ({count_cat_16} Casa Verde, {count_cat_34} Tatuapé)")
+        print(f"Dados do cartório carregados e processados: {total_registros} registros ({count_cat_92} Casa Verde, {count_cat_94} Tatuapé)") # Mensagem atualizada
+        
+        # Garantir que STAGE_ID está presente
+        if 'STAGE_ID' not in df.columns:
+            print("[WARN] Coluna STAGE_ID não encontrada no DataFrame final do cartório.")
+            # Você pode querer adicionar uma coluna padrão ou parar aqui
+            df['STAGE_ID'] = 'STAGE_DESCONHECIDO' 
+
         # Retornar o dataframe final 'df'
         return df
         

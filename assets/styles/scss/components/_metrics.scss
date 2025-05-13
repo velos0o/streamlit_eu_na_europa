@@ -1,4 +1,6 @@
 // assets/styles/scss/components/_metrics.scss
+@use '../variables' as vars;
+@use '../mixins' as mix;
 
 // Estilos para os containers de st.metric na seção de acompanhamento
 // Assumindo que as métricas estão dentro de st.columns após um st.markdown("#### Métricas Gerais")
@@ -47,13 +49,13 @@ h4:contains("Métricas Gerais") + div[data-testid="stHorizontalBlock"] > div[dat
 // Seletor para a Coluna 3 (Concluídas)
 h4:contains("Métricas Gerais") + div[data-testid="stHorizontalBlock"] > div[data-testid="stVerticalBlock"] > div.stColumn:nth-child(4) {
   [data-testid="stMetricValue"] {
-      color: $success !important; // Usa a variável $success do SCSS (verde)
+      color: vars.$success !important; // Usa a variável $success do SCSS (verde)
   }
 }
 
 // Seletor para a Coluna 4 (% Conclusão)
 h4:contains("Métricas Gerais") + div[data-testid="stHorizontalBlock"] > div[data-testid="stVerticalBlock"] > div.stColumn:nth-child(5) {
   [data-testid="stMetricValue"] {
-      color: $success !important; // Usa a variável $success do SCSS (verde)
+      color: vars.$success !important; // Usa a variável $success do SCSS (verde)
   }
 } 

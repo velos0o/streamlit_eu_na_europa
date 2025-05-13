@@ -1,36 +1,37 @@
-@use '../variables' as *;
-@use '../mixins' as *;
+@use 'sass:map';
+@use '../variables' as vars;
+@use '../mixins' as mix;
 
 // Cores SUTIS para fundo das CÉLULAS de dados por categoria
-$cat-andamento-bg-cell: rgba($warning, 0.06);
-$cat-sucesso-bg-cell: rgba($success, 0.06);
-$cat-falha-bg-cell: rgba($danger, 0.06);
-$cat-desconhecido-bg-cell: rgba($gray-500, 0.08);
+$cat-andamento-bg-cell: rgba(vars.$warning, 0.06);
+$cat-sucesso-bg-cell: rgba(vars.$success, 0.06);
+$cat-falha-bg-cell: rgba(vars.$danger, 0.06);
+$cat-desconhecido-bg-cell: rgba(vars.$gray-500, 0.08);
 
 // Cores para bordas de separação (mantido)
-$cat-andamento-border: rgba($warning, 0.3);
-$cat-sucesso-border: rgba($success, 0.3);
-$cat-falha-border: rgba($danger, 0.3);
-$cat-desconhecido-border: rgba($gray-500, 0.3);
+$cat-andamento-border: rgba(vars.$warning, 0.3);
+$cat-sucesso-border: rgba(vars.$success, 0.3);
+$cat-falha-border: rgba(vars.$danger, 0.3);
+$cat-desconhecido-border: rgba(vars.$gray-500, 0.3);
 
 .pendencias-table-container {
-  margin-top: map-get($spacing, 4);
+  margin-top: map.get(vars.$spacing, 4);
 }
 
 // Aumentar especificidade: target table.dataframe.pendencias-table
 table.dataframe.pendencias-table {
   width: 100%;
   border-collapse: collapse; // Remove espaços entre bordas
-  font-size: map-get($font-sizes, 'sm'); // Tamanho de fonte menor
-  background-color: var(--card-bg, $gray-50); // Fundo geral claro
-  box-shadow: map-get($shadows, 'base');
-  border-radius: map-get($border-radius, 'md');
+  font-size: map.get(vars.$font-sizes, 'sm'); // Tamanho de fonte menor
+  background-color: var(--card-bg, vars.$gray-50); // Fundo geral claro
+  box-shadow: map.get(vars.$shadows, 'base');
+  border-radius: map.get(vars.$border-radius, 'md');
   overflow: hidden; // Para que o border-radius funcione nas bordas da tabela
   text-align: center; // Centralizar texto por padrão
 
   th, td {
-    padding: map-get($spacing, 2) map-get($spacing, 2);
-    border-bottom: 1px solid var(--card-border, $gray-200);
+    padding: map.get(vars.$spacing, 2) map.get(vars.$spacing, 2);
+    border-bottom: 1px solid var(--card-border, vars.$gray-200);
     vertical-align: middle;
     border-right: 1px solid transparent; // Espaço para borda do header
     white-space: nowrap !important; // <<-- ADICIONAR !important
@@ -40,11 +41,11 @@ table.dataframe.pendencias-table {
   thead th:first-child,
   tbody th { // Assumindo que Responsável é sempre <th> no tbody
     text-align: left;
-    padding-left: map-get($spacing, 3);
+    padding-left: map.get(vars.$spacing, 3);
     font-weight: 500;
-    background-color: var(--card-bg, $gray-50); // Fundo do tema
+    background-color: var(--card-bg, vars.$gray-50); // Fundo do tema
     // white-space: nowrap; // Já coberto pela regra geral th, td
-    border-right: 1px solid var(--card-border, $gray-300); // Linha divisória após responsável
+    border-right: 1px solid var(--card-border, vars.$gray-300); // Linha divisória após responsável
   }
 
   // Alinhar última coluna (Total Geral)
@@ -52,23 +53,23 @@ table.dataframe.pendencias-table {
   tbody td:last-child {
     text-align: right;
     font-weight: 600;
-    border-left: 1px solid var(--card-border, $gray-300);
+    border-left: 1px solid var(--card-border, vars.$gray-300);
     border-right: none;
-    padding-right: map-get($spacing, 3);
-    background-color: rgba($gray-500, 0.1); // Fundo levemente destacado para total
+    padding-right: map.get(vars.$spacing, 3);
+    background-color: rgba(vars.$gray-500, 0.1); // Fundo levemente destacado para total
     // white-space: nowrap; // Já coberto pela regra geral th, td
   }
 
   thead {
      th {
-        background-color: var(--header-bg, $gray-100);
-        color: var(--card-text, $gray-700);
+        background-color: var(--header-bg, vars.$gray-100);
+        color: var(--card-text, vars.$gray-700);
         font-weight: 600;
         position: sticky;
         top: 0;
         z-index: 1;
         border-top: none;
-        border-bottom: 2px solid var(--card-border, $gray-300);
+        border-bottom: 2px solid var(--card-border, vars.$gray-300);
         border-right: 1px solid transparent; // Espaço para borda da categoria
         white-space: nowrap; // <<-- IMPEDIR QUEBRA DE TEXTO NOS HEADERS
      }
@@ -87,7 +88,7 @@ table.dataframe.pendencias-table {
      }
      // Garantir que a segunda linha do header (se existir) tenha estilo padrão
      tr:not(:first-child) th {
-         background-color: var(--header-bg, $gray-100) !important;
+         background-color: var(--header-bg, vars.$gray-100) !important;
          border-right: none !important;
          font-weight: normal; // Estilo menos destacado
      }
@@ -96,42 +97,192 @@ table.dataframe.pendencias-table {
   tbody tr:last-child { // Linha de Total Geral
     background-color: transparent; // Remover fundo da linha toda
     font-weight: bold;
-    border-top: 2px solid var(--card-border, $gray-300);
+    border-top: 2px solid var(--card-border, vars.$gray-300);
 
     th, td { // Aplicar a todas as células da linha total
-      color: var(--card-text, $gray-700);
-      background-color: var(--header-bg, $gray-100); // Fundo consistente para linha total
+      color: var(--card-text, vars.$gray-700);
+      background-color: var(--header-bg, vars.$gray-100); // Fundo consistente para linha total
     }
     td:last-child {
         font-weight: 700;
-        background-color: rgba($gray-500, 0.15); // Fundo mais destacado para célula total
+        background-color: rgba(vars.$gray-500, 0.15); // Fundo mais destacado para célula total
     }
   }
 }
 
 // Ajustes para tema escuro
-@include dark-mode {
+@include mix.dark-mode {
   table.dataframe.pendencias-table {
-    background-color: var(--card-bg, $gray-800);
-    border-color: $gray-700;
+    background-color: var(--card-bg, vars.$gray-800);
+    border-color: vars.$gray-700;
 
-    th, td { border-bottom-color: var(--card-border, $gray-700); }
-    thead th:first-child, tbody th { border-right-color: var(--card-border, $gray-600); }
-    thead th:last-child, tbody td:last-child { border-left-color: var(--card-border, $gray-600); background-color: rgba($gray-100, 0.1);}
-    tbody th { background-color: var(--card-bg, $gray-800); }
+    th, td { border-bottom-color: var(--card-border, vars.$gray-700); }
+    thead th:first-child, tbody th { border-right-color: var(--card-border, vars.$gray-600); }
+    thead th:last-child, tbody td:last-child { border-left-color: var(--card-border, vars.$gray-600); background-color: rgba(vars.$gray-100, 0.1);}
+    tbody th { background-color: var(--card-bg, vars.$gray-800); }
     thead th, thead tr:not(:first-child) th, tbody tr:last-child th, tbody tr:last-child td {
-        background-color: var(--header-bg, $gray-900) !important;
+        background-color: var(--header-bg, vars.$gray-900) !important;
     }
-    thead th { border-bottom-color: var(--card-border, $gray-600); }
-    tbody tr:last-child { border-top-color: var(--card-border, $gray-600); }
-    tbody tr:last-child td:last-child { background-color: rgba($gray-100, 0.15); }
+    thead th { border-bottom-color: var(--card-border, vars.$gray-600); }
+    tbody tr:last-child { border-top-color: var(--card-border, vars.$gray-600); }
+    tbody tr:last-child td:last-child { background-color: rgba(vars.$gray-100, 0.15); }
 
     // Cores SUTIS para fundo das CÉLULAS (Dark Mode)
     // Estas variáveis NÃO são usadas diretamente aqui, mas servem de referência para o Python
-    $cat-andamento-bg-cell-dark: rgba($warning, 0.12);
-    $cat-sucesso-bg-cell-dark: rgba($success, 0.12);
-    $cat-falha-bg-cell-dark: rgba($danger, 0.12);
-    $cat-desconhecido-bg-cell-dark: rgba($gray-500, 0.15);
+    $cat-andamento-bg-cell-dark: rgba(vars.$warning, 0.12);
+    $cat-sucesso-bg-cell-dark: rgba(vars.$success, 0.12);
+    $cat-falha-bg-cell-dark: rgba(vars.$danger, 0.12);
+    $cat-desconhecido-bg-cell-dark: rgba(vars.$gray-500, 0.15);
   }
-} 
-} 
+}
+
+// Tabela Avançada para Pendências
+
+.pendencias-table {
+  overflow-x: auto;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+table.pendencias {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  margin-top: map.get(vars.$spacing, 4);
+  border: 1px solid #eaeaea;
+  
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid #eaeaea;
+    font-size: map.get(vars.$font-sizes, 'sm'); // Tamanho de fonte menor
+  }
+  
+  th {
+    box-shadow: map.get(vars.$shadows, 'base');
+    border-radius: map.get(vars.$border-radius, 'md');
+    background-color: #f9fafb;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  tbody tr {
+    &:hover {
+      padding: map.get(vars.$spacing, 2) map.get(vars.$spacing, 2);        
+      background-color: #f9fafb;
+    }
+    &:nth-child(even) {
+      background-color: #fcfcfc;
+    }
+  }
+  
+  td {
+    // Estilos específicos para células
+    
+    // Coluna de Status com ícones e cores
+    &.status {
+      width: 100px;
+      text-align: center;
+      
+      .status-badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        display: inline-block;
+        
+        &.concluido {
+          background-color: rgba(16, 185, 129, 0.1);
+          color: rgb(16, 185, 129);
+        }
+        
+        &.andamento {
+          background-color: rgba(245, 158, 11, 0.1);
+          color: rgb(245, 158, 11);
+        }
+        
+        &.pendente {
+          background-color: rgba(239, 68, 68, 0.1);
+          color: rgb(239, 68, 68);
+        }
+        
+        &.bloqueado {
+          background-color: rgba(107, 114, 128, 0.1);
+          color: rgb(107, 114, 128);
+        }
+      }
+    }
+    
+    // Título da tarefa
+    &.tarefa {
+      width: 40%;
+      
+      // Estilo do título principal
+      .tarefa-titulo {
+        font-weight: 500;
+        color: #1f2937;
+        margin-bottom: 4px;
+      }
+      
+      // Descrição da tarefa
+      .tarefa-descricao {
+        font-size: 0.75rem;
+        color: #6b7280;
+      }
+    }
+    
+    // Responsável pela tarefa
+    &.responsavel {
+      width: 15%;
+      
+      .responsavel-badge {
+        display: flex;
+        align-items: center;
+        
+        img {
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          margin-right: 8px;
+        }
+        
+        span {
+          font-size: 0.825rem;
+        }
+      }
+    }
+    
+    // Data limite
+    &.data-limite {
+      width: 15%;
+      
+      .data {
+        font-weight: 500;
+        
+        &.atrasada {
+          color: rgb(239, 68, 68);
+        }
+      }
+    }
+    
+    // Ações
+    &.acoes {
+      width: 10%;
+      text-align: right;
+      
+      .btn-acao {
+        background: none;
+        border: none;
+        color: #6b7280;
+        font-size: 1rem;
+        cursor: pointer;
+        padding: 4px;
+        
+        &:hover {
+          color: vars.$primary;
+        }
+      }
+    }
+  }
+}                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             

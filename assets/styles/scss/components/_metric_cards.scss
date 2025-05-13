@@ -1,0 +1,68 @@
+@use 'sass:map';
+@use '../variables' as vars;
+@use '../mixins' as mix;
+
+// Estilos para cards de métricas
+.metric-card {
+  background-color: white;
+  border-radius: map.get(vars.$border-radius, 'md');
+  box-shadow: map.get(vars.$shadows, 'base');
+  padding: map.get(vars.$spacing, 3);
+  margin-bottom: map.get(vars.$spacing, 3);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: map.get(vars.$shadows, 'md');
+  }
+  
+  &__title {
+    font-size: map.get(vars.$font-sizes, 'sm');
+    color: vars.$gray-700;
+    margin-bottom: map.get(vars.$spacing, 2);
+    font-weight: 600;
+  }
+  
+  &__value {
+    font-size: map.get(vars.$font-sizes, 'xl');
+    font-weight: 700;
+    color: vars.$primary;
+  }
+  
+  &__subtitle {
+    font-size: map.get(vars.$font-sizes, 'xs');
+    color: vars.$gray-600;
+    margin-top: map.get(vars.$spacing, 1);
+  }
+}
+
+// Variações de cores para cards de métricas
+.metric-card {
+  &--success {
+    border-left: 4px solid vars.$success;
+    .metric-card__value {
+      color: vars.$success;
+    }
+  }
+  
+  &--warning {
+    border-left: 4px solid vars.$warning;
+    .metric-card__value {
+      color: vars.$warning;
+    }
+  }
+  
+  &--danger {
+    border-left: 4px solid vars.$danger;
+    .metric-card__value {
+      color: vars.$danger;
+    }
+  }
+  
+  &--primary {
+    border-left: 4px solid vars.$primary;
+    .metric-card__value {
+      color: vars.$primary;
+    }
+  }
+} 

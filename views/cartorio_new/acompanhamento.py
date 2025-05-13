@@ -34,8 +34,8 @@ def exibir_acompanhamento(df_cartorio):
         return
 
     # Verificar se as colunas necessárias existem
-    coluna_nome_familia = 'UF_CRM_12_1722882763189'
-    coluna_id_requerente = 'UF_CRM_12_1723552729' # ID para contagem
+    coluna_nome_familia = 'UF_CRM_34_NOME_FAMILIA'  # ATUALIZADO para o novo campo SPA
+    coluna_id_requerente = 'UF_CRM_34_ID_REQUERENTE' # ATUALIZADO para o novo campo SPA
     coluna_data_venda_familia = 'DATA_VENDA_FAMILIA' # Adicionado para filtro
     colunas_requeridas = ['ID', 'STAGE_ID', coluna_nome_familia, coluna_id_requerente, coluna_data_venda_familia]
     colunas_faltantes = [col for col in colunas_requeridas if col not in df_cartorio.columns]
