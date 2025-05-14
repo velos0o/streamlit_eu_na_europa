@@ -7,7 +7,7 @@ from .data_loader import carregar_dados_cartorio
 # Importar funções das novas seções/abas
 from .visao_geral import exibir_visao_geral
 from .acompanhamento import exibir_acompanhamento
-from .producao import exibir_producao
+# from .producao import exibir_producao # REMOVIDO
 from .pendencias import exibir_pendencias
 from .higienizacao_desempenho import exibir_higienizacao_desempenho
 
@@ -48,17 +48,15 @@ def show_cartorio_new():
         return
         
     # --- Renderização Condicional da View baseada no Estado da Sessão de main.py ---
-    subpagina_selecionada = st.session_state.get('emissao_subpagina', 'Visão Geral')
+    subpagina_selecionada = st.session_state.get('emissao_subpagina', 'Funil Certidões')
     
-    if subpagina_selecionada == "Visão Geral":
+    if subpagina_selecionada == "Funil Certidões":
         exibir_visao_geral(df_cartorio)
-    elif subpagina_selecionada == "Acompanhamento":
+    elif subpagina_selecionada == "Emissões Por Família":
         exibir_acompanhamento(df_cartorio)
-    elif subpagina_selecionada == "Produção":
-        exibir_producao(df_cartorio)
-    elif subpagina_selecionada == "Pendências":
+    elif subpagina_selecionada == "Certidões Pendentes por responsável":
         exibir_pendencias(df_cartorio)
-    elif subpagina_selecionada == "Higienização Desempenho":
+    elif subpagina_selecionada == "Desempenho Conclusão de Pasta":
         exibir_higienizacao_desempenho()
     else:
         st.warning(f"Subpágina desconhecida: {subpagina_selecionada}")

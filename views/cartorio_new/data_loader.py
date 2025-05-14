@@ -221,12 +221,94 @@ def carregar_dados_crm_deal_com_uf():
 
     return df_mesclado
 
+# Função para carregar dados do crm_deal com category_id = 46
+def carregar_dados_crm_deal_cat46():
+    """
+    Carrega dados de CRM_DEAL (cat 46) e seus campos personalizados (UF_CRM_1746054586042 - data venda),
+    usando a função de carregamento cacheada.
+    
+    Returns:
+        pandas.DataFrame: DataFrame com dados da categoria 46 com data de venda.
+    """
+    # Carregar crm_deal com filtro de categoria 46
+    table_deal = "crm_deal"
+    category_filter = {"dimensionsFilters": [[]]}
+    category_filter["dimensionsFilters"][0].append({
+        "fieldName": "CATEGORY_ID", 
+        "values": ["46"], 
+        "type": "INCLUDE", 
+        "operator": "EQUALS"
+    })
+    df_deal = load_data_cached(table_deal, filters=category_filter)
+    if df_deal.empty:
+        print("[WARN] Não foi possível carregar os dados da tabela crm_deal para a categoria 46.")
+        return pd.DataFrame()
+        
+    # Selecionar colunas e processar dados básicos
+    colunas_necessarias = ['ID', 'TITLE', 'ASSIGNED_BY_NAME']
+    colunas_presentes = [col for col in colunas_necessarias if col in df_deal.columns]
+    df_deal = df_deal[colunas_presentes].copy()
+
+    # Carregar crm_deal_uf com filtro de ID para obter campos personalizados
+    table_deal_uf = "crm_deal_uf"
+    deal_ids = df_deal['ID'].astype(str).tolist()
+    if len(deal_ids) > 1000:
+        deal_ids = deal_ids[:1000]
+    deal_filter = {"dimensionsFilters": [[]]}
+    deal_filter["dimensionsFilters"][0].append({
+        "fieldName": "DEAL_ID", 
+        "values": deal_ids, 
+        "type": "INCLUDE", 
+        "operator": "EQUALS"
+    })
+    df_deal_uf = load_data_cached(table_deal_uf, filters=deal_filter)
+    if df_deal_uf.empty:
+        print("[WARN] Não foi possível carregar os dados da tabela crm_deal_uf para a categoria 46.")
+        return pd.DataFrame()
+
+    # Selecionar campos personalizados necessários
+    colunas_uf_obrigatorias = ['DEAL_ID', 'UF_CRM_1722605592778', 'UF_CRM_1746054586042']
+    colunas_uf_presentes = [col for col in colunas_uf_obrigatorias if col in df_deal_uf.columns]
+    
+    # Verificar se os campos chave existem
+    campos_faltantes = set(colunas_uf_obrigatorias) - set(colunas_uf_presentes)
+    if campos_faltantes:
+        print(f"[WARN] Campos obrigatórios ausentes em crm_deal_uf: {campos_faltantes}")
+        if 'UF_CRM_1722605592778' not in colunas_uf_presentes or 'DEAL_ID' not in colunas_uf_presentes:
+            print("[ERROR] Campo de ID Família ou DEAL_ID não encontrado. Impossível prosseguir.")
+            return pd.DataFrame()
+    
+    df_deal_uf_filtrado = df_deal_uf[colunas_uf_presentes].copy()
+
+    # Mesclar dados principais com UFs
+    df_mesclado = pd.merge(
+        df_deal,
+        df_deal_uf_filtrado,
+        left_on='ID',
+        right_on='DEAL_ID',
+        how='inner'
+    )
+    
+    # Processar data de venda (UF_CRM_1746054586042)
+    if 'UF_CRM_1746054586042' in df_mesclado.columns:
+        df_mesclado = df_mesclado.rename(columns={'UF_CRM_1746054586042': 'DATA_VENDA'})
+        df_mesclado['DATA_VENDA'] = pd.to_datetime(df_mesclado['DATA_VENDA'], errors='coerce')
+        print(f"[INFO] Coluna de data de venda processada. {df_mesclado['DATA_VENDA'].notna().sum()} registros com data.")
+    else:
+        df_mesclado['DATA_VENDA'] = pd.NaT
+        print("[WARN] Coluna de data de venda não encontrada.")
+
+    # Garantir que UF_CRM_1722605592778 esteja como string para facilitar o merge
+    df_mesclado['UF_CRM_1722605592778'] = df_mesclado['UF_CRM_1722605592778'].fillna('N/A').astype(str).str.strip()
+    
+    return df_mesclado
+
 # A função principal agora chama load_data(), que usa o cache internamente
 # Não precisa cachear esta função diretamente
 def carregar_dados_cartorio():
     """
     Carrega os dados dos cartórios (cat 92 e 94 - SPA) usando cache e filtro na API,
-    e faz o merge com os dados de negócio (cat 0) para obter a data de venda (DATE_CREATE).
+    e faz o merge com os dados de negócio (cat 46) para obter a data de venda (UF_CRM_1746054586042).
 
     Returns:
         pandas.DataFrame: DataFrame com os dados dos cartórios filtrados e enriquecidos com a data de venda.
@@ -240,59 +322,103 @@ def carregar_dados_cartorio():
             # print("Nenhum dado de item de cartório carregado.") 
             return pd.DataFrame()
 
-        # Carregar dados de negócio (cat 0) com a data de criação e ID de família
-        df_deal_cat0 = carregar_dados_crm_deal_com_uf()
-        if df_deal_cat0.empty:
-            st.warning("Dados de negócio (cat 0) não encontrados. A coluna 'Data de Venda' não será adicionada.")
-            # Adicionar coluna vazia para consistência, se necessário nas views
-            df_cartorio['DATA_VENDA'] = pd.NaT 
-        else:
-            # Selecionar colunas relevantes do df_deal_cat0 para o merge
-            col_id_familia_deal = 'UF_CRM_CAMPO_COMPARACAO' # Este é o UF_CRM_1722605592778
-            col_data_venda = 'DATE_CREATE'
-            if col_id_familia_deal not in df_deal_cat0.columns:
-                st.error(f"Coluna chave '{col_id_familia_deal}' não encontrada nos dados de negócio (cat 0). Merge não pode ser realizado.")
+        # Carregar dados de negócio (cat 46) com data de venda (NOVA IMPLEMENTAÇÃO)
+        df_deal_cat46 = carregar_dados_crm_deal_cat46()
+        if df_deal_cat46.empty:
+            st.warning("Dados de negócio (cat 46) não encontrados. A coluna 'Data de Venda' não será adicionada.")
+            # Verificar se a abordagem antiga ainda está configurada como fallback
+            df_deal_cat0 = carregar_dados_crm_deal_com_uf()
+            if df_deal_cat0.empty:
+                print("[WARN] Dados de negócio (cat 0 e cat 46) não disponíveis. Nenhuma data de venda será adicionada.")
                 df_cartorio['DATA_VENDA'] = pd.NaT
-            elif col_data_venda not in df_deal_cat0.columns:
-                 st.warning(f"Coluna '{col_data_venda}' não encontrada nos dados de negócio (cat 0). Data de venda não será adicionada.")
-                 df_cartorio['DATA_VENDA'] = pd.NaT
             else:
-                df_deal_to_merge = df_deal_cat0[[col_id_familia_deal, col_data_venda]].copy()
-                # Remover duplicatas no lado do deal, mantendo a primeira data de venda (ou a mais antiga?)
-                # Assumindo que queremos a primeira data encontrada para um ID de família
-                df_deal_to_merge = df_deal_to_merge.dropna(subset=[col_id_familia_deal, col_data_venda])
-                df_deal_to_merge = df_deal_to_merge.sort_values(by=col_data_venda, ascending=True) # Ordenar para pegar a mais antiga
-                df_deal_to_merge = df_deal_to_merge.drop_duplicates(subset=[col_id_familia_deal], keep='first')
-
-                # --- Verificações e Processamento Adicional no df_cartorio ---
-                
-                # Coluna ID Família (Usada para o merge com dados de venda)
-                col_id_familia_cartorio = 'UF_CRM_34_ID_FAMILIA' # Alterado para novo campo SPA
-                if col_id_familia_cartorio not in df_cartorio.columns:
-                    print(f"[ERROR] Coluna chave '{col_id_familia_cartorio}' (ID Família SPA) não encontrada nos dados do cartório. Merge não pode ser realizado.") # Mensagem atualizada
-                    df_cartorio['DATA_VENDA'] = pd.NaT # Adiciona coluna vazia
+                # FALLBACK - Usar abordagem antiga com cat 0 como antes
+                print("[INFO] Usando dados de categoria 0 como fallback para data de venda.")
+                # Manter código existente para cat 0
+                col_id_familia_deal = 'UF_CRM_CAMPO_COMPARACAO'
+                col_data_venda = 'DATE_CREATE'
+                if col_id_familia_deal not in df_deal_cat0.columns:
+                    print(f"[ERROR] Coluna chave '{col_id_familia_deal}' não encontrada nos dados de negócio (cat 0).")
+                    df_cartorio['DATA_VENDA'] = pd.NaT
+                elif col_data_venda not in df_deal_cat0.columns:
+                    print(f"[WARN] Coluna '{col_data_venda}' não encontrada nos dados de negócio (cat 0).")
+                    df_cartorio['DATA_VENDA'] = pd.NaT
                 else:
-                     # Garantir que a chave de merge seja string em ambos DFs E REMOVER ESPAÇOS
-                    df_cartorio[col_id_familia_cartorio] = df_cartorio[col_id_familia_cartorio].fillna('N/A').astype(str).str.strip()
-                    # Tratar também a coluna no df_deal_to_merge, caso não tenha sido feito antes
-                    df_deal_to_merge[col_id_familia_deal] = df_deal_to_merge[col_id_familia_deal].astype(str).str.strip()
+                    # Manter código existente para processamento cat 0
+                    # [CÓDIGO EXISTENTE MANTIDO]
+                    df_deal_to_merge = df_deal_cat0[[col_id_familia_deal, col_data_venda]].copy()
+                    df_deal_to_merge = df_deal_to_merge.dropna(subset=[col_id_familia_deal, col_data_venda])
+                    df_deal_to_merge = df_deal_to_merge.sort_values(by=col_data_venda, ascending=True)
+                    df_deal_to_merge = df_deal_to_merge.drop_duplicates(subset=[col_id_familia_deal], keep='first')
+                    
+                    # --- Processamento Coluna ID Família no Cartório ---
+                    col_id_familia_cartorio = 'UF_CRM_34_ID_FAMILIA'
+                    if col_id_familia_cartorio not in df_cartorio.columns:
+                        print(f"[ERROR] Coluna chave '{col_id_familia_cartorio}' não encontrada nos dados do cartório.")
+                        df_cartorio['DATA_VENDA'] = pd.NaT
+                    else:
+                        # Preparar para merge
+                        df_cartorio[col_id_familia_cartorio] = df_cartorio[col_id_familia_cartorio].fillna('N/A').astype(str).str.strip()
+                        df_deal_to_merge[col_id_familia_deal] = df_deal_to_merge[col_id_familia_deal].astype(str).str.strip()
 
-                    # Realizar o merge
-                    print(f"[INFO] Realizando merge entre Cartório ({len(df_cartorio)}) e Deals ({len(df_deal_to_merge)}) usando '{col_id_familia_cartorio}' e '{col_id_familia_deal}'")
-                    df_cartorio = pd.merge(
-                        df_cartorio,
-                        df_deal_to_merge,
-                        left_on=col_id_familia_cartorio,
-                        right_on=col_id_familia_deal,
-                        how='left' # Mantém todos os registros do cartório
-                    )
-                    
-                    # Renomear a coluna de data e tratar possíveis NaT pós-merge
-                    df_cartorio = df_cartorio.rename(columns={col_data_venda: 'DATA_VENDA'})
-                    df_cartorio['DATA_VENDA'] = pd.to_datetime(df_cartorio['DATA_VENDA'], errors='coerce')
-                    
-                    n_merged = df_cartorio['DATA_VENDA'].notna().sum()
-                    print(f"[INFO] Merge concluído. {n_merged} registros do cartório receberam uma Data de Venda.")
+                        # Realizar merge com abordagem antiga
+                        print(f"[INFO] Realizando merge entre Cartório e Deals (cat 0) usando '{col_id_familia_cartorio}' e '{col_id_familia_deal}'")
+                        df_cartorio = pd.merge(
+                            df_cartorio,
+                            df_deal_to_merge,
+                            left_on=col_id_familia_cartorio,
+                            right_on=col_id_familia_deal,
+                            how='left'
+                        )
+                        
+                        # Renomear e processar
+                        df_cartorio = df_cartorio.rename(columns={col_data_venda: 'DATA_VENDA'})
+                        df_cartorio['DATA_VENDA'] = pd.to_datetime(df_cartorio['DATA_VENDA'], errors='coerce')
+                        
+                        n_merged = df_cartorio['DATA_VENDA'].notna().sum()
+                        print(f"[INFO] Merge cat 0 concluído. {n_merged} registros receberam Data de Venda.")
+        else:
+            # NOVA IMPLEMENTAÇÃO - Usar dados da cat 46
+            print(f"[INFO] Processando merge com dados de negócio categoria 46 ({len(df_deal_cat46)} registros)")
+            
+            # Selecionar colunas relevantes do df_deal_cat46 para o merge
+            col_id_familia_cat46 = 'UF_CRM_1722605592778'  # ID da família
+            col_data_venda = 'DATA_VENDA'  # Já renomeado na função carregar_dados_crm_deal_cat46
+            
+            # Preparar dados para merge
+            df_deal_to_merge = df_deal_cat46[[col_id_familia_cat46, col_data_venda]].copy()
+            
+            # Remover registros sem ID ou data
+            df_deal_to_merge = df_deal_to_merge.dropna(subset=[col_id_familia_cat46, col_data_venda])
+            
+            # Ordenar por data (ascendente) e pegar a primeira data para cada ID de família
+            df_deal_to_merge = df_deal_to_merge.sort_values(by=col_data_venda, ascending=True)
+            df_deal_to_merge = df_deal_to_merge.drop_duplicates(subset=[col_id_familia_cat46], keep='first')
+            
+            # Coluna ID Família no Cartório
+            col_id_familia_cartorio = 'UF_CRM_34_ID_FAMILIA'
+            
+            if col_id_familia_cartorio not in df_cartorio.columns:
+                print(f"[ERROR] Coluna chave '{col_id_familia_cartorio}' não encontrada nos dados do cartório.")
+                df_cartorio['DATA_VENDA'] = pd.NaT
+            else:
+                # Preparar colunas para merge em ambos DataFrames
+                df_cartorio[col_id_familia_cartorio] = df_cartorio[col_id_familia_cartorio].fillna('N/A').astype(str).str.strip()
+                
+                # Realizar o merge
+                print(f"[INFO] Realizando merge entre Cartório ({len(df_cartorio)}) e Deals cat 46 ({len(df_deal_to_merge)})")
+                print(f"[INFO] Usando '{col_id_familia_cartorio}' e '{col_id_familia_cat46}'")
+                df_cartorio = pd.merge(
+                    df_cartorio,
+                    df_deal_to_merge,
+                    left_on=col_id_familia_cartorio,
+                    right_on=col_id_familia_cat46,
+                    how='left'
+                )
+                
+                # Ver quantos registros receberam data
+                n_merged = df_cartorio['DATA_VENDA'].notna().sum()
+                print(f"[INFO] Merge cat 46 concluído. {n_merged} registros receberam Data de Venda.")
         
         # Mover o processamento restante para após o merge, caso dependam dos dados mesclados
         # ou precisem ser refeitos no dataframe 'df_cartorio' atualizado

@@ -449,7 +449,7 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
 
     # Para garantir que a ficha ocupe todo o espaço disponível,
     # vamos incluir CSS adicional diretamente na página
-    css_fullwidth = """
+    css_fullwidth = '''
     <style>
     .ficha-familia-container {
         width: 100% !important;
@@ -464,7 +464,7 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
         flex: 0 1 100% !important;
     }
     </style>
-    """
+    '''
     
     # Primeiro injetamos o CSS, depois o HTML da ficha
     st.markdown(css_fullwidth, unsafe_allow_html=True)
@@ -475,7 +475,7 @@ def exibir_metricas_macro():
     st.info("Seção de métricas gerais ainda em desenvolvimento.")
     pass
 
-def show_pagina_inicial():
+def show_ficha_familia():
     # Configurar layout da página para wide
     # Idealmente, isso deve ser chamado apenas uma vez no script principal (main.py)
     # Se main.py já chama set_page_config, esta linha pode causar erro ou ser ignorada.
@@ -491,7 +491,7 @@ def show_pagina_inicial():
     st.markdown("<p class='page-subtitle'>Busque por uma família para ver detalhes ou visualize métricas gerais.</p>", unsafe_allow_html=True)
 
     # Garantir que toda a página use a largura máxima disponível
-    st.markdown("""
+    st.markdown('''
     <style>
     .block-container {
         max-width: 100% !important;
@@ -533,7 +533,7 @@ def show_pagina_inicial():
         font-style: italic;
     }
     </style>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
 
     # Carregar os dados das famílias antecipadamente para agilizar a busca
     df_crm_deals_full = load_crm_deal_data(category_id=46)
@@ -695,10 +695,10 @@ def show_pagina_inicial():
 if __name__ == '__main__':
     # Simular st.session_state se necessário para testes
     if 'pagina_atual' not in st.session_state:
-        st.session_state['pagina_atual'] = "Página Inicial"
+        st.session_state['pagina_atual'] = "Ficha da Família"
     if 'emissao_subpagina' not in st.session_state:
         st.session_state.emissao_subpagina = 'Visão Geral'
     if 'comune_subpagina' not in st.session_state:
         st.session_state.comune_subpagina = 'Visão Geral'
         
-    show_pagina_inicial() 
+    show_ficha_familia() 

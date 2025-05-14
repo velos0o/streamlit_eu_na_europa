@@ -18,23 +18,19 @@ sys.path.append(str(path_root))
 
 # Importações das páginas - usando a pasta views
 from views.inicio import show_inicio
-from views.producao import show_producao
-from views.conclusoes import show_conclusoes
 from views.extracoes.extracoes_main import show_extracoes
 # Importar nova página de apresentação de conclusões
-from views.apresentacao import show_apresentacao
+# from views.apresentacao import show_apresentacao
 # Importar nova página de COMUNE
-from views.comune.comune_main import show_comune
+# from views.comune.comune_main import show_comune
 # Importar nova página de Tickets
-from views.tickets import show_tickets
+# from views.tickets import show_tickets
 # Importar nova página de Reclamações (caminho atualizado)
-from views.reclamacoes.reclamacoes_main import show_reclamacoes
+# from views.reclamacoes.reclamacoes_main import show_reclamacoes
 # Importar nova página de Emissões Brasileiras
 from views.cartorio_new.cartorio_new_main import show_cartorio_new
-# --- NOVO: Importar nova página de Comune (Novo) ---
-from views.comune_new.comune_new_main import show_comune_new
-# --- NOVO: Importar Página Inicial ---
-from views.pagina_inicial import show_pagina_inicial
+# --- NOVO: Importar Ficha da Família (anteriormente Página Inicial) ---
+from views.ficha_familia import show_ficha_familia
 # --- NOVO: Importar nova página unificada de Higienizações ---
 from views.higienizacoes import show_higienizacoes
 
@@ -50,95 +46,83 @@ from components.quick_links import show_quick_links, show_page_links_sidebar
 # ----- INÍCIO DA ADIÇÃO: PROCESSAMENTO DE URLs PERSONALIZADAS -----
 # Mapeamento de rotas para páginas
 ROTAS = {
-    "pagina_inicial": "Página Inicial",
+    "ficha_familia": "Ficha da Família",
     "higienizacoes": "Higienizações",
     "cartorio_new": "Emissões Brasileiras",
-    "comune_new": "Comune (Novo)",
-    "comune": "Comune",
-    "extracoes": "Extrações de Dados",
-    "tickets": "Tickets",
-    "reclamacoes": "Reclamações",
-    "apresentacao": "Apresentação Conclusões"
+    "extracoes": "Extrações de Dados"
 }
 
 # Mapeamento de sub-rotas para Emissões Brasileiras
 SUB_ROTAS_EMISSOES = {
-    "visao_geral": "Visão Geral",
-    "acompanhamento": "Acompanhamento",
-    "producao": "Produção",
-    "pendencias": "Pendências",
-    "higienizacao_desempenho": "Higienização Desempenho"
+    "funil_certidoes": "Funil Certidões",
+    "emissoes_por_familia": "Emissões Por Família",
+    "certidoes_pendentes_responsavel": "Certidões Pendentes por responsável",
+    "desempenho_conclusao_pasta": "Desempenho Conclusão de Pasta"
 }
 
-# Mapeamento de sub-rotas para Comune (Novo)
-SUB_ROTAS_COMUNE = {
-    "visao_geral": "Visão Geral",
-    "tempo_solicitacao": "Tempo de Solicitação",
-    "mapa_comune_1": "Mapa Comune 1",
-    "mapa_comune_2": "Mapa Comune 2",
-    "mapa_comune_3": "Mapa Comune 3"
-}
+# Mapeamento de sub-rotas para Comune (Novo) - REMOVIDO
+# SUB_ROTAS_COMUNE = {
+#     "visao_geral": "Visão Geral",
+#     "tempo_solicitacao": "Tempo de Solicitação",
+#     "mapa_comune_1": "Mapa Comune 1",
+#     "mapa_comune_2": "Mapa Comune 2",
+#     "mapa_comune_3": "Mapa Comune 3"
+# }
 
 # Mapeamento de sub-rotas para Higienizações
 SUB_ROTAS_HIGIENIZACOES = {
-    "producao": "Produção",
-    "conclusoes": "Conclusões",
+    # "producao": "Produção", # REMOVIDO
+    # "conclusoes": "Conclusões", # REMOVIDO
     "checklist": "Checklist"
 }
 
 # Processar parâmetros da URL
 def processar_parametros_url():
-    # Verificar se existe o parâmetro 'page' na URL
-    if 'page' in st.query_params:
+    # Processar a URL apenas se 'pagina_atual_via_url_processada' ainda não foi definida 
+    # (ou seja, na primeira carga ou se o estado foi perdido)
+    if 'pagina_atual_via_url_processada' not in st.session_state and 'page' in st.query_params:
         rota = st.query_params['page'].lower()
-        
-        # Verificar se a rota existe no nosso mapeamento
         if rota in ROTAS:
             st.session_state['pagina_atual'] = ROTAS[rota]
-            
-            # Expandir submenu apropriado com base na página selecionada
+            st.session_state['pagina_atual_via_url_processada'] = True # Marcar que processamos
+
+            # Lógica de subrotas como antes
             if rota == 'cartorio_new':
                 st.session_state.emissao_submenu_expanded = True
-                # Verificar se há subrota
                 if 'sub' in st.query_params and st.query_params['sub'] in SUB_ROTAS_EMISSOES:
                     st.session_state.emissao_subpagina = SUB_ROTAS_EMISSOES[st.query_params['sub']]
                 else:
-                    st.session_state.emissao_subpagina = "Visão Geral"  # Valor padrão
-                    
-            elif rota == 'comune_new':
-                st.session_state.comune_submenu_expanded = True
-                # Verificar se há subrota
-                if 'sub' in st.query_params and st.query_params['sub'] in SUB_ROTAS_COMUNE:
-                    st.session_state.comune_subpagina = SUB_ROTAS_COMUNE[st.query_params['sub']]
-                else:
-                    st.session_state.comune_subpagina = "Visão Geral"  # Valor padrão
-                    
+                    st.session_state.emissao_subpagina = "Funil Certidões"
             elif rota == 'higienizacoes':
                 st.session_state.higienizacao_submenu_expanded = True
-                # Verificar se há subrota
                 if 'sub' in st.query_params and st.query_params['sub'] in SUB_ROTAS_HIGIENIZACOES:
                     st.session_state.higienizacao_subpagina = SUB_ROTAS_HIGIENIZACOES[st.query_params['sub']]
                 else:
-                    st.session_state.higienizacao_subpagina = "Produção"  # Valor padrão
+                    st.session_state.higienizacao_subpagina = "Checklist" 
+        # Se a rota na URL não for válida, não faz nada, deixa o default do session_state
+    elif 'pagina_atual_via_url_processada' not in st.session_state:
+        st.session_state['pagina_atual_via_url_processada'] = True
                     
 # Inicializar estado da sessão
 if 'pagina_atual' not in st.session_state:
-    st.session_state['pagina_atual'] = 'Página Inicial'
+    st.session_state['pagina_atual'] = 'Ficha da Família'
+    if 'pagina_atual_via_url_processada' in st.session_state: # Adicionado para resetar o flag
+        del st.session_state['pagina_atual_via_url_processada']
 # --- Estado para submenu Emissões --- 
 if 'emissao_submenu_expanded' not in st.session_state:
     st.session_state.emissao_submenu_expanded = False
 if 'emissao_subpagina' not in st.session_state:
-    st.session_state.emissao_subpagina = 'Visão Geral' # Subpágina padrão
-# --- Estado para submenu Comune (Novo) ---
-if 'comune_submenu_expanded' not in st.session_state:
-    st.session_state.comune_submenu_expanded = False
-if 'comune_subpagina' not in st.session_state:
-    st.session_state.comune_subpagina = 'Visão Geral' # Subpágina padrão
+    st.session_state.emissao_subpagina = 'Funil Certidões' # Subpágina padrão ATUALIZADO
+# --- Estado para submenu Comune (Novo) --- REMOVIDO
+# if 'comune_submenu_expanded' not in st.session_state:
+#     st.session_state.comune_submenu_expanded = False
+# if 'comune_subpagina' not in st.session_state:
+#     st.session_state.comune_subpagina = 'Visão Geral' # Subpágina padrão
 # --- Estado para submenu Higienizações ---
 if 'higienizacao_submenu_expanded' not in st.session_state:
     st.session_state.higienizacao_submenu_expanded = False
 if 'higienizacao_subpagina' not in st.session_state:
-    st.session_state.higienizacao_subpagina = 'Produção' # Subpágina padrão
+    st.session_state.higienizacao_subpagina = 'Checklist' # Subpágina padrão ATUALIZADO para Checklist
 
 # Processar os parâmetros da URL
 processar_parametros_url()
@@ -227,10 +211,8 @@ st.sidebar.image("assets/LOGO-EU.NA.EUROPA-MAIO.24-COLORIDO-VERTICAL.svg", width
 # Menu de navegação simplificado
 st.sidebar.title("Dashboard CRM Bitrix24")
 
-# Adicionar o botão grande de atualização na barra lateral
-render_sidebar_refresh_button()
-
-st.sidebar.markdown("---")
+# Adicionar o guia de relatório na barra lateral
+# show_guide_sidebar()
 
 # Adicionar barra de pesquisa no topo do sidebar
 show_search_box()
@@ -241,36 +223,18 @@ st.sidebar.subheader("Navegação")
 
 # Variáveis de estado para controlar a navegação
 if 'pagina_atual' not in st.session_state:
-    st.session_state['pagina_atual'] = 'Página Inicial'
+    st.session_state['pagina_atual'] = 'Ficha da Família'
 # --- NOVO: Estado para submenu Emissões --- 
 if 'emissao_submenu_expanded' not in st.session_state:
     st.session_state.emissao_submenu_expanded = False
 if 'emissao_subpagina' not in st.session_state:
-    st.session_state.emissao_subpagina = 'Visão Geral' # Subpágina padrão
+    st.session_state.emissao_subpagina = 'Funil Certidões' # Subpágina padrão ATUALIZADO
 
-# --- NOVO: Estado para submenu Comune (Novo) ---
-if 'comune_submenu_expanded' not in st.session_state:
-    st.session_state.comune_submenu_expanded = False
-if 'comune_subpagina' not in st.session_state:
-    st.session_state.comune_subpagina = 'Visão Geral' # Subpágina padrão
-
-# --- NOVO: Estado para submenu Higienizações ---
-if 'higienizacao_submenu_expanded' not in st.session_state:
-    st.session_state.higienizacao_submenu_expanded = False
-if 'higienizacao_subpagina' not in st.session_state:
-    st.session_state.higienizacao_subpagina = 'Produção' # Subpágina padrão
-
-# Funções para alterar a página e controlar submenu
-def reset_submenu():
-    st.session_state.emissao_submenu_expanded = False
-    st.session_state.comune_submenu_expanded = False # Resetar submenu Comune também
-    st.session_state.higienizacao_submenu_expanded = False # Resetar submenu Higienizações também
-
-# --- FUNÇÕES DE NAVEGAÇÃO COM ATUALIZAÇÃO DE URL ---
-def ir_para_pagina_inicial():
+# --- NOVO: Funções de Navegação COM ATUALIZAÇÃO DE URL ---
+def ir_para_ficha_familia():
     reset_submenu()
-    st.session_state['pagina_atual'] = 'Página Inicial'
-    st.query_params['page'] = 'pagina_inicial'
+    st.session_state['pagina_atual'] = 'Ficha da Família'
+    st.query_params['page'] = 'ficha_familia'
     # Remover parâmetro 'sub' se existir
     if 'sub' in st.query_params:
         del st.query_params['sub']
@@ -296,13 +260,6 @@ def ir_para_conclusoes():
     if 'sub' in st.query_params:
         del st.query_params['sub']
         
-def ir_para_comune(): 
-    reset_submenu()
-    st.session_state['pagina_atual'] = 'Comune'
-    st.query_params['page'] = 'comune'
-    if 'sub' in st.query_params:
-        del st.query_params['sub']
-        
 def ir_para_extracoes(): 
     reset_submenu()
     st.session_state['pagina_atual'] = 'Extrações de Dados'
@@ -310,154 +267,127 @@ def ir_para_extracoes():
     if 'sub' in st.query_params:
         del st.query_params['sub']
         
-def ir_para_apresentacao(): 
-    reset_submenu()
-    st.session_state['pagina_atual'] = 'Apresentação Conclusões'
-    st.query_params['page'] = 'apresentacao'
-    if 'sub' in st.query_params:
-        del st.query_params['sub']
-        
-def ir_para_tickets(): 
-    reset_submenu()
-    st.session_state['pagina_atual'] = 'Tickets'
-    st.query_params['page'] = 'tickets'
-    if 'sub' in st.query_params:
-        del st.query_params['sub']
-        
-def ir_para_reclamacoes(): 
-    reset_submenu()
-    st.session_state['pagina_atual'] = 'Reclamações'
-    st.query_params['page'] = 'reclamacoes'
-    if 'sub' in st.query_params:
-        del st.query_params['sub']
+# Funções para alterar a página e controlar submenu
+def reset_submenu():
+    st.session_state.emissao_submenu_expanded = False
+    # st.session_state.comune_submenu_expanded = False # Resetar submenu Comune também - REMOVIDO
+    st.session_state.higienizacao_submenu_expanded = False # Resetar submenu Higienizações também
 
 # --- NOVO: Função para toggle e navegação do submenu Emissões ---
 def toggle_emissao_submenu():
+    print(f"DEBUG: toggle_emissao_submenu chamada. Expandido antes: {st.session_state.get('emissao_submenu_expanded')}") # DEBUG
     st.session_state.emissao_submenu_expanded = not st.session_state.get('emissao_submenu_expanded', False)
-    st.session_state.comune_submenu_expanded = False # Fecha outro submenu
     st.session_state.higienizacao_submenu_expanded = False # Fecha submenu Higienizações
-    # Define a página principal e subpágina padrão ao abrir/fechar
+    
+    print(f"DEBUG: toggle_emissao_submenu - Expandido depois: {st.session_state.emissao_submenu_expanded}") # DEBUG
     if st.session_state.emissao_submenu_expanded:
+        print(f"DEBUG: toggle_emissao_submenu - Página atual ANTES: {st.session_state.get('pagina_atual')}") # DEBUG
         st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+        print(f"DEBUG: toggle_emissao_submenu - Página atual DEPOIS: {st.session_state.get('pagina_atual')}") # DEBUG
         st.query_params['page'] = 'cartorio_new'
-        # Mantém a subpágina atual se já estiver em uma subpágina de Emissões
-        if st.session_state.get('pagina_atual') != 'Emissões Brasileiras':
-             st.session_state.emissao_subpagina = 'Visão Geral'
-             st.query_params['sub'] = 'visao_geral'
-    # Se fechar, mantém a URL atual
+        current_subpage = st.session_state.get('emissao_subpagina')
+        if current_subpage not in SUB_ROTAS_EMISSOES.values():
+             st.session_state.emissao_subpagina = 'Funil Certidões'
+             st.query_params['sub'] = 'funil_certidoes' 
+        print(f"DEBUG: toggle_emissao_submenu - Subpágina definida para: {st.session_state.get('emissao_subpagina')}") # DEBUG
 
 # --- NOVO: Funções on_click para sub-botões Emissões ---
-def ir_para_emissao_visao_geral():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'Visão Geral'
+def ir_para_emissao_funil_certidoes():
+    print(f"DEBUG: ir_para_emissao_funil_certidoes chamada. Página atual ANTES: {st.session_state.get('pagina_atual')}") # DEBUG
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras' 
+    print(f"DEBUG: ir_para_emissao_funil_certidoes - Página atual DEPOIS: {st.session_state.get('pagina_atual')}") # DEBUG
+    st.session_state.emissao_subpagina = 'Funil Certidões'
     st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'visao_geral'
+    st.query_params['sub'] = 'funil_certidoes'
+    print(f"DEBUG: ir_para_emissao_funil_certidoes - Subpágina definida para: {st.session_state.get('emissao_subpagina')}") # DEBUG
 
-def ir_para_emissao_acompanhamento():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'Acompanhamento'
+def ir_para_emissao_emissoes_por_familia():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras' 
+    st.session_state.emissao_subpagina = 'Emissões Por Família'
     st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'acompanhamento'
+    st.query_params['sub'] = 'emissoes_por_familia'
 
-def ir_para_emissao_producao():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'Produção'
+def ir_para_emissao_certidoes_pendentes_responsavel():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras' # Garante que a página principal está correta
+    st.session_state.emissao_subpagina = 'Certidões Pendentes por responsável'
     st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'producao'
+    st.query_params['sub'] = 'certidoes_pendentes_responsavel'
 
-def ir_para_emissao_pendencias():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'Pendências'
+# --- Função on_click para sub-botão Desempenho Conclusão de Pasta ---
+def ir_para_emissao_desempenho_conclusao_pasta():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras' # Garante que a página principal está correta
+    st.session_state.emissao_subpagina = 'Desempenho Conclusão de Pasta'
     st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'pendencias'
+    st.query_params['sub'] = 'desempenho_conclusao_pasta'
 
-# --- NOVO: Função on_click para sub-botão Higienização Desempenho ---
-def ir_para_emissao_higienizacao_desempenho():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'Higienização Desempenho'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'higienizacao_desempenho'
-
-# --- NOVO: Função para toggle e navegação do submenu Comune (Novo) ---
-def toggle_comune_submenu():
-    st.session_state.comune_submenu_expanded = not st.session_state.get('comune_submenu_expanded', False)
-    st.session_state.emissao_submenu_expanded = False # Fecha outro submenu
-    st.session_state.higienizacao_submenu_expanded = False # Fecha submenu Higienizações
-    # Define a página principal e subpágina padrão ao abrir/fechar
-    if st.session_state.comune_submenu_expanded:
-        st.session_state['pagina_atual'] = 'Comune (Novo)'
-        st.query_params['page'] = 'comune_new'
-        # Mantém a subpágina atual se já estiver em uma subpágina do Comune
-        if st.session_state.get('pagina_atual') != 'Comune (Novo)':
-            st.session_state.comune_subpagina = 'Visão Geral'
-            st.query_params['sub'] = 'visao_geral'
-    # Se fechar, mantém a URL atual
+# --- NOVO: Função para toggle e navegação do submenu Comune (Novo) --- REMOVIDO
+# def toggle_comune_submenu():
+#     st.session_state.comune_submenu_expanded = not st.session_state.get('comune_submenu_expanded', False)
+#     st.session_state.emissao_submenu_expanded = False # Fecha outro submenu
+#     st.session_state.higienizacao_submenu_expanded = False # Fecha submenu Higienizações
+#     # Define a página principal e subpágina padrão ao abrir/fechar
+#     if st.session_state.comune_submenu_expanded:
+#         st.session_state['pagina_atual'] = 'Comune (Novo)'
+#         st.query_params['page'] = 'comune_new'
+#         # Mantém a subpágina atual se já estiver em uma subpágina do Comune
+#         if st.session_state.get('pagina_atual') != 'Comune (Novo)':
+#             st.session_state.comune_subpagina = 'Visão Geral'
+#             st.query_params['sub'] = 'visao_geral'
+#     # Se fechar, mantém a URL atual
 
 # --- NOVO: Função para toggle e navegação do submenu Higienizações ---
 def toggle_higienizacao_submenu():
     st.session_state.higienizacao_submenu_expanded = not st.session_state.get('higienizacao_submenu_expanded', False)
     st.session_state.emissao_submenu_expanded = False # Fecha submenu Emissões
-    st.session_state.comune_submenu_expanded = False # Fecha submenu Comune
+    # st.session_state.comune_submenu_expanded = False # Fecha submenu Comune - REMOVIDO
     # Define a página principal e subpágina padrão ao abrir/fechar
     if st.session_state.higienizacao_submenu_expanded:
         st.session_state['pagina_atual'] = 'Higienizações'
         st.query_params['page'] = 'higienizacoes'
         # Mantém a subpágina atual se já estiver em uma subpágina de Higienizações
         if st.session_state.get('pagina_atual') != 'Higienizações':
-            st.session_state.higienizacao_subpagina = 'Produção'
-            st.query_params['sub'] = 'producao'
+            st.session_state.higienizacao_subpagina = 'Checklist' # ATUALIZADO
+            st.query_params['sub'] = 'checklist' # ATUALIZADO
     # Se fechar, mantém a URL atual
 
 # --- NOVO: Funções on_click para sub-botões de Higienizações ---
-def ir_para_higienizacao_producao():
-    st.session_state['pagina_atual'] = 'Higienizações'
-    st.session_state.higienizacao_subpagina = 'Produção'
-    st.query_params['page'] = 'higienizacoes'
-    st.query_params['sub'] = 'producao'
-
-def ir_para_higienizacao_conclusoes():
-    st.session_state['pagina_atual'] = 'Higienizações'
-    st.session_state.higienizacao_subpagina = 'Conclusões'
-    st.query_params['page'] = 'higienizacoes'
-    st.query_params['sub'] = 'conclusoes'
-
 def ir_para_higienizacao_checklist():
     st.session_state['pagina_atual'] = 'Higienizações'
     st.session_state.higienizacao_subpagina = 'Checklist'
     st.query_params['page'] = 'higienizacoes'
     st.query_params['sub'] = 'checklist'
 
-# Funções on_click para sub-botões Comune (Novo)
-def ir_para_comune_visao_geral():
-    st.session_state['pagina_atual'] = 'Comune (Novo)'
-    st.session_state.comune_subpagina = 'Visão Geral'
-    st.query_params['page'] = 'comune_new'
-    st.query_params['sub'] = 'visao_geral'
+# Funções on_click para sub-botões Comune (Novo) - REMOVIDO
+# def ir_para_comune_visao_geral():
+#     st.session_state['pagina_atual'] = 'Comune (Novo)'
+#     st.session_state.comune_subpagina = 'Visão Geral'
+#     st.query_params['page'] = 'comune_new'
+#     st.query_params['sub'] = 'visao_geral'
 
-def ir_para_comune_tempo_solicitacao():
-    st.session_state['pagina_atual'] = 'Comune (Novo)'
-    st.session_state.comune_subpagina = 'Tempo de Solicitação'
-    st.query_params['page'] = 'comune_new'
-    st.query_params['sub'] = 'tempo_solicitacao'
+# def ir_para_comune_tempo_solicitacao():
+#     st.session_state['pagina_atual'] = 'Comune (Novo)'
+#     st.session_state.comune_subpagina = 'Tempo de Solicitação'
+#     st.query_params['page'] = 'comune_new'
+#     st.query_params['sub'] = 'tempo_solicitacao'
 
-# Funções on_click para sub-botões do MAPA (dentro de Comune Novo)
-def ir_para_mapa_comune_1():
-    st.session_state['pagina_atual'] = 'Comune (Novo)' # Permanece na página principal
-    st.session_state.comune_subpagina = 'Mapa Comune 1' # Define a subpágina para o mapa 1
-    st.query_params['page'] = 'comune_new'
-    st.query_params['sub'] = 'mapa_comune_1'
+# Funções on_click para sub-botões do MAPA (dentro de Comune Novo) - REMOVIDO
+# def ir_para_mapa_comune_1():
+#     st.session_state['pagina_atual'] = 'Comune (Novo)' # Permanece na página principal
+#     st.session_state.comune_subpagina = 'Mapa Comune 1' # Define a subpágina para o mapa 1
+#     st.query_params['page'] = 'comune_new'
+#     st.query_params['sub'] = 'mapa_comune_1'
 
-def ir_para_mapa_comune_2():
-    st.session_state['pagina_atual'] = 'Comune (Novo)'
-    st.session_state.comune_subpagina = 'Mapa Comune 2'
-    st.query_params['page'] = 'comune_new'
-    st.query_params['sub'] = 'mapa_comune_2'
+# def ir_para_mapa_comune_2():
+#     st.session_state['pagina_atual'] = 'Comune (Novo)'
+#     st.session_state.comune_subpagina = 'Mapa Comune 2'
+#     st.query_params['page'] = 'comune_new'
+#     st.query_params['sub'] = 'mapa_comune_2'
 
-def ir_para_mapa_comune_3():
-    st.session_state['pagina_atual'] = 'Comune (Novo)'
-    st.session_state.comune_subpagina = 'Mapa Comune 3'
-    st.query_params['page'] = 'comune_new'
-    st.query_params['sub'] = 'mapa_comune_3'
+# def ir_para_mapa_comune_3():
+#     st.session_state['pagina_atual'] = 'Comune (Novo)'
+#     st.session_state.comune_subpagina = 'Mapa Comune 3'
+#     st.query_params['page'] = 'comune_new'
+#     st.query_params['sub'] = 'mapa_comune_3'
 
 # --- NOVO: CSS ÚNICO para TODOS os sub-botões (movido de dentro dos ifs) ---
 st.markdown("""
@@ -510,10 +440,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Botões individuais para navegação
-st.sidebar.button("🏠 Página Inicial", key="btn_pagina_inicial",
-            on_click=ir_para_pagina_inicial,
+st.sidebar.button("🏠 Ficha da Família", key="btn_ficha_familia",
+            on_click=ir_para_ficha_familia,
             use_container_width=True,
-            type="primary" if st.session_state['pagina_atual'] == "Página Inicial" else "secondary")
+            type="primary" if st.session_state['pagina_atual'] == "Ficha da Família" else "secondary")
 
 # --- NOVO: Botão para Higienizações agora usa toggle_higienizacao_submenu ---
 st.sidebar.button("Higienizações", key="btn_higienizacoes", 
@@ -525,14 +455,6 @@ st.sidebar.button("Higienizações", key="btn_higienizacoes",
 # --- NOVO: Bloco condicional para o submenu Higienizações ---
 if st.session_state.get('higienizacao_submenu_expanded', False):
     with st.sidebar.container():
-        st.button("Produção", key="subbtn_higienizacao_producao",
-                  on_click=ir_para_higienizacao_producao,
-                  use_container_width=True,
-                  type="primary" if st.session_state.get('higienizacao_subpagina') == "Produção" else "secondary")
-        st.button("Conclusões", key="subbtn_higienizacao_conclusoes",
-                  on_click=ir_para_higienizacao_conclusoes,
-                  use_container_width=True,
-                  type="primary" if st.session_state.get('higienizacao_subpagina') == "Conclusões" else "secondary")
         st.button("Checklist", key="subbtn_higienizacao_checklist",
                   on_click=ir_para_higienizacao_checklist,
                   use_container_width=True,
@@ -553,99 +475,30 @@ st.sidebar.button("Emissões Brasileiras", key="btn_cartorio_new",
 # Bloco condicional para o submenu Emissões Brasileiras
 if st.session_state.get('emissao_submenu_expanded', False):
     with st.sidebar.container():
-        st.button("Visão Geral", key="subbtn_emissao_visao_geral",
-                    on_click=ir_para_emissao_visao_geral,
+        st.button("Funil Certidões", key="subbtn_emissao_funil_certidoes",
+                    on_click=ir_para_emissao_funil_certidoes,
                     use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Visão Geral" else "secondary")
-        st.button("Acompanhamento", key="subbtn_emissao_acompanhamento",
-                    on_click=ir_para_emissao_acompanhamento,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Funil Certidões" else "secondary")
+        st.button("Emissões Por Família", key="subbtn_emissao_emissoes_por_familia",
+                    on_click=ir_para_emissao_emissoes_por_familia,
                     use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Acompanhamento" else "secondary")
-        st.button("Produção", key="subbtn_emissao_producao",
-                    on_click=ir_para_emissao_producao,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Emissões Por Família" else "secondary")
+        st.button("Certidões Pendentes por responsável", key="subbtn_emissao_certidoes_pendentes_responsavel",
+                    on_click=ir_para_emissao_certidoes_pendentes_responsavel,
                     use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Produção" else "secondary")
-        st.button("Pendências", key="subbtn_emissao_pendencias",
-                    on_click=ir_para_emissao_pendencias,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Certidões Pendentes por responsável" else "secondary")
+        st.button("Desempenho Conclusão de Pasta", key="subbtn_emissao_desempenho_conclusao_pasta",
+                    on_click=ir_para_emissao_desempenho_conclusao_pasta,
                     use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Pendências" else "secondary")
-        st.button("Higienização Desempenho", key="subbtn_emissao_higienizacao",
-                    on_click=ir_para_emissao_higienizacao_desempenho,
-                    use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Higienização Desempenho" else "secondary")
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Desempenho Conclusão de Pasta" else "secondary")
 
-st.sidebar.button("Comune Bitrix24", key="btn_comune", 
-            on_click=ir_para_comune,
-            use_container_width=True,
-            type="primary" if st.session_state['pagina_atual'] == "Comune" else "secondary")
-
-# --- NOVO: Botão para Comune (Novo) com toggle ---
-st.sidebar.button("Comune (Novo)", key="btn_comune_new",
-            on_click=toggle_comune_submenu,
-            use_container_width=True,
-            type="primary" if st.session_state['pagina_atual'] == "Comune (Novo)" else "secondary",
-            help="Módulo refatorado de Comune")
-
-# --- NOVO: Bloco condicional para o submenu Comune (Novo) ---
-if st.session_state.get('comune_submenu_expanded', False):
-    with st.sidebar.container():
-        # Botões diretamente dentro do container da sidebar
-        st.button("Visão Geral", key="subbtn_comune_visao_geral",
-                    on_click=ir_para_comune_visao_geral,
-                    use_container_width=True,
-                    type="primary" if st.session_state.get('comune_subpagina') == "Visão Geral" else "secondary")
-        st.button("Tempo de Solicitação", key="subbtn_comune_tempo",
-                    on_click=ir_para_comune_tempo_solicitacao,
-                    use_container_width=True,
-                    type="primary" if st.session_state.get('comune_subpagina') == "Tempo de Solicitação" else "secondary")
-        
-        # Adicionar Separador e Botões do Mapa
-        st.markdown("<hr style='margin: 5px 0; border-top: 1px solid #ddd;'/>", unsafe_allow_html=True)
-        st.markdown("<span style='font-size: 0.8em; color: #666; margin-left: 15px; font-weight: bold;'>Mapas</span>", unsafe_allow_html=True)
-        
-        st.button("Mapa Comune 1 (Cat 22)", key="subbtn_mapa_c1",
-                    on_click=ir_para_mapa_comune_1,
-                    use_container_width=True,
-                    type="primary" if st.session_state.get('comune_subpagina') == "Mapa Comune 1" else "secondary")
-        st.button("Mapa Comune 2 (Cat 58)", key="subbtn_mapa_c2",
-                    on_click=ir_para_mapa_comune_2,
-                    use_container_width=True,
-                    type="primary" if st.session_state.get('comune_subpagina') == "Mapa Comune 2" else "secondary")
-        st.button("Mapa Comune 3 (Cat 60)", key="subbtn_mapa_c3",
-                    on_click=ir_para_mapa_comune_3,
-                    use_container_width=True,
-                    type="primary" if st.session_state.get('comune_subpagina') == "Mapa Comune 3" else "secondary")
-
-st.sidebar.button("Extrações", key="btn_extracoes", 
-            on_click=ir_para_extracoes,
-            use_container_width=True,
-            type="primary" if st.session_state['pagina_atual'] == "Extrações de Dados" else "secondary")
-
-st.sidebar.button("Tickets de Suporte", key="btn_tickets", 
-            on_click=ir_para_tickets,
-            use_container_width=True,
-            type="primary" if st.session_state['pagina_atual'] == "Tickets" else "secondary")
-
-st.sidebar.button("Reclamações", key="btn_reclamacoes", 
-            on_click=ir_para_reclamacoes,
-            use_container_width=True,
-            type="primary" if st.session_state['pagina_atual'] == "Reclamações" else "secondary")
+# st.sidebar.button("Extrações", key="btn_extracoes", 
+#             on_click=ir_para_extracoes,
+#             use_container_width=True,
+#             type="primary" if st.session_state['pagina_atual'] == "Extrações de Dados" else "secondary")
 
 # Adicionar o componente de links rápidos na barra lateral
-show_page_links_sidebar()
-
-# Adicionar separador para seção de apresentação
-st.sidebar.markdown("---")
-st.sidebar.subheader("Modo Apresentação")
-
-# Botão destacado para o modo de apresentação
-st.sidebar.button("📺 Apresentação em TV (9:16)", key="btn_apresentacao", 
-            on_click=ir_para_apresentacao,
-            use_container_width=True,
-            type="primary" if st.session_state['pagina_atual'] == "Apresentação Conclusões" else "secondary")
-
-# Adicionar o guia de relatório na barra lateral
-show_guide_sidebar()
+# show_page_links_sidebar()
 
 # Função utilitária para gerar URLs de navegação
 def gerar_url_navegacao(pagina, subpagina=None):
@@ -677,12 +530,6 @@ def gerar_url_navegacao(pagina, subpagina=None):
                 if subpagina in subpagina_para_rota:
                     url += f"&sub={subpagina_para_rota[subpagina]}"
             
-            elif pagina == "Comune (Novo)":
-                # Mapeamento reverso para subpáginas de Comune
-                subpagina_para_rota = {v: k for k, v in SUB_ROTAS_COMUNE.items()}
-                if subpagina in subpagina_para_rota:
-                    url += f"&sub={subpagina_para_rota[subpagina]}"
-            
             elif pagina == "Higienizações":
                 # Mapeamento reverso para subpáginas de Higienizações
                 subpagina_para_rota = {v: k for k, v in SUB_ROTAS_HIGIENIZACOES.items()}
@@ -691,119 +538,72 @@ def gerar_url_navegacao(pagina, subpagina=None):
         
         return url
     
-    # Se a página não for encontrada, retorna link para página inicial
-    return f"{base_url}page=pagina_inicial"
+    # Se a página não for encontrada, retorna link para página inicial (agora Ficha da Família)
+    return f"{base_url}page=ficha_familia"
 
 # Exibição da página selecionada com base na variável de sessão
-pagina = st.session_state['pagina_atual']
+pagina = st.session_state.get('pagina_atual', 'Ficha da Família') # Adicionado .get com default para segurança
+print(f"DEBUG: main.py - VALOR DE 'pagina' ANTES DO TRY: {pagina}") # DEBUG ADICIONAL
 
 try:
     # Adicionar guia de página contextual para cada página
-    if pagina != "Apresentação Conclusões":  # Não mostrar na apresentação
-        show_page_guide(pagina)
+    # if pagina != "Apresentação Conclusões":  # Comentado temporariamente
+    #     if pagina != "Extrações de Dados": # Adiciona esta condição
+    #         show_page_guide(pagina)
     
-    if pagina == "Página Inicial":
-        show_pagina_inicial()
-    elif pagina == "Macro Higienização":
-        # Definir as seções para o sumário da página
-        sections = [
-            {"label": "Métricas Gerais", "anchor": "metricas_gerais", "icon": "📊"},
-            {"label": "Últimas Conclusões", "anchor": "ultimas_conclusoes", "icon": "✅"}
-        ]
-        show_inicio()
+    if pagina == "Ficha da Família":
+        print("DEBUG: main.py - Renderizando Ficha da Família") # DEBUG
+        show_ficha_familia()
+    # Comentar outras páginas temporariamente
+    # elif pagina == "Macro Higienização":
+    #     # Definir as seções para o sumário da página
+    #     sections = [
+    #         {"label": "Métricas Gerais", "anchor": "metricas_gerais", "icon": "📊"},
+    #         {"label": "Últimas Conclusões", "anchor": "ultimas_conclusoes", "icon": "✅"}
+    #     ]
+    #     show_inicio()
         
-    elif pagina == "Produção Higienização":
-        # Definir as seções para o sumário da página
-        sections = [
-            {"label": "Métricas de Produção", "anchor": "metricas_producao", "icon": "📊"},
-            {"label": "Produção por Responsável", "anchor": "producao_responsavel", "icon": "👤"},
-            {"label": "Tendências Temporais", "anchor": "tendencias_temporais", "icon": "📈"},
-            {"label": "Pendências", "anchor": "pendencias", "icon": "⚠️"}
-        ]
-        show_producao()
+    # elif pagina == "Produção Higienização":
+    #     # Definir as seções para o sumário da página
+    #     sections = [
+    #         {"label": "Métricas de Produção", "anchor": "metricas_producao", "icon": "📊"},
+    #         {"label": "Produção por Responsável", "anchor": "producao_responsavel", "icon": "👤"},
+    #         {"label": "Tendências Temporais", "anchor": "tendencias_temporais", "icon": "📈"},
+    #         {"label": "Pendências", "anchor": "pendencias", "icon": "⚠️"}
+    #     ]
+    #     show_producao()
         
-    elif pagina == "Conclusões Higienização":
-        # Definir as seções para o sumário da página
-        sections = [
-            {"label": "Métricas de Conclusão", "anchor": "metricas_conclusao", "icon": "📊"},
-            {"label": "Análise de Qualidade", "anchor": "analise_qualidade", "icon": "🔍"},
-            {"label": "Tendências de Conclusão", "anchor": "tendencias_conclusao", "icon": "📈"}
-        ]
-        show_conclusoes()
+    # elif pagina == "Conclusões Higienização":
+    #     # Definir as seções para o sumário da página
+    #     sections = [
+    #         {"label": "Métricas de Conclusão", "anchor": "metricas_conclusao", "icon": "📊"},
+    #         {"label": "Análise de Qualidade", "anchor": "analise_qualidade", "icon": "🔍"},
+    #         {"label": "Tendências de Conclusão", "anchor": "tendencias_conclusao", "icon": "📈"}
+    #     ]
+    #     show_conclusoes()
         
-    # --- NOVO: Roteamento para página de Higienizações ---
     elif pagina == "Higienizações":
-        # Mostrar a página unificada de Higienizações, que irá rotear internamente
-        # com base no valor de st.session_state.higienizacao_subpagina
+        print("DEBUG: main.py - Renderizando Higienizações") # DEBUG
         show_higienizacoes()
-    # --- FIM NOVO ---
-        
-    elif pagina == "Comune":
-        # Definir as seções para o sumário da página
-        sections = [
-            {"label": "Análise de Comunidades", "anchor": "analise_comunidades", "icon": "👥"},
-            {"label": "Interações", "anchor": "interacoes", "icon": "🔄"},
-            {"label": "Métricas de Engajamento", "anchor": "metricas_engajamento", "icon": "📊"}
-        ]
-        show_comune()
         
     elif pagina == "Extrações de Dados":
-        # Definir as seções para o sumário da página
-        sections = [
-            {"label": "Extração Personalizada", "anchor": "extracao_personalizada", "icon": "🔍"},
-            {"label": "Relatórios Prontos", "anchor": "relatorios_prontos", "icon": "📋"},
-            {"label": "Exportação", "anchor": "exportacao", "icon": "📤"}
-        ]
+        print("DEBUG: main.py - Renderizando Extrações de Dados") # DEBUG
         show_extracoes()
         
-    elif pagina == "Tickets":
-        # Definir as seções para o sumário da página
-        sections = [
-            {"label": "Visão Geral", "anchor": "visao_geral", "icon": "📊"},
-            {"label": "Por Tempo", "anchor": "por_tempo", "icon": "🕒"},
-            {"label": "Detalhes", "anchor": "detalhes", "icon": "🔍"}
-        ]
-        show_tickets()
-        
-    elif pagina == "Reclamações":
-        # Definir as seções para o sumário da página (atualizado)
-        sections = [
-            {"label": "Visão Geral", "anchor": "visao_geral", "icon": "📊"}, # O anchor pode ser o próprio subheader se não houver um explícito
-            {"label": "Tendência", "anchor": "tendencia", "icon": "📈"},
-            {"label": "Detalhes", "anchor": "detalhes_das_reclamacoes", "icon": "🔍"} # Usar o anchor do subheader em details.py
-        ]
-        show_reclamacoes() # Função importada do novo local
-        
-    elif pagina == "Apresentação Conclusões":
-        # Verificar se há parâmetro 'slide' na URL
-        slide_inicial = 0
-        try:
-            if 'slide' in st.query_params:
-                slide_inicial = int(st.query_params['slide'])
-                print(f"Iniciando apresentação a partir do slide: {slide_inicial}")
-        except Exception as e:
-            print(f"Erro ao processar parâmetro de slide: {str(e)}")
-            
-        # Chamar a função com o parâmetro de slide inicial
-        show_apresentacao(slide_inicial=slide_inicial)
-        
-    # Nova lógica para a página refatorada
     elif pagina == "Emissões Brasileiras":
-        # Define as seções para o sumário da página (precisa ser dinâmico ou removido)
-        # sections = [...] 
-        
-        # Chama a função principal, que agora deve rotear internamente
-        show_cartorio_new() # Assumindo que show_cartorio_new agora usa st.session_state.emissao_subpagina para rotear
-        
-    # --- NOVO: Lógica para a página Comune (Novo) ---
-    elif pagina == "Comune (Novo)":
-        # Não precisa mais diferenciar 'Mapa Comunes' aqui
-        show_comune_new() # A função interna agora roteia a subpágina
-    # --- FIM NOVO ---
-    
+        print(f"DEBUG: main.py - Renderizando Emissões Brasileiras. Subpágina: {st.session_state.get('emissao_subpagina')}") # DEBUG
+        st.write(f"Debug: main.py - Entrou no bloco para exibir Emissões Brasileiras. Subpágina atual: {st.session_state.get('emissao_subpagina')}") 
+        show_cartorio_new() # CHAMADA DA FUNÇÃO DEVE ESTAR AQUI
+    else:
+        print(f"DEBUG: main.py - Página desconhecida na renderização: {pagina}. Voltando para Ficha da Família.") # DEBUG
+        st.warning(f"Página '{pagina}' não reconhecida. Exibindo Ficha da Família.")
+        show_ficha_familia() # Fallback mais explícito
+
     # Adicionar seção de links rápidos no rodapé (apenas para páginas que não são de apresentação)
-    if pagina != "Apresentação Conclusões":
-        st.markdown("---")
+    # Condição original era if pagina != "Apresentação Conclusões":
+    # Como Apresentação foi removida, podemos chamar diretamente ou adicionar nova condição se necessário.
+    st.markdown("---")
+    if pagina != "Extrações de Dados": # Adiciona esta condição
         show_quick_links()
 
 except Exception as e:
@@ -813,4 +613,5 @@ except Exception as e:
 
 # Rodapé do sidebar
 st.sidebar.markdown("---")
+render_sidebar_refresh_button()
 st.sidebar.markdown("Dashboard desenvolvido para análise de dados do CRM Bitrix24") 

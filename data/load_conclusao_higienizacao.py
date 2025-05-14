@@ -145,7 +145,8 @@ def load_conclusao_data(start_date=None, end_date=None):
         # --- FIM TRATAMENTO ---
 
         # Converte colunas relevantes para os tipos corretos (opcional, mas recomendado)
-        df['data'] = pd.to_datetime(df['data'], errors='coerce') # Ajuste o formato se necessário
+        # df['data'] = pd.to_datetime(df['data'], errors='coerce') # Linha original
+        df['data'] = pd.to_datetime(df['data'], format='%d/%m/%Y', errors='coerce') # Assumindo formato dd/mm/yyyy
 
         # --- Filtragem por Data (Opcional) --- REINTRODUZIDO
         if start_date and end_date:
@@ -155,6 +156,7 @@ def load_conclusao_data(start_date=None, end_date=None):
             
             # Remove linhas onde a data não pôde ser convertida (NaT)
             df_filtrado = df.dropna(subset=['data']).copy()
+            print(f"[DEBUG] Linhas com datas válidas (não-NaT) antes do filtro de intervalo: {len(df_filtrado)}") # Novo log
             
             # Aplica o filtro
             mask = (df_filtrado['data'] >= start_datetime) & (df_filtrado['data'] <= end_datetime)

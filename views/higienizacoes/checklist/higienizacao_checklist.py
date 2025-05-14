@@ -194,31 +194,54 @@ def show_higienizacao_checklist():
         data_valida = False
         st.warning("Coluna 'data' não está no formato de data. Alguns filtros serão desabilitados.")
     
-    # Adicionar filtros na barra lateral
-    with st.sidebar.expander("Filtros", expanded=True):
-        if data_valida:
-            # Filtro de período
-            st.subheader("Período")
-            col1, col2 = st.columns(2)
-            with col1:
-                data_inicial = st.date_input("Data Inicial", 
-                                        value=(datetime.now() - timedelta(days=30)).date(),
-                                        max_value=datetime.now().date())
-            with col2:
-                data_final = st.date_input("Data Final", 
-                                        value=datetime.now().date(),
-                                        max_value=datetime.now().date())
-        
-        # Filtro por responsável
+    # --- SEÇÃO DE FILTROS DIRETAMENTE NA PÁGINA PRINCIPAL ---
+    st.subheader("Filtros")
+    
+    # Layout com colunas para os filtros
+    col_filtro1, col_filtro2 = st.columns(2)
+    col_filtro3, col_filtro4 = st.columns(2)
+    
+    # Filtro de data
+    if data_valida:
+        with col_filtro1:
+            # Determinar valores mín/máx para os inputs de data
+            min_date = df["data"].min().date() if not df["data"].empty else (datetime.now() - timedelta(days=365)).date()
+            max_date = df["data"].max().date() if not df["data"].empty else datetime.now().date()
+            
+            # Calcular um valor padrão seguro (30 dias atrás ou o mínimo, o que for maior)
+            default_start_date = max(min_date, (datetime.now() - timedelta(days=30)).date())
+            
+            data_inicial = st.date_input("Data Inicial", 
+                                value=default_start_date,
+                                min_value=min_date,
+                                max_value=max_date)
+        with col_filtro2:
+            # Valor padrão para data final (hoje ou max_date, o que for menor)
+            today = datetime.now().date()
+            default_end_date = min(today, max_date)
+            
+            data_final = st.date_input("Data Final", 
+                                value=default_end_date,
+                                min_value=min_date,
+                                max_value=max_date)
+    
+    # Filtro por responsável
+    with col_filtro3:
         responsaveis = ["Todos"] + sorted(df["responsavel"].unique().tolist())
         responsavel_filtro = st.selectbox("Responsável", options=responsaveis, index=0)
-        
-        # Filtro por status
+    
+    # Filtro por status
+    with col_filtro4:
         status_unicos = ["Todos"] + sorted(df["status"].unique().tolist())
         status_filtro = st.selectbox("Status", options=status_unicos, index=0)
-        
-        # Botão para aplicar filtros
+    
+    # Botão para aplicar filtros centralizado
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    with col_btn2:
         aplicar_filtro = st.button("Aplicar Filtros", use_container_width=True)
+    
+    # Divisor visual
+    st.markdown("---")
     
     # Aplicar filtros
     df_filtrado = df.copy()
@@ -232,13 +255,22 @@ def show_higienizacao_checklist():
     # Filtrar por data apenas se a coluna data for válida
     if data_valida:
         df_filtrado = df_filtrado[(df_filtrado["data"] >= pd.to_datetime(data_inicial)) & 
-                           (df_filtrado["data"] <= pd.to_datetime(data_final))]
+                               (df_filtrado["data"] <= pd.to_datetime(data_final))]
+    
+    # Exibir mensagem de feedback sobre os filtros aplicados
+    registros_antes = len(df)
+    registros_depois = len(df_filtrado)
+    
+    if registros_antes != registros_depois:
+        st.info(f"Exibindo {registros_depois} de {registros_antes} registros após aplicação dos filtros")
+    
+    # --- FIM DA SEÇÃO DE FILTROS DIRETAMENTE NA PÁGINA PRINCIPAL ---
     
     # Criar métricas para STATUS
     st.subheader("Métricas de Status")
     
     # Contagem de ocorrências por status
-    status_counts = df["status"].value_counts().reset_index()
+    status_counts = df_filtrado["status"].value_counts().reset_index()
     status_counts.columns = ["Status", "Total"]
     
     # Adicionar cores para categorias de status
@@ -266,9 +298,9 @@ def show_higienizacao_checklist():
         status_nome = row["Status"]
         status_total = row["Total"]
         
-        # Calcular percentual em relação ao total de todos os status do DataFrame original df
-        # (não do df_filtrado, para que o percentual seja em relação ao universo total de status)
-        percentual = (status_total / df["status"].count() * 100) if df["status"].count() > 0 else 0
+        # Calcular percentual em relação ao total de todos os status do DataFrame filtrado
+        # (para refletir corretamente os filtros aplicados)
+        percentual = (status_total / df_filtrado["status"].count() * 100) if df_filtrado["status"].count() > 0 else 0
         
         with current_col:
             # Usar st.metric para exibir os dados
@@ -283,39 +315,77 @@ def show_higienizacao_checklist():
     # Tabela de responsáveis por status (tabela cruzada)
     st.subheader("Responsáveis por Status")
     
-    # Criar tabela cruzada (crosstab) de responsáveis x status
-    crosstab = pd.crosstab(df["responsavel"], df["status"], margins=True, margins_name="Total")
-    
-    # Reordenar as colunas para ter o Total no final
-    cols = [col for col in crosstab.columns if col != "Total"] + ["Total"]
-    crosstab = crosstab[cols]
-    
-    # Função para aplicar estilo à tabela
-    def highlight_status(val):
-        # Verifique se é um valor numérico e igual a zero
+    # Verificar se há dados para criar a tabela cruzada
+    if df_filtrado.empty:
+        st.warning("Não há dados disponíveis para criar a tabela de responsáveis por status.")
+    else:
         try:
-            return 'opacity: 0.3; color: #aaa' if val == 0 or val == 0.0 else ''
-        except:
-            # Se não puder comparar diretamente (Series), retorne string vazia
-            return ''
-    
-    # Estilizar a tabela
-    # Primeiro, aplicamos o highlight para as células com valor 0
-    styled_crosstab = crosstab.style.map(highlight_status) 
-    
-    # Depois, aplicamos as barras coloridas para cada status
-    for status_col_name in crosstab.columns:
-        if status_col_name != "Total" and status_col_name in status_colors:
-            styled_crosstab = styled_crosstab.bar(
-                subset=[status_col_name], 
-                color=f'rgba{tuple(int(status_colors[status_col_name].lstrip("#")[i:i+2], 16) for i in (0, 2, 4)) + (0.2,)}', 
-                vmin=0
-            )
+            # Criar tabela cruzada (crosstab) de responsáveis x status
+            crosstab = pd.crosstab(df_filtrado["responsavel"], df_filtrado["status"], margins=True, margins_name="Total")
             
-    st.dataframe(styled_crosstab, use_container_width=True)
+            # Reordenar as colunas para ter o Total no final
+            cols = [col for col in crosstab.columns if col != "Total"] + ["Total"]
+            crosstab = crosstab[cols]
+            
+            # Verificar se a tabela cruzada tem conteúdo
+            if crosstab.empty or crosstab.shape[0] <= 1 or crosstab.shape[1] <= 1:
+                st.warning("Tabela cruzada vazia ou com apenas uma linha/coluna.")
+            else:
+                # ABORDAGEM COMPLETAMENTE NOVA: Renderização HTML pura (sem usar Pandas styler)
+                # Esta abordagem evita problemas no JavaScript do Streamlit com DataFrame.style
+                
+                # Convertemos a tabela para HTML completamente customizado
+                html_table = "<div style='overflow-x: auto;'><table style='width:100%; border-collapse: collapse;'>"
+                
+                # Cabeçalho da tabela
+                html_table += "<thead><tr><th></th>"  # Coluna vazia para o índice
+                for col in crosstab.columns:
+                    bgcolor = status_colors.get(col, "#6c757d") if col != "Total" else "#007bff"
+                    text_color = "white"
+                    html_table += f"<th style='padding: 8px; background-color: {bgcolor}; color: {text_color}; text-align: center;'>{col}</th>"
+                html_table += "</tr></thead>"
+                
+                # Corpo da tabela
+                html_table += "<tbody>"
+                for idx, row in crosstab.iterrows():
+                    html_table += f"<tr><th style='padding: 8px; background-color: #f8f9fa; text-align: left;'>{idx}</th>"
+                    for col in crosstab.columns:
+                        value = row[col]
+                        # Aplicar estilo para valores zero
+                        if value == 0:
+                            cell_style = "color: #aaa; opacity: 0.7;"
+                        else:
+                            cell_style = ""
+                        html_table += f"<td style='padding: 8px; text-align: center; {cell_style}'>{int(value)}</td>"
+                    html_table += "</tr>"
+                html_table += "</tbody>"
+                html_table += "</table></div>"
+                
+                # Mostrar HTML puro em vez do dataframe estilizado
+                st.write(html_table, unsafe_allow_html=True)
+                st.caption("Tabela de responsáveis por status (cabeçalhos coloridos)")
+                
+                # Oferecer um botão para visualizar a tabela básica como fallback
+                if st.checkbox("Mostrar tabela sem formatação", value=False):
+                    st.dataframe(crosstab, use_container_width=True)
+                
+        except Exception as e:
+            # Se falhar ao criar a crosstab, mostre um erro e uma visualização alternativa
+            st.error(f"Erro ao criar a tabela cruzada: {str(e)}")
+            
+            # Criar uma visualização alternativa mais simples como fallback
+            try:
+                # Contar por responsável e status
+                status_resp_counts = df_filtrado.groupby(['responsavel', 'status']).size().reset_index(name='contagem')
+                if not status_resp_counts.empty:
+                    # Mostrar agrupamento simplificado sem estilização
+                    st.write("Visualização alternativa:")
+                    st.dataframe(status_resp_counts, use_container_width=True)
+            except Exception as inner_e:
+                st.error(f"Não foi possível criar visualização alternativa: {str(inner_e)}")
     
     # Tabela Detalhes dos Dados
-    st.subheader("Detalhes dos Dados")
+    st.subheader("Higienização Detalhada por Família")
 
     # Colunas padronizadas que esperamos do load_data e queremos exibir
     colunas_padrao_exibir = ['data', 'responsavel', 'nome da família', 'mesa', 'status', 'motivo']
@@ -330,63 +400,87 @@ def show_higienizacao_checklist():
         'motivo': 'Motivo'
     }
 
-    # Filtrar df_filtrado para colunas padrão existentes
-    colunas_existentes_em_df = [col for col in colunas_padrao_exibir if col in df_filtrado.columns]
-    
-    if not colunas_existentes_em_df:
-        st.warning("Nenhuma das colunas esperadas foi encontrada nos dados carregados.")
-        return
-        
-    df_exibir = df_filtrado[colunas_existentes_em_df].copy() # Seleciona apenas as colunas padrão encontradas
-
-    # Formatar a coluna de data (se existir e for válida)
-    if 'data' in df_exibir.columns:
-        if data_valida: # Verifica se a conversão original em load_data funcionou
-            try:
-                # Tenta formatar, tratando possíveis erros se a coluna não for datetime
-                df_exibir['data'] = df_exibir['data'].dt.strftime('%d/%m/%Y')
-            except AttributeError:
-                 # Se não for datetime (ex: falhou a conversão), tenta converter para string
-                 df_exibir['data'] = df_exibir['data'].astype(str)
-                 st.warning("Não foi possível formatar a coluna 'Data' como DD/MM/YYYY.")
-        else:
-            # Se a coluna 'data' não era válida desde o início, converte para string
-             df_exibir['data'] = df_exibir['data'].astype(str)
-
-    # Renomear colunas padrão para nomes de exibição
-    df_exibir.rename(columns=nomes_display, inplace=True)
-
-    # Resetar o índice para st.dataframe
-    df_exibir = df_exibir.reset_index(drop=True)
-
-    # Função para destacar APENAS a célula de status
-    def highlight_single_status(status_value):
-        # Lida com possíveis valores NaN ou não string
-        if pd.isna(status_value):
-            return '' # Sem estilo para NaN
-        status_value = str(status_value) # Garante que é string para .get()
-        color = status_colors.get(status_value, '#6c757d') # Cor padrão cinza
-        return f'background-color: {color}30; color: {color}; font-weight: bold'
-
-    # Obter o nome de exibição da coluna Status
-    display_status_col_name = nomes_display.get('status', 'Status') # Pega o nome do mapeamento
-
-    # Verificar se a coluna de status existe para aplicar estilo
-    if display_status_col_name in df_exibir.columns:
-        # Aplicar estilo apenas à coluna 'Status' usando .map()
-        styled_df = df_exibir.style.map(highlight_single_status, subset=[display_status_col_name])
-        # Exibir a tabela ESTILIZADA
-        st.dataframe(styled_df, use_container_width=True, height=400)
+    # Verificar se o dataframe tem dados após a filtragem
+    if df_filtrado.empty:
+        st.warning("Não há dados disponíveis para exibir após a aplicação dos filtros.")
     else:
-        # Exibir a tabela sem estilo se a coluna 'Status' não existir
-        st.dataframe(df_exibir, use_container_width=True, height=400)
-        st.warning(f"Coluna '{display_status_col_name}' não encontrada para estilização.")
+        try:
+            # Filtrar df_filtrado para colunas padrão existentes
+            colunas_existentes_em_df = [col for col in colunas_padrao_exibir if col in df_filtrado.columns]
+            
+            if not colunas_existentes_em_df:
+                st.warning("Nenhuma das colunas esperadas foi encontrada nos dados carregados.")
+            else:
+                df_exibir = df_filtrado[colunas_existentes_em_df].copy() # Seleciona apenas as colunas padrão encontradas
 
-    # Adicionar exportação de dados (usando df_filtrado com nomes padrão)
-    csv = df_filtrado.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="Baixar dados filtrados (CSV)",
-        data=csv,
-        file_name=f"higienizacao_checklist_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv",
-    ) 
+                # Formatar a coluna de data (se existir e for válida)
+                if 'data' in df_exibir.columns:
+                    if data_valida: # Verifica se a conversão original em load_data funcionou
+                        try:
+                            # Tenta formatar, tratando possíveis erros se a coluna não for datetime
+                            df_exibir['data'] = df_exibir['data'].dt.strftime('%d/%m/%Y')
+                        except AttributeError:
+                             # Se não for datetime (ex: falhou a conversão), tenta converter para string
+                             df_exibir['data'] = df_exibir['data'].astype(str)
+                             st.warning("Não foi possível formatar a coluna 'Data' como DD/MM/YYYY.")
+                    else:
+                        # Se a coluna 'data' não era válida desde o início, converte para string
+                         df_exibir['data'] = df_exibir['data'].astype(str)
+
+                # Renomear colunas padrão para nomes de exibição
+                renomear_colunas = {col: nomes_display[col] for col in colunas_existentes_em_df if col in nomes_display}
+                df_exibir.rename(columns=renomear_colunas, inplace=True)
+
+                # Resetar o índice para st.dataframe
+                df_exibir = df_exibir.reset_index(drop=True)
+
+                # Verificar se a tabela resultante tem conteúdo
+                if df_exibir.empty:
+                    st.warning("A tabela de detalhes está vazia após o processamento.")
+                else:
+                    # Função para destacar APENAS a célula de status
+                    def highlight_single_status(status_value):
+                        # Lida com possíveis valores NaN ou não string
+                        if pd.isna(status_value):
+                            return '' # Sem estilo para NaN
+                        status_value = str(status_value) # Garante que é string para .get()
+                        color = status_colors.get(status_value, '#6c757d') # Cor padrão cinza
+                        return f'background-color: {color}30; color: {color}; font-weight: bold'
+
+                    # Obter o nome de exibição da coluna Status
+                    display_status_col_name = nomes_display.get('status', 'Status') # Pega o nome do mapeamento
+
+                    # Verificar se a coluna de status existe para aplicar estilo
+                    if display_status_col_name in df_exibir.columns:
+                        try:
+                            # Aplicar estilo apenas à coluna 'Status' usando .map()
+                            styled_df = df_exibir.style.map(highlight_single_status, subset=[display_status_col_name])
+                            # Exibir a tabela ESTILIZADA
+                            st.dataframe(styled_df, use_container_width=True, height=400)
+                        except Exception as e:
+                            st.warning(f"Erro ao aplicar estilo à tabela: {str(e)}")
+                            # Exibir a tabela sem estilo como fallback
+                            st.dataframe(df_exibir, use_container_width=True, height=400)
+                    else:
+                        # Exibir a tabela sem estilo se a coluna 'Status' não existir
+                        st.dataframe(df_exibir, use_container_width=True, height=400)
+                        st.warning(f"Coluna '{display_status_col_name}' não encontrada para estilização.")
+        except Exception as e:
+            st.error(f"Erro ao processar tabela de detalhes: {str(e)}") 
+            # Como fallback, mostrar o DataFrame filtrado original sem processamento adicional
+            st.dataframe(df_filtrado, use_container_width=True, height=400)
+
+    # Adicionar exportação de dados apenas se houver dados para exportar
+    if not df_filtrado.empty:
+        try:
+            csv = df_filtrado.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Baixar dados filtrados (CSV)",
+                data=csv,
+                file_name=f"higienizacao_checklist_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+            )
+        except Exception as e:
+            st.error(f"Erro ao gerar arquivo CSV para download: {str(e)}")
+    else:
+        st.info("Não há dados para exportar com os filtros atuais.") 

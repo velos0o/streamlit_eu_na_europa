@@ -10,6 +10,7 @@ KEY_BUSCA_FAMILIA = "busca_familia_acompanhamento"
 KEY_DATA_INICIO = "data_venda_inicio_acompanhamento"
 KEY_DATA_FIM = "data_venda_fim_acompanhamento"
 KEY_PERCENTUAL = "filtro_percentual_acompanhamento"
+KEY_RESPONSAVEL = "filtro_responsavel_acompanhamento"  # Nova constante para filtro de responsável
 
 def exibir_acompanhamento(df_cartorio):
     """
@@ -18,6 +19,9 @@ def exibir_acompanhamento(df_cartorio):
     com Totais de Requerentes (contagem única), Certidões e Concluídas por Família.
     Inclui filtros com opção de limpeza.
     Aplica estilos via SCSS.
+    
+    Nota: Agora utiliza a coluna DATA_VENDA_FAMILIA que é obtida a partir do 
+    campo UF_CRM_1746054586042 da categoria 46 do crm_deal.
     """
     # --- Carregar CSS Compilado ---
     try:
@@ -36,7 +40,7 @@ def exibir_acompanhamento(df_cartorio):
     # Verificar se as colunas necessárias existem
     coluna_nome_familia = 'UF_CRM_34_NOME_FAMILIA'  # ATUALIZADO para o novo campo SPA
     coluna_id_requerente = 'UF_CRM_34_ID_REQUERENTE' # ATUALIZADO para o novo campo SPA
-    coluna_data_venda_familia = 'DATA_VENDA_FAMILIA' # Adicionado para filtro
+    coluna_data_venda_familia = 'DATA_VENDA_FAMILIA' # Vem da categoria 46 - UF_CRM_1746054586042
     coluna_responsavel = 'ASSIGNED_BY_NAME' # Coluna do responsável (ASSUMIDO)
     colunas_requeridas = ['ID', 'STAGE_ID', coluna_nome_familia, coluna_id_requerente, coluna_data_venda_familia, coluna_responsavel]
     colunas_faltantes = [col for col in colunas_requeridas if col not in df_cartorio.columns]
@@ -48,7 +52,7 @@ def exibir_acompanhamento(df_cartorio):
         if cols_necessarias_origem:
              msg_erro += f"Erro: As seguintes colunas são necessárias e não foram encontradas nos dados originais: {', '.join(cols_necessarias_origem)}. Verifique o data_loader. "
         if coluna_data_venda_familia in colunas_faltantes:
-             msg_erro += f"Erro: A coluna '{coluna_data_venda_familia}' (necessária para o filtro de data) não foi encontrada. Verifique o merge no data_loader. "
+             msg_erro += f"Erro: A coluna '{coluna_data_venda_familia}' (obtida da categoria 46 - UF_CRM_1746054586042) não foi encontrada. Verifique o merge no data_loader. "
         if coluna_responsavel in colunas_faltantes: # Adicionar verificação do responsável
              msg_erro += f"Erro: A coluna '{coluna_responsavel}' (necessária para o responsável) não foi encontrada. Verifique o data_loader."
         
@@ -115,6 +119,8 @@ def exibir_acompanhamento(df_cartorio):
         st.session_state[KEY_DATA_FIM] = max_date_default
     if KEY_PERCENTUAL not in st.session_state:
         st.session_state[KEY_PERCENTUAL] = []
+    if KEY_RESPONSAVEL not in st.session_state:  # Inicialização do state para responsável
+        st.session_state[KEY_RESPONSAVEL] = []
 
     # --- Função para Limpar Filtros --- 
     def clear_filters():
@@ -122,12 +128,14 @@ def exibir_acompanhamento(df_cartorio):
         st.session_state[KEY_DATA_INICIO] = min_date_default
         st.session_state[KEY_DATA_FIM] = max_date_default
         st.session_state[KEY_PERCENTUAL] = []
+        st.session_state[KEY_RESPONSAVEL] = []  # Limpar filtro de responsável
 
     # --- Filtros --- 
     with st.expander("Filtros", expanded=True): 
-        # Layout: Linha 1 (Família, Data), Linha 2 (Percentual, Botão Limpar)
+        # Layout: Linha 1 (Família, Data), Linha 2 (Percentual, Responsável), Linha 3 (Botão Limpar)
         col_l1_familia, col_l1_data = st.columns([0.5, 0.5])
-        col_l2_perc, col_l2_btn = st.columns([0.8, 0.2])
+        col_l2_perc, col_l2_resp = st.columns([0.5, 0.5])  # Nova linha com colunas para percentual e responsável
+        col_l3_empty, col_l3_btn = st.columns([0.8, 0.2])  # Renomear para l3 (linha 3)
         
         with col_l1_familia:
             st.text_input(
@@ -181,9 +189,21 @@ def exibir_acompanhamento(df_cartorio):
                 placeholder="Selecione a(s) faixa(s)", # Placeholder melhorado
                 key=KEY_PERCENTUAL 
             )
+        
+        with col_l2_resp:
+            # Obter lista de responsáveis únicos para o filtro
+            responsaveis_unicos = sorted(df_agrupado['responsavel'].unique().tolist())
+            # Remover valores vazios ou nulos se existirem
+            responsaveis_unicos = [resp for resp in responsaveis_unicos if resp and str(resp).strip() != '']
             
-        with col_l2_btn:
-            # Remover <br> e deixar alinhamento padrão da coluna por enquanto
+            st.multiselect(
+                "Filtrar por Responsável",
+                options=responsaveis_unicos,
+                placeholder="Selecione um ou mais responsáveis",
+                key=KEY_RESPONSAVEL
+            )
+            
+        with col_l3_btn:
             # Adicionar um pouco de espaço acima do botão
             st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) 
             st.button("Limpar", on_click=clear_filters, help="Limpar todos os filtros")
@@ -195,6 +215,7 @@ def exibir_acompanhamento(df_cartorio):
     data_inicio_selecionada = st.session_state[KEY_DATA_INICIO]
     data_fim_selecionada = st.session_state[KEY_DATA_FIM]
     faixas_selecionadas = st.session_state[KEY_PERCENTUAL]
+    responsaveis_selecionados = st.session_state[KEY_RESPONSAVEL]  # Ler valores de responsáveis selecionados
     
     # Processar datas selecionadas
     data_venda_min, data_venda_max = None, None
@@ -238,6 +259,12 @@ def exibir_acompanhamento(df_cartorio):
         if condicoes:
             filtro_combinado = pd.concat(condicoes, axis=1).any(axis=1)
             df_filtrado_agrupado = df_filtrado_agrupado[filtro_combinado]
+    
+    # Aplicar filtro por responsável
+    if responsaveis_selecionados:
+        df_filtrado_agrupado = df_filtrado_agrupado[
+            df_filtrado_agrupado['responsavel'].isin(responsaveis_selecionados)
+        ]
 
     # --- Cálculos Macro DIN MICOS (após filtros) ---
     # Obter a lista de famílias que passaram pelos filtros
@@ -283,7 +310,7 @@ def exibir_acompanhamento(df_cartorio):
     # Verificar se, após todos os filtros, o dataframe está vazio
     if df_tabela.empty:
         # Verificar se algum filtro ESTÁ ativo para mostrar a mensagem
-        filtros_ativos = search_term or (data_venda_min and data_venda_max) or faixas_selecionadas
+        filtros_ativos = search_term or (data_venda_min and data_venda_max) or faixas_selecionadas or responsaveis_selecionados
         if filtros_ativos:
              st.warning("Nenhuma família encontrada com os critérios de filtros aplicados.")
         # else: Não mostrar nada se não há filtros e a tabela está vazia (já avisado no início)
