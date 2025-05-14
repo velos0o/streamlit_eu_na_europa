@@ -8,6 +8,10 @@ import json
 import re
 from unidecode import unidecode
 import numpy as np
+from pathlib import Path
+import unicodedata
+from thefuzz import fuzz, process
+from utils.refresh_utils import load_csv_with_refresh
 
 # Tentar importar thefuzz
 try:
@@ -485,18 +489,17 @@ def _normalizar_localizacao(series):
 @st.cache_data(ttl=86400) # Cache de 1 dia
 def _carregar_coordenadas_mapa_normalizadas():
     """
-    Carrega os dados de comunes e coordenadas dos arquivos CSV do 
-    repositório opendatasicilia/comuni-italiani, junta-os, normaliza 
-    e retorna um DataFrame.
-    Assume a presença dos arquivos 'comuni.csv' e 'coordinate.csv' na pasta 'comuni-italiani-main/dati/'.
-    """
-    # Caminhos relativos para os arquivos CSV - Ajustado para ser mais robusto
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Assumindo que 'comuni-italiani-main' está na raiz do projeto, que está dois níveis acima de 'views/comune_new'
-    project_root = os.path.abspath(os.path.join(script_dir, '..', '..')) 
-    base_path = os.path.join(project_root, 'comuni-italiani-main', 'dati') 
+    Carrega dados de coordenadas de comuni.csv e coordinate.csv.
+    Aplica normalização aos nomes para facilitar o merge posterior.
     
-    # Verificar se o diretório base existe para dar um feedback melhor em caso de erro
+    Returns:
+        pandas.DataFrame: DataFrame com COMUNE_MAPA_NORM, PROVINCIA_MAPA_NORM, latitude, longitude.
+                         Retorna DataFrame vazio em caso de erro.
+    """
+    # Caminho para os CSVs (fixo, dentro da estrutura do projeto)
+    base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
+                          'comuni-italiani-main', 'dati')
+    
     if not os.path.isdir(base_path):
         st.error(f"Erro Crítico: O diretório base de dados '{base_path}' não foi encontrado. Verifique a estrutura do projeto.")
         return pd.DataFrame()
@@ -505,9 +508,13 @@ def _carregar_coordenadas_mapa_normalizadas():
     coords_path = os.path.join(base_path, 'coordinate.csv')
 
     try:
-        # Ler os arquivos CSV
-        df_comuni = pd.read_csv(comuni_path)
-        df_coords = pd.read_csv(coords_path)
+        # Usar as novas funções de carregamento com atualização
+        df_comuni = load_csv_with_refresh(comuni_path)
+        df_coords = load_csv_with_refresh(coords_path)
+        
+        # Adicionar informação sobre a última atualização
+        comuni_ultima_atualizacao = os.path.getmtime(comuni_path)
+        st.caption(f"📍 Dados de comuni.csv atualizados em: {pd.to_datetime(comuni_ultima_atualizacao, unit='s').strftime('%d/%m/%Y %H:%M:%S')}")
 
         # Verificar colunas essenciais em cada arquivo
         cols_comuni_necessarias = ['comune', 'sigla', 'pro_com_t']

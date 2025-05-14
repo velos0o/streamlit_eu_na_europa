@@ -1,4 +1,5 @@
 import streamlit as st
+from utils.refresh_utils import clear_file_cache
 
 def render_refresh_button():
     """
@@ -53,6 +54,9 @@ def render_refresh_button():
             st.session_state['reload_trigger'] = True
             st.session_state['loading_state'] = 'loading'
             
+            # Limpar cache de arquivos
+            clear_file_cache()
+            
             # Registrar no log
             print("Botão de atualização acionado - recarregando dados")
             
@@ -63,28 +67,17 @@ def render_refresh_button():
 
 def render_sidebar_refresh_button():
     """
-    Renderiza um botão grande de atualização na barra lateral esquerda
+    Renderiza um botão de atualização na barra lateral esquerda
     
     Este botão permite atualizar todos os dados do relatório de uma só vez
     """
-    # Criar seção visualmente destacada
-    st.sidebar.markdown("""
-    <div style="
-        background-color: #f8f9fa; 
-        padding: 15px; 
-        border-radius: 8px; 
-        margin: 15px 0; 
-        border-left: 5px solid #FF5722;
-        text-align: center;
-        font-weight: bold;
-        font-size: 18px;
-        color: #FF5722;
-    ">
-        ⚡ ATUALIZAÇÃO RÁPIDA
-    </div>
-    """, unsafe_allow_html=True)
+    # Verificar se tem mensagem de sucesso para mostrar (de uma atualização anterior)
+    if 'refresh_success' in st.session_state and st.session_state['refresh_success']:
+        st.sidebar.success("✅ Dados atualizados com sucesso!", icon="✅")
+        # Limpar flag após mostrar
+        st.session_state['refresh_success'] = False
     
-    # Botão grande nativo do Streamlit
+    # Botão nativo do Streamlit (sem o cabeçalho "ATUALIZAÇÃO RÁPIDA")
     if st.sidebar.button("🔄 ATUALIZAR DADOS", key="btn_sidebar_refresh_all", type="primary", use_container_width=True):
         # Limpar TODOS os dados em cache para forçar nova chamada à API
         chaves_para_limpar = [
@@ -101,23 +94,60 @@ def render_sidebar_refresh_button():
             'filtered_df',
             'filtered_df_cat34',
             
-            # Outros dados de cache que possam existir
+            # Dados de páginas principais
             'df_conclusoes',
             'df_cartorio',
             'df_comune',
             'df_extracoes',
+            'df_ficha_familia',
+            'df_higienizacoes',
+            'df_cartorio_new',
+            
+            # Novos dados de checklist
+            'df_checklist',
+            'df_higienizacoes_checklist',
+            
+            # Dados das novas sub-páginas de Emissões
+            'df_funil_certidoes',
+            'df_emissoes_por_familia',
+            'df_certidoes_pendentes',
+            'df_desempenho_conclusao',
             
             # Filtros e configurações para reiniciar
             'start_date',
             'end_date',
             'selected_status',
-            'selected_responsibles'
+            'selected_responsibles',
+            
+            # Chaves específicas para planilhas
+            'data_planilha',
+            'df_planilha',
+            'df_planilha_raw',
+            'planilha_time',
+            'planilha_ultima_atualizacao',
+            'planilha_cache_key',
+            
+            # Limpeza de todos os caches relacionados a DataFrames
+            'df_',
+            'data_',
+            'cached_',
+            'excel_',
+            'csv_',
+            'sheet_',
         ]
         
         # Limpar cada chave se existir no estado da sessão
         for chave in chaves_para_limpar:
+            # Limpar chaves exatas
             if chave in st.session_state:
                 del st.session_state[chave]
+            
+            # Limpar todas as chaves que começam com determinados prefixos
+            if chave.endswith('_'):
+                prefixo = chave
+                chaves_com_prefixo = [k for k in st.session_state.keys() if k.startswith(prefixo)]
+                for k in chaves_com_prefixo:
+                    del st.session_state[k]
         
         # Definir explicitamente o estado de carregamento como 'not_started' 
         # para forçar recarregamento completo
@@ -125,6 +155,19 @@ def render_sidebar_refresh_button():
         
         # Flag para indicar que estamos fazendo uma atualização completa
         st.session_state['full_refresh'] = True
+        
+        # Flag para forçar releitura de arquivos externos
+        st.session_state['force_reload_files'] = True
+        
+        # Timestamp atual para invalidar caches
+        import time
+        st.session_state['last_refresh_timestamp'] = time.time()
+        
+        # Limpar cache de arquivos usando a função dedicada
+        clear_file_cache()
+        
+        # Definir flag de sucesso para mostrar mensagem após recarregar
+        st.session_state['refresh_success'] = True
         
         # Registrar no log
         print("Atualizando todos os dados - limpeza completa do cache")

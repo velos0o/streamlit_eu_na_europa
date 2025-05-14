@@ -6,6 +6,8 @@ import os # Adicionado para verificar existência do arquivo CSV
 
 # Importar função de simplificação de estágio
 from .visao_geral import simplificar_nome_estagio_comune
+# Importar nova função de atualização
+from utils.refresh_utils import load_csv_with_refresh
 
 def exibir_tempo_solicitacao(df_comune):
     """
@@ -109,7 +111,16 @@ def exibir_tempo_solicitacao(df_comune):
             st.error(f"Arquivo CSV para Comune 1 não encontrado em: {path_csv_comune1}")
         else:
             try:
-                df_csv = pd.read_csv(path_csv_comune1, low_memory=False) # Adicionado low_memory=False por precaução
+                # Usar a nova função load_csv_with_refresh em vez de pd.read_csv diretamente
+                df_csv = load_csv_with_refresh(
+                    path_csv_comune1, 
+                    low_memory=False
+                )
+                
+                # Registrar info sobre a atualização
+                ultima_atualizacao = datetime.fromtimestamp(os.path.getmtime(path_csv_comune1))
+                st.caption(f"📊 Dados da planilha atualizados em: {ultima_atualizacao.strftime('%d/%m/%Y %H:%M:%S')}")
+                
                 # Garantir que a coluna de ID no CSV também seja string para o merge
                 if coluna_id not in df_csv.columns:
                      st.error(f"Coluna '{coluna_id}' não encontrada no arquivo CSV: {path_csv_comune1}")

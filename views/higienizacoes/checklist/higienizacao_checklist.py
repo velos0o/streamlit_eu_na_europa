@@ -154,12 +154,40 @@ def show_higienizacao_checklist():
                 # Verificar se a coluna 'data' existe e convertê-la para o tipo data
                 if 'data' in df.columns:
                     try:
+                        # Limpar espaços extras e caracteres problemáticos
+                        df['data'] = df['data'].astype(str).str.strip()
+                        
+                        # Tentar diferentes formatos de data
+                        # Primeiro tenta o formato padrão (dia/mês/ano)
                         df['data'] = pd.to_datetime(df['data'], format='%d/%m/%Y', errors='coerce')
-                        # Verificar se há valores nulos após a conversão
+                        
+                        # Se houver valores nulos, tentar outros formatos comuns
+                        mask_null = df['data'].isna()
+                        if mask_null.any():
+                            # Tentar formato ano-mês-dia
+                            df.loc[mask_null, 'data'] = pd.to_datetime(
+                                df.loc[mask_null, 'data'].astype(str), 
+                                format='%Y-%m-%d', 
+                                errors='coerce'
+                            )
+                            
+                            # Tentar formato mês/dia/ano
+                            mask_null = df['data'].isna()
+                            if mask_null.any():
+                                df.loc[mask_null, 'data'] = pd.to_datetime(
+                                    df.loc[mask_null, 'data'].astype(str), 
+                                    format='%m/%d/%Y', 
+                                    errors='coerce'
+                                )
+                        
+                        # Verificar se há valores nulos após todas as tentativas
                         if df['data'].isna().any():
-                            pass
+                            # Log para registros problemáticos
+                            problemas = df[df['data'].isna()]['data'].astype(str).unique()
+                            print(f"Valores de data que não puderam ser convertidos: {problemas}")
                     except Exception as e:
-                        pass  # Continuar sem a conversão, mas manter o DataFrame
+                        print(f"Erro ao converter coluna 'data': {str(e)}")
+                        # Continuar sem a conversão, mas manter o DataFrame
 
                 return df
 
@@ -197,41 +225,65 @@ def show_higienizacao_checklist():
     # --- SEÇÃO DE FILTROS DIRETAMENTE NA PÁGINA PRINCIPAL ---
     st.subheader("Filtros")
     
-    # Layout com colunas para os filtros
-    col_filtro1, col_filtro2 = st.columns(2)
-    col_filtro3, col_filtro4 = st.columns(2)
+    # Opção para desabilitar filtro de data completamente
+    ignorar_filtro_data = st.checkbox("Mostrar todos os registros (ignorar filtro de data)", value=False)
     
-    # Filtro de data
+    # Se o usuário escolher ignorar o filtro de data, mostrar um aviso visual
+    if ignorar_filtro_data:
+        st.success("✅ Filtro de data desativado - mostrando TODOS os registros independentemente da data")
+    
+    # Filtro de data (mostrado mesmo se ignorado, mas com cor diferente)
     if data_valida:
-        with col_filtro1:
-            # Determinar valores mín/máx para os inputs de data
-            min_date = df["data"].min().date() if not df["data"].empty else (datetime.now() - timedelta(days=365)).date()
-            max_date = df["data"].max().date() if not df["data"].empty else datetime.now().date()
-            
-            # Calcular um valor padrão seguro (30 dias atrás ou o mínimo, o que for maior)
-            default_start_date = max(min_date, (datetime.now() - timedelta(days=30)).date())
-            
-            data_inicial = st.date_input("Data Inicial", 
-                                value=default_start_date,
-                                min_value=min_date,
-                                max_value=max_date)
-        with col_filtro2:
-            # Valor padrão para data final (hoje ou max_date, o que for menor)
-            today = datetime.now().date()
-            default_end_date = min(today, max_date)
-            
-            data_final = st.date_input("Data Final", 
-                                value=default_end_date,
-                                min_value=min_date,
-                                max_value=max_date)
+        # Adicionar um contêiner com estilo diferente se o filtro estiver sendo ignorado
+        date_filter_container = st.container()
+        if ignorar_filtro_data:
+            date_filter_container.markdown(
+                """
+                <div style="opacity: 0.6; border: 1px dashed #ccc; padding: 10px; border-radius: 5px; background-color: #f8f9fa;">
+                <p style="color: #6c757d; font-style: italic; margin-bottom: 5px;">⚠️ Filtro de data desabilitado (será ignorado)</p>
+                """, 
+                unsafe_allow_html=True
+            )
+        
+        with date_filter_container:
+            col_date1, col_date2 = st.columns(2)
+            with col_date1:
+                # Determinar valores mín/máx para os inputs de data
+                min_date = df["data"].min().date() if not df["data"].empty else (datetime.now() - timedelta(days=365)).date()
+                max_date = df["data"].max().date() if not df["data"].empty else datetime.now().date()
+                
+                # Calcular um valor padrão seguro (30 dias atrás ou o mínimo, o que for maior)
+                default_start_date = max(min_date, (datetime.now() - timedelta(days=30)).date())
+                
+                data_inicial = st.date_input("Data Inicial", 
+                                    value=default_start_date,
+                                    min_value=min_date,
+                                    max_value=max_date,
+                                    disabled=False)  # Não desabilitar visualmente
+            with col_date2:
+                # Valor padrão para data final (hoje ou max_date, o que for menor)
+                today = datetime.now().date()
+                default_end_date = min(today, max_date)
+                
+                data_final = st.date_input("Data Final", 
+                                    value=default_end_date,
+                                    min_value=min_date,
+                                    max_value=max_date,
+                                    disabled=False)  # Não desabilitar visualmente
+        
+        if ignorar_filtro_data:
+            date_filter_container.markdown("</div>", unsafe_allow_html=True)
+    
+    # Filtros de responsável e status em colunas
+    col_filtro1, col_filtro2 = st.columns(2)
     
     # Filtro por responsável
-    with col_filtro3:
+    with col_filtro1:
         responsaveis = ["Todos"] + sorted(df["responsavel"].unique().tolist())
         responsavel_filtro = st.selectbox("Responsável", options=responsaveis, index=0)
     
     # Filtro por status
-    with col_filtro4:
+    with col_filtro2:
         status_unicos = ["Todos"] + sorted(df["status"].unique().tolist())
         status_filtro = st.selectbox("Status", options=status_unicos, index=0)
     
@@ -252,17 +304,51 @@ def show_higienizacao_checklist():
     if status_filtro != "Todos":
         df_filtrado = df_filtrado[df_filtrado["status"] == status_filtro]
     
-    # Filtrar por data apenas se a coluna data for válida
-    if data_valida:
-        df_filtrado = df_filtrado[(df_filtrado["data"] >= pd.to_datetime(data_inicial)) & 
-                               (df_filtrado["data"] <= pd.to_datetime(data_final))]
+    # Filtrar por data apenas se a coluna data for válida E o usuário não escolheu ignorar o filtro
+    if data_valida and not ignorar_filtro_data:
+        # Converter para datetime para garantir comparação consistente
+        data_inicial_dt = pd.to_datetime(data_inicial)
+        data_final_dt = pd.to_datetime(data_final)
+        
+        # Adicionar 23:59:59 à data final para incluir todo o dia
+        data_final_dt = data_final_dt + pd.Timedelta(hours=23, minutes=59, seconds=59)
+        
+        # Imprimir informações de debug para resolver o problema
+        total_antes = len(df_filtrado)
+        
+        # Contar valores nulos na coluna data
+        nulos_data = df_filtrado["data"].isna().sum()
+        print(f"Registros com data nula: {nulos_data}")
+        
+        # Aplicar filtro incluindo registros sem data
+        mask_data_valida = df_filtrado["data"].notna()
+        mask_intervalo = (df_filtrado["data"] >= data_inicial_dt) & (df_filtrado["data"] <= data_final_dt)
+        df_filtrado = df_filtrado[mask_intervalo | ~mask_data_valida]
+        
+        # Verificar quantos registros ficaram de fora
+        total_depois = len(df_filtrado)
+        diferenca = total_antes - total_depois
+        if diferenca > 0:
+            print(f"ATENÇÃO: {diferenca} registros foram filtrados pela data!")
+            # Exibir informações sobre os registros filtrados para debugging
+            registros_antes_filtro = set(df.index)
+            registros_depois_filtro = set(df_filtrado.index)
+            registros_filtrados = registros_antes_filtro - registros_depois_filtro
+            if registros_filtrados:
+                df_filtrados_fora = df.loc[list(registros_filtrados)]
+                print("Exemplo de registros que não passaram no filtro:")
+                if "data" in df_filtrados_fora.columns:
+                    print(df_filtrados_fora[["data"]].head())
     
     # Exibir mensagem de feedback sobre os filtros aplicados
     registros_antes = len(df)
     registros_depois = len(df_filtrado)
     
     if registros_antes != registros_depois:
-        st.info(f"Exibindo {registros_depois} de {registros_antes} registros após aplicação dos filtros")
+        msg_filtros = f"Exibindo {registros_depois} de {registros_antes} registros após aplicação dos filtros"
+        if registros_depois < registros_antes and ignorar_filtro_data:
+            msg_filtros += " (filtro de data ignorado)"
+        st.info(msg_filtros)
     
     # --- FIM DA SEÇÃO DE FILTROS DIRETAMENTE NA PÁGINA PRINCIPAL ---
     

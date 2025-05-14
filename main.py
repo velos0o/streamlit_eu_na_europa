@@ -132,43 +132,25 @@ processar_parametros_url()
 with open('assets/styles.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
-# CSS adicional para o botão de atualização gigante
+# CSS simplificado para o botão de atualização
 st.markdown("""
 <style>
-/* CSS específico para o botão de atualização na barra lateral usando ID */
+/* CSS para botão de atualização mais simples */
 div.stButton > button#btn_sidebar_refresh_all {
-    height: 120px !important;
-    font-size: 24px !important;
-    font-weight: 900 !important;
-    letter-spacing: 1px !important;
-    border-radius: 12px !important;
-    margin: 15px 0 !important;
-    padding: 10px !important;
-    background-color: #FF5722 !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    margin: 10px 0 !important;
+    background-color: #2196F3 !important;
     color: white !important;
     border: none !important;
-    box-shadow: 0 6px 12px rgba(0,0,0,0.2) !important;
-    transition: all 0.3s ease !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
+    transition: all 0.2s ease !important;
 }
 
 div.stButton > button#btn_sidebar_refresh_all:hover {
-    background-color: #E64A19 !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 15px rgba(0,0,0,0.3) !important;
-}
-
-/* Adicionar animação pulsante para chamar mais atenção */
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.03); }
-    100% { transform: scale(1); }
-}
-
-div.stButton > button#btn_sidebar_refresh_all {
-    animation: pulse 2s infinite;
+    background-color: #1976D2 !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
 }
 </style>
 """, unsafe_allow_html=True)
