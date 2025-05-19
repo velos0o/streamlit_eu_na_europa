@@ -32,7 +32,10 @@ def ensure_numeric_display(df):
     # Tratar colunas de porcentagem
     for col in percent_columns:
         if col in df_clean.columns:
-            df_clean[col] = df_clean[col].apply(lambda x: f"{float(str(x).replace('%', '')):.2f}%" if pd.notnull(x) else "0.00%")
+            # Primeiro garantir que são números
+            df_clean[col] = pd.to_numeric(df_clean[col].astype(str).str.replace('%', '').str.strip(), errors='coerce').fillna(0)
+            # Depois formatar como string com 2 casas decimais e %
+            df_clean[col] = df_clean[col].apply(lambda x: f"{x:.2f}%")
     
     # Tratar colunas de texto
     for col in string_columns:
@@ -593,12 +596,14 @@ def exibir_higienizacao_desempenho():
                 df_total_mesas['Pasta C/Emissão Concluída'] / df_total_mesas['PASTAS TOTAIS'] * 100
             ).round(2)
 
-        # Formatar percentuais do total
-        df_total_mesas['CONVERSÃO (%)'] = df_total_mesas['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
-        df_total_mesas['Taxa Emissão Concluída (%)'] = df_total_mesas['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+        # Aplicar formatação numérica para garantir compatibilidade com Arrow
+        df_total_mesas = ensure_numeric_display(df_total_mesas)
 
         # Concatenar mesas com seu total
         df_display_mesas_final = pd.concat([df_display_mesas, df_total_mesas], ignore_index=True)
+        
+        # Aplicar formatação numérica a todo o DataFrame final
+        df_display_mesas_final = ensure_numeric_display(df_display_mesas_final)
 
         # Exibir tabela das MESAS 1-8
         st.dataframe(df_display_mesas_final, hide_index=True, use_container_width=True)
@@ -643,9 +648,8 @@ def exibir_higienizacao_desempenho():
         df_total_cabines['MESA'] = 'TOTAL'
         df_display_cabines = pd.concat([df_cabines_final, df_total_cabines], ignore_index=True)
 
-        # Formatar percentuais
-        df_display_cabines['CONVERSÃO (%)'] = df_display_cabines['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
-        df_display_cabines['Taxa Emissão Concluída (%)'] = df_display_cabines['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+        # Aplicar formatação numérica para garantir compatibilidade com Arrow
+        df_display_cabines = ensure_numeric_display(df_display_cabines)
         
         st.dataframe(df_display_cabines, hide_index=True, use_container_width=True)
         
@@ -689,9 +693,8 @@ def exibir_higienizacao_desempenho():
         df_total_carrao['MESA'] = 'TOTAL'
         df_display_carrao = pd.concat([df_carrao_final, df_total_carrao], ignore_index=True)
 
-        # Formatar percentuais
-        df_display_carrao['CONVERSÃO (%)'] = df_display_carrao['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
-        df_display_carrao['Taxa Emissão Concluída (%)'] = df_display_carrao['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+        # Aplicar formatação numérica para garantir compatibilidade com Arrow
+        df_display_carrao = ensure_numeric_display(df_display_carrao)
         
         st.dataframe(df_display_carrao, hide_index=True, use_container_width=True)
         

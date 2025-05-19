@@ -222,7 +222,8 @@ def load_conclusao_data(start_date=None, end_date=None):
         
         status_incompleto = [
             'PENDENTE *ATENÇÃO',
-            'HIGIENIZAÇÃO DEVOLVIDA - INCOMPLETO'
+            'HIGIENIZAÇÃO DEVOLVIDA - INCOMPLETO',
+            'HIGIENIZAÇÃO DEVOLVIDA'
         ]
         
         status_distrato = [
