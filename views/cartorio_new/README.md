@@ -10,6 +10,7 @@ Este diretório contém o código refatorado para a seção "Emissões Brasileir
 *   `s02_acompanhamento.py`: (Em construção) Destinado à lógica e visualização da aba "Acompanhamento".
 *   `s03_producao.py`: (Em construção) Destinado à lógica e visualização da aba "Produção".
 *   `s04_pendencias.py`: (Em construção) Destinado à lógica e visualização da aba "Pendências".
+*   `pendencias_adm.py`: Contém a lógica para a aba "Certidões Pendentes Por ADM", focando no responsável ADM de Pasta e destacando devoluções administrativas.
 *   `__init__.py`: Arquivo necessário para que o Python trate o diretório como um pacote.
 
 ## Conceitos Aplicados

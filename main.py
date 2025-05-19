@@ -57,6 +57,7 @@ SUB_ROTAS_EMISSOES = {
     "funil_certidoes": "Funil Certidões",
     "emissoes_por_familia": "Emissões Por Família",
     "certidoes_pendentes_responsavel": "Certidões Pendentes por responsável",
+    "certidoes_pendentes_adm": "Certidões Pendentes Por ADM",
     "desempenho_conclusao_pasta": "Desempenho Conclusão de Pasta"
 }
 
@@ -295,6 +296,13 @@ def ir_para_emissao_certidoes_pendentes_responsavel():
     st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'certidoes_pendentes_responsavel'
 
+# --- Função on_click para sub-botão Certidões Pendentes Por ADM ---
+def ir_para_emissao_certidoes_pendentes_adm():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Certidões Pendentes Por ADM'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'certidoes_pendentes_adm'
+
 # --- Função on_click para sub-botão Desempenho Conclusão de Pasta ---
 def ir_para_emissao_desempenho_conclusao_pasta():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras' # Garante que a página principal está correta
@@ -469,6 +477,10 @@ if st.session_state.get('emissao_submenu_expanded', False):
                     on_click=ir_para_emissao_certidoes_pendentes_responsavel,
                     use_container_width=True,
                     type="primary" if st.session_state.get('emissao_subpagina') == "Certidões Pendentes por responsável" else "secondary")
+        st.button("Certidões Pendentes Por ADM", key="subbtn_emissao_certidoes_pendentes_adm",
+                    on_click=ir_para_emissao_certidoes_pendentes_adm,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Certidões Pendentes Por ADM" else "secondary")
         st.button("Desempenho Conclusão de Pasta", key="subbtn_emissao_desempenho_conclusao_pasta",
                     on_click=ir_para_emissao_desempenho_conclusao_pasta,
                     use_container_width=True,

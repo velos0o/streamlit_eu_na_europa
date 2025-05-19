@@ -9,6 +9,7 @@ from .visao_geral import exibir_visao_geral
 from .acompanhamento import exibir_acompanhamento
 # from .producao import exibir_producao # REMOVIDO
 from .pendencias import exibir_pendencias
+from .pendencias_adm import exibir_pendencias_adm
 from .higienizacao_desempenho import exibir_higienizacao_desempenho
 
 # Importar componente TOC - REMOVIDO
@@ -56,6 +57,8 @@ def show_cartorio_new():
         exibir_acompanhamento(df_cartorio)
     elif subpagina_selecionada == "Certidões Pendentes por responsável":
         exibir_pendencias(df_cartorio)
+    elif subpagina_selecionada == "Certidões Pendentes Por ADM":
+        exibir_pendencias_adm(df_cartorio)
     elif subpagina_selecionada == "Desempenho Conclusão de Pasta":
         exibir_higienizacao_desempenho()
     else:

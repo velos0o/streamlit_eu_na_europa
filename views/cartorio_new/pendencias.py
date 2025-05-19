@@ -287,9 +287,9 @@ def exibir_pendencias(df_original):
 
     # --- Verificação das Colunas Essenciais ---
     colunas_necessarias = [coluna_estagio_id, coluna_estagio_name]
-    colunas_responsaveis = [coluna_responsavel_adm, coluna_assigned_name, coluna_assigned_id]
+    # colunas_responsaveis = [coluna_responsavel_adm, coluna_assigned_name, coluna_assigned_id] # Reavaliar uso
     
-    colunas_faltando = [col for col in colunas_necessarias if col not in df.columns and col != coluna_estagio_name] # stage_name é opcional se stage_id existir
+    colunas_faltando = [col for col in colunas_necessarias if col not in df.columns and col != coluna_estagio_name] 
     if 'STAGE_ID' not in df.columns and 'STAGE_NAME' not in df.columns:
          colunas_faltando.append("STAGE_ID ou STAGE_NAME")
 
@@ -298,51 +298,42 @@ def exibir_pendencias(df_original):
         st.caption(f"Colunas disponíveis: {list(df.columns)}")
         return
         
-    # Verificar se existe pelo menos UMA forma de obter o responsável
-    existe_resp_adm = coluna_responsavel_adm in df.columns
+    # Verificar se existe a coluna principal de responsável (ASSIGNED_BY_NAME ou ASSIGNED_BY_ID)
     existe_assigned_name = coluna_assigned_name in df.columns
-    # existe_assigned_id = coluna_assigned_id in df.columns # Não usamos ID diretamente para nome
+    existe_assigned_id = coluna_assigned_id in df.columns
+    # existe_resp_adm = coluna_responsavel_adm in df.columns # Não é prioritário aqui
     
-    if not existe_resp_adm and not existe_assigned_name:
-         st.error(f"Erro: Nenhuma coluna para identificar o responsável encontrada (verificadas: '{coluna_responsavel_adm}', '{coluna_assigned_name}').")
+    if not existe_assigned_name and not existe_assigned_id:
+         st.error(f"Erro: Nenhuma coluna para identificar o responsável primário encontrada (verificadas: '{coluna_assigned_name}', '{coluna_assigned_id}').")
          st.caption(f"Colunas disponíveis: {list(df.columns)}")
          return
-    elif not existe_assigned_name:
-        st.warning(f"Aviso: Coluna de nome do responsável de fallback ('{coluna_assigned_name}') não encontrada. Apenas '{coluna_responsavel_adm}' será usada para nomes.")
-    elif not existe_resp_adm:
-         st.warning(f"Aviso: Coluna principal de responsável ('{coluna_responsavel_adm}') não encontrada. Usando '{coluna_assigned_name}' como fallback.")
-         # Criar coluna ADM vazia para simplificar lógica
-         df[coluna_responsavel_adm] = pd.NA
-
+    
     # --- Pré-processamento (Continuação) --- 
-    df = df.dropna(subset=[coluna_estagio], how='all') # Remove linhas sem estágio original (se necessário)
+    df = df.dropna(subset=[coluna_estagio], how='all') 
     
     # Garantir que as colunas de responsável existam (mesmo que vazias)
-    if coluna_responsavel_adm not in df.columns: df[coluna_responsavel_adm] = pd.NA
     if coluna_assigned_name not in df.columns: df[coluna_assigned_name] = pd.NA
-    
-    # 1. Tentar extrair nome da coluna ADM
-    df['RESP_NOME_TEMP'] = df[coluna_responsavel_adm].apply(extrair_nome_responsavel)
-    
-    # Identificar valores "vazios" padrão (None, NaN, strings vazias, 'nan', 'None', <NA>)
-    empty_values = [None, '', 'nan', 'None', '<NA>']
-    # Verificar onde o nome extraído da ADM é considerado vazio OU é a string '[]' (caso comum de lista vazia)
-    condition_adm_vazio = df['RESP_NOME_TEMP'].isin(empty_values) | df['RESP_NOME_TEMP'].isnull() | (df['RESP_NOME_TEMP'] == '[]')
+    if coluna_assigned_id not in df.columns: df[coluna_assigned_id] = pd.NA
+    if coluna_responsavel_adm not in df.columns: df[coluna_responsavel_adm] = pd.NA # Para a função extrair_nome_responsavel, caso seja usada em outro contexto
 
-    # 2. Preencher com ASSIGNED_BY_NAME onde ADM falhou (e a coluna existe)
+    # Priorizar ASSIGNED_BY_NAME, depois tentar extrair de ASSIGNED_BY_ID
+    df['RESP_NOME_TEMP'] = pd.NA # Inicializar
     if existe_assigned_name:
-        # Tratar a coluna assigned_name também, convertendo nulos/vazios para None para consistência
-        df[coluna_assigned_name] = df[coluna_assigned_name].replace(empty_values, None)
-        # Preencher onde ADM estava vazio E assigned_name TEM um valor
-        df.loc[condition_adm_vazio & df[coluna_assigned_name].notnull(), 'RESP_NOME_TEMP'] = df.loc[condition_adm_vazio & df[coluna_assigned_name].notnull(), coluna_assigned_name]
-
-    # 3. Reavaliar onde o nome ainda está vazio após tentar ADM e Assigned Name
-    # Garantir que o tipo seja string antes de aplicar isin
-    df['RESP_NOME_TEMP'] = df['RESP_NOME_TEMP'].astype(str) 
-    condition_ainda_vazio = df['RESP_NOME_TEMP'].isin(empty_values + ['[]', 'nan']) | df['RESP_NOME_TEMP'].isnull()
+        df['RESP_NOME_TEMP'] = df[coluna_assigned_name].apply(extrair_nome_responsavel)
     
-    # 4. Preencher com "SEM_RESPONSAVEL" onde ainda está vazio
-    df.loc[condition_ainda_vazio, 'RESP_NOME_TEMP'] = 'SEM_RESPONSAVEL'
+    # Se RESP_NOME_TEMP ainda estiver vazio e ASSIGNED_BY_ID existir, tentar extrair dele
+    # (A função extrair_nome_responsavel pode precisar ser ajustada para lidar com IDs diretamente se for o caso)
+    if existe_assigned_id:
+        condition_resp_vazio_after_name = df['RESP_NOME_TEMP'].isin([None, '', 'nan', 'None', '<NA>', '[]']) | df['RESP_NOME_TEMP'].isnull()
+        df.loc[condition_resp_vazio_after_name, 'RESP_NOME_TEMP'] = df.loc[condition_resp_vazio_after_name, coluna_assigned_id].apply(extrair_nome_responsavel)
+
+    # Identificar valores "vazios" padrão (None, NaN, strings vazias, 'nan', 'None', <NA>)
+    empty_values = [None, '', 'nan', 'None', '<NA>', '[]']
+    # Verificar onde o nome extraído é considerado vazio
+    condition_resp_final_vazio = df['RESP_NOME_TEMP'].isin(empty_values) | df['RESP_NOME_TEMP'].isnull()
+    
+    # Preencher com "SEM_RESPONSAVEL" onde ainda está vazio
+    df.loc[condition_resp_final_vazio, 'RESP_NOME_TEMP'] = 'SEM_RESPONSAVEL'
 
     # Definir a coluna final
     df['RESPONSAVEL_NOME'] = df['RESP_NOME_TEMP']
