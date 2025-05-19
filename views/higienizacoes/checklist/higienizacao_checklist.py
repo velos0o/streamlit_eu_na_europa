@@ -11,6 +11,32 @@ import traceback
 # Importar a função de obter credenciais do helper
 from utils.secrets_helper import get_google_credentials
 
+# Função utilitária para garantir que colunas numéricas sejam exibidas corretamente
+def ensure_numeric_display(df):
+    """Converte colunas percentuais para formato numérico seguro para exibição."""
+    # Crie uma cópia para evitar SettingWithCopyWarning
+    df_safe = df.copy()
+    
+    # Identifique colunas que contenham '%' nos valores (potencialmente percentuais formatados como string)
+    cols_to_fix = []
+    for col in df_safe.columns:
+        # Verificar apenas colunas de string
+        if df_safe[col].dtype == 'object':
+            # Verifique apenas algumas linhas para eficiência
+            sample = df_safe[col].astype(str).head(10)
+            if sample.str.contains('%').any():
+                cols_to_fix.append(col)
+    
+    # Converta cada coluna percentual para formato numérico
+    for col in cols_to_fix:
+        try:
+            # Remova o símbolo '%' e converta para float
+            df_safe[col] = df_safe[col].astype(str).str.replace('%', '').str.replace(',', '.').astype(float) / 100
+        except Exception as e:
+            print(f"Erro ao converter coluna {col}: {e}")
+    
+    return df_safe
+
 def show_higienizacao_checklist():
     """
     Exibe a página de checklist de produção de higienização.
@@ -105,49 +131,50 @@ def show_higienizacao_checklist():
                 df = pd.DataFrame(rows, columns=fixed_headers)
 
                 # --- Lógica Revisada de Mapeamento e Renomeação ---
-                standard_columns_keywords = {
-                    'data': ['data'],
-                    'responsavel': ['responsavel'],
-                    'status': ['status'],
-                    'nome da família': ['família', 'familia'], # Palavras-chave
-                    'mesa': ['mesa'],
-                    'motivo': ['motivo'] # Palavra-chave
+                # Mapeamento por posição das colunas (A-G)
+                # Os cabeçalhos são valores da linha 1 mas o conteúdo é mais importante que os nomes
+                mapeamento_colunas_posicao = {
+                    0: 'data',                  # Coluna A 
+                    1: 'responsavel',           # Coluna B
+                    2: 'nome da família',       # Coluna C
+                    3: 'id da família',         # Coluna D
+                    4: 'mesa',                  # Coluna E
+                    5: 'status',                # Coluna F
+                    6: 'motivo'                 # Coluna G
                 }
-
-                final_rename_map = {} # Mapeia: fixed_header original -> nome padrão final
-                found_standard_cols = {} # Rastreia: nome padrão -> fixed_header original encontrado
-
-                # 1. Priorizar correspondências exatas (ignorando maiúsculas/minúsculas e espaços)
-                for standard_name in standard_columns_keywords.keys():
-                    if standard_name not in found_standard_cols: # Se ainda não encontramos este nome padrão
-                        for header in fixed_headers:
-                            if header.lower().strip() == standard_name:
-                                if header not in final_rename_map: # Garantir que o header original não seja mapeado duas vezes
-                                    final_rename_map[header] = standard_name
-                                    found_standard_cols[standard_name] = header
-                                    break # Passa para o próximo nome padrão
-
-                # 2. Procurar por palavras-chave para os nomes padrão restantes
-                for standard_name, keywords in standard_columns_keywords.items():
-                    if standard_name not in found_standard_cols: # Se ainda não encontramos este nome padrão
-                        for header in fixed_headers:
-                            # Garantir que este header original ainda não foi mapeado
-                            if header not in final_rename_map:
-                                normalized_header = header.lower().strip()
-                                if any(keyword in normalized_header for keyword in keywords):
-                                    final_rename_map[header] = standard_name
-                                    found_standard_cols[standard_name] = header
-                                    break # Encontrou a primeira correspondência por palavra-chave, passa para o próximo nome padrão
+                
+                # Construir um dicionário de renomeação baseado em posição, não em conteúdo
+                final_rename_map = {}
+                for posicao, nome_coluna in mapeamento_colunas_posicao.items():
+                    if posicao < len(fixed_headers):
+                        print(f"Mapeando coluna na posição {posicao} (valor: '{fixed_headers[posicao]}') para '{nome_coluna}'")
+                        final_rename_map[fixed_headers[posicao]] = nome_coluna
+                    else:
+                        print(f"AVISO: Posição {posicao} está fora do intervalo (total de colunas: {len(fixed_headers)})")
+                
+                # Log do mapeamento final (apenas para console, não para interface)
+                print(f"DEBUG: Cabeçalhos originais da planilha: {fixed_headers}")
+                print(f"DEBUG: Mapeamento final de colunas: {final_rename_map}")
 
                 # Renomear as colunas encontradas para nomes padrão
                 df.rename(columns=final_rename_map, inplace=True)
 
                 # Selecionar APENAS as colunas padrão que foram encontradas e renomeadas
-                standard_cols_to_keep = list(found_standard_cols.keys())
+                standard_cols_to_keep = list(mapeamento_colunas_posicao.values())
                 
-                # Manter apenas as colunas padrão identificadas
-                # Filtrar df para manter apenas as colunas cujos nomes agora correspondem aos nomes padrão
-                df = df[[col for col in standard_cols_to_keep if col in df.columns]]
+                # Manter apenas as colunas padrão identificadas que existem no DataFrame
+                colunas_existentes = [col for col in standard_cols_to_keep if col in df.columns]
+                if colunas_existentes:
+                    print(f"Colunas mapeadas encontradas: {colunas_existentes}")
+                    df = df[colunas_existentes]
+                else:
+                    print("ALERTA: Nenhuma coluna mapeada foi encontrada no DataFrame após renomeação!")
+                    # Manter o DataFrame original para não quebrar o processamento subsequente
+                
+                # Verificar os dados após o mapeamento (apenas no console)
+                print(f"DEBUG: Colunas após o mapeamento: {list(df.columns)}")
+                print(f"DEBUG: Valores únicos de status: {df['status'].unique().tolist() if 'status' in df.columns else 'Coluna status não existe'}")
+                print(f"DEBUG: Quantidade de registros: {len(df)}")
 
                 # --- Fim da Lógica Revisada ---
 
@@ -389,14 +416,18 @@ def show_higienizacao_checklist():
         percentual = (status_total / df_filtrado["status"].count() * 100) if df_filtrado["status"].count() > 0 else 0
         
         with current_col:
-            # Usar st.metric para exibir os dados
-            # O delta pode ser usado para mostrar a variação percentual ou outra informação
-            # Para apenas mostrar o percentual, formatamos como string no label ou valor, ou usamos o delta
-            # Vamos tentar colocar o percentual como "delta" simbólico, sem cor de up/down
-            st.metric(label=status_nome, value=f"{status_total:,}", delta=f"{percentual:.1f}%", delta_color="off")
-    
-    # Distribuição de Status (tabela)
-    st.subheader("Distribuição de Status")
+            # Definir cor do card com base no dicionário de cores
+            bgcolor = status_colors.get(status_nome, "#6c757d")  # Cor padrão cinza se não estiver no dicionário
+            
+            # Criar uma div personalizada com estilo
+            card_html = f"""
+            <div style="padding: 1rem; border-radius: 0.5rem; background-color: {bgcolor}20; border-left: 5px solid {bgcolor}; margin-bottom: 1rem;">
+                <h4 style="color: {bgcolor}; margin-bottom: 0.5rem;">{status_nome}</h4>
+                <div style="font-size: 1.5rem; font-weight: bold;">{status_total:,}</div>
+                <div style="font-size: 0.8rem; color: #666;">{percentual:.1f}% do total</div>
+            </div>
+            """
+            st.markdown(card_html, unsafe_allow_html=True)
     
     # Tabela de responsáveis por status (tabela cruzada)
     st.subheader("Responsáveis por Status")
@@ -407,53 +438,49 @@ def show_higienizacao_checklist():
     else:
         try:
             # Criar tabela cruzada (crosstab) de responsáveis x status
-            crosstab = pd.crosstab(df_filtrado["responsavel"], df_filtrado["status"], margins=True, margins_name="Total")
-            
-            # Reordenar as colunas para ter o Total no final
-            cols = [col for col in crosstab.columns if col != "Total"] + ["Total"]
-            crosstab = crosstab[cols]
-            
-            # Verificar se a tabela cruzada tem conteúdo
-            if crosstab.empty or crosstab.shape[0] <= 1 or crosstab.shape[1] <= 1:
-                st.warning("Tabela cruzada vazia ou com apenas uma linha/coluna.")
-            else:
-                # ABORDAGEM COMPLETAMENTE NOVA: Renderização HTML pura (sem usar Pandas styler)
-                # Esta abordagem evita problemas no JavaScript do Streamlit com DataFrame.style
+            if 'responsavel' in df_filtrado.columns and 'status' in df_filtrado.columns:
+                crosstab = pd.crosstab(df_filtrado["responsavel"], df_filtrado["status"], margins=True, margins_name="Total")
                 
-                # Convertemos a tabela para HTML completamente customizado
-                html_table = "<div style='overflow-x: auto;'><table style='width:100%; border-collapse: collapse;'>"
+                # Reordenar as colunas para ter o Total no final
+                cols = [col for col in crosstab.columns if col != "Total"] + ["Total"]
+                crosstab = crosstab[cols]
                 
-                # Cabeçalho da tabela
-                html_table += "<thead><tr><th></th>"  # Coluna vazia para o índice
-                for col in crosstab.columns:
-                    bgcolor = status_colors.get(col, "#6c757d") if col != "Total" else "#007bff"
-                    text_color = "white"
-                    html_table += f"<th style='padding: 8px; background-color: {bgcolor}; color: {text_color}; text-align: center;'>{col}</th>"
-                html_table += "</tr></thead>"
-                
-                # Corpo da tabela
-                html_table += "<tbody>"
-                for idx, row in crosstab.iterrows():
-                    html_table += f"<tr><th style='padding: 8px; background-color: #f8f9fa; text-align: left;'>{idx}</th>"
+                # Verificar se a tabela cruzada tem conteúdo
+                if crosstab.empty or crosstab.shape[0] <= 1 or crosstab.shape[1] <= 1:
+                    st.warning("Tabela cruzada vazia ou com apenas uma linha/coluna.")
+                else:
+                    # Renderização HTML pura para melhor formatação
+                    
+                    # Convertemos a tabela para HTML completamente customizado
+                    html_table = "<div style='overflow-x: auto;'><table style='width:100%; border-collapse: collapse;'>"
+                    
+                    # Cabeçalho da tabela
+                    html_table += "<thead><tr><th></th>"  # Coluna vazia para o índice
                     for col in crosstab.columns:
-                        value = row[col]
-                        # Aplicar estilo para valores zero
-                        if value == 0:
-                            cell_style = "color: #aaa; opacity: 0.7;"
-                        else:
-                            cell_style = ""
-                        html_table += f"<td style='padding: 8px; text-align: center; {cell_style}'>{int(value)}</td>"
-                    html_table += "</tr>"
-                html_table += "</tbody>"
-                html_table += "</table></div>"
-                
-                # Mostrar HTML puro em vez do dataframe estilizado
-                st.write(html_table, unsafe_allow_html=True)
-                st.caption("Tabela de responsáveis por status (cabeçalhos coloridos)")
-                
-                # Oferecer um botão para visualizar a tabela básica como fallback
-                if st.checkbox("Mostrar tabela sem formatação", value=False):
-                    st.dataframe(crosstab, use_container_width=True)
+                        bgcolor = status_colors.get(col, "#6c757d") if col != "Total" else "#007bff"
+                        text_color = "white"
+                        html_table += f"<th style='padding: 8px; background-color: {bgcolor}; color: {text_color}; text-align: center;'>{col}</th>"
+                    html_table += "</tr></thead>"
+                    
+                    # Corpo da tabela
+                    html_table += "<tbody>"
+                    for idx, row in crosstab.iterrows():
+                        html_table += f"<tr><th style='padding: 8px; background-color: #f8f9fa; text-align: left;'>{idx}</th>"
+                        for col in crosstab.columns:
+                            value = row[col]
+                            # Aplicar estilo para valores zero
+                            if value == 0:
+                                cell_style = "color: #aaa; opacity: 0.7;"
+                            else:
+                                cell_style = ""
+                            html_table += f"<td style='padding: 8px; text-align: center; {cell_style}'>{int(value)}</td>"
+                        html_table += "</tr>"
+                    html_table += "</tbody>"
+                    html_table += "</table></div>"
+                    
+                    # Mostrar HTML puro em vez do dataframe estilizado
+                    st.write(html_table, unsafe_allow_html=True)
+                    st.caption("Tabela de responsáveis por status (cabeçalhos coloridos)")
                 
         except Exception as e:
             # Se falhar ao criar a crosstab, mostre um erro e uma visualização alternativa
@@ -513,6 +540,9 @@ def show_higienizacao_checklist():
                         # Se a coluna 'data' não era válida desde o início, converte para string
                          df_exibir['data'] = df_exibir['data'].astype(str)
 
+                # Garantir que colunas numéricas estejam formatadas corretamente
+                df_exibir = ensure_numeric_display(df_exibir)
+
                 # Renomear colunas padrão para nomes de exibição
                 renomear_colunas = {col: nomes_display[col] for col in colunas_existentes_em_df if col in nomes_display}
                 df_exibir.rename(columns=renomear_colunas, inplace=True)
@@ -539,13 +569,53 @@ def show_higienizacao_checklist():
                     # Verificar se a coluna de status existe para aplicar estilo
                     if display_status_col_name in df_exibir.columns:
                         try:
-                            # Aplicar estilo apenas à coluna 'Status' usando .map()
-                            styled_df = df_exibir.style.map(highlight_single_status, subset=[display_status_col_name])
-                            # Exibir a tabela ESTILIZADA
-                            st.dataframe(styled_df, use_container_width=True, height=400)
+                            # Abordagem 1: Tentar aplicar estilo usando .style do pandas
+                            try:
+                                # Aplicar estilo apenas à coluna 'Status' usando .map()
+                                styled_df = df_exibir.style.map(highlight_single_status, subset=[display_status_col_name])
+                                # Exibir a tabela ESTILIZADA
+                                st.dataframe(styled_df, use_container_width=True, height=400)
+                            except Exception as style_error:
+                                st.warning(f"Não foi possível aplicar estilo: {str(style_error)}. Tentando abordagem alternativa...")
+                                
+                                # Abordagem 2: Alternativa usando HTML manual para casos onde o .style falha
+                                st.markdown("<h5>Visualização dos registros:</h5>", unsafe_allow_html=True)
+                                
+                                # Criar tabela HTML formatada manualmente
+                                html_table = "<div style='overflow-x: auto;'><table style='width:100%; border-collapse: collapse;'>"
+                                
+                                # Cabeçalho
+                                html_table += "<thead><tr>"
+                                for col in df_exibir.columns:
+                                    html_table += f"<th style='padding: 8px; background-color: #f1f1f1; text-align: left;'>{col}</th>"
+                                html_table += "</tr></thead><tbody>"
+                                
+                                # Dados (limitar a 100 linhas para performance)
+                                max_rows = min(100, len(df_exibir))
+                                for i in range(max_rows):
+                                    html_table += "<tr>"
+                                    for col in df_exibir.columns:
+                                        cell_value = df_exibir.iloc[i][col]
+                                        
+                                        # Aplicar formatação especial para status
+                                        if col == display_status_col_name:
+                                            status_value = str(cell_value)
+                                            bgcolor = status_colors.get(status_value, '#6c757d')
+                                            html_table += f"<td style='padding: 8px; background-color: {bgcolor}30; color: {bgcolor}; font-weight: bold;'>{status_value}</td>"
+                                        else:
+                                            html_table += f"<td style='padding: 8px; border-bottom: 1px solid #ddd;'>{cell_value}</td>"
+                                    html_table += "</tr>"
+                                
+                                html_table += "</tbody></table></div>"
+                                
+                                if len(df_exibir) > max_rows:
+                                    html_table += f"<p><em>Mostrando {max_rows} de {len(df_exibir)} registros...</em></p>"
+                                
+                                st.markdown(html_table, unsafe_allow_html=True)
+                                
                         except Exception as e:
                             st.warning(f"Erro ao aplicar estilo à tabela: {str(e)}")
-                            # Exibir a tabela sem estilo como fallback
+                            # Exibir a tabela sem estilo como fallback final
                             st.dataframe(df_exibir, use_container_width=True, height=400)
                     else:
                         # Exibir a tabela sem estilo se a coluna 'Status' não existir
