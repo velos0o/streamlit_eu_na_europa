@@ -534,7 +534,7 @@ def exibir_higienizacao_desempenho():
             data=csv_principal,
             file_name='desempenho_higienizacao_mesas_1_8.csv',
             mime='text/csv',
-            key='download_mesas_1_8'
+            key='download_mesas_1_8_new'
         )
         st.markdown("---")
     else:
@@ -584,7 +584,7 @@ def exibir_higienizacao_desempenho():
             data=csv_cabines_detalhes,
             file_name='detalhes_cabines.csv',
             mime='text/csv',
-            key='download_cabines'
+            key='download_cabines_new'
         )
     else:
         st.info("Não há dados de CABINES na planilha para exibir detalhes.") 
@@ -625,7 +625,7 @@ def exibir_higienizacao_desempenho():
             data=csv_carrao_detalhes,
             file_name='detalhes_carrao.csv',
             mime='text/csv',
-            key='download_carrao'
+            key='download_carrao_new'
         )
     else:
         st.info("Não há dados de CARRÃO na planilha para exibir detalhes.") 
@@ -667,6 +667,18 @@ def exibir_higienizacao_desempenho():
 
     # Aplicar tratamento antes de exibir cada tabela
     if not df_final_sem_cabines.empty:
+        # Calcular total de Pasta C/Emissão Concluída para MESAS 1-8
+        total_mesas_1_8 = df_final[df_final['MESA'].isin(mesas_1_8_list)]['Pasta C/Emissão Concluída'].sum()
+
+        # Exibir faixa com total das MESAS 1-8
+        st.markdown(f"""
+        <div style="{faixa_style}">
+            <h4 style="{titulo_style}">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (MESAS 1-8)</h4>
+            <p style="{contagem_style}">{int(total_mesas_1_8)} PASTAS</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("---")
+
         # Tratar e exibir tabela principal (MESAS 1-8)
         df_display_mesas = df_display_principal[
             ~df_display_principal['MESA'].isin(['CABINES', 'CARRÃO', 'TOTAL'])
@@ -690,13 +702,13 @@ def exibir_higienizacao_desempenho():
         st.dataframe(df_display_mesas_final, hide_index=True, use_container_width=True)
 
         # Botão de download para tabela principal (MESAS 1-8)
-        csv_principal = convert_df_to_csv(df_display_mesas_final)
+        csv_mesas = convert_df_to_csv(df_display_mesas_final)
         st.download_button(
             label="Download Tabela MESAS 1-8 como CSV",
-            data=csv_principal,
+            data=csv_mesas,
             file_name='desempenho_higienizacao_mesas_1_8.csv',
             mime='text/csv',
-            key='download_mesas_1_8'
+            key='download_mesas_1_8_new'
         )
         st.markdown("---")
 
@@ -722,13 +734,13 @@ def exibir_higienizacao_desempenho():
         st.dataframe(df_display_cabines, hide_index=True, use_container_width=True)
 
         # Botão de download para CABINES
-        csv_cabines_detalhes = convert_df_to_csv(df_cabines_final)
+        csv_cabines = convert_df_to_csv(df_cabines_final)
         st.download_button(
             label="Download Detalhes Cabines como CSV",
-            data=csv_cabines_detalhes,
+            data=csv_cabines,
             file_name='detalhes_cabines.csv',
             mime='text/csv',
-            key='download_cabines'
+            key='download_cabines_new'
         )
         st.markdown("---")
     else:
@@ -756,13 +768,13 @@ def exibir_higienizacao_desempenho():
         st.dataframe(df_display_carrao, hide_index=True, use_container_width=True)
 
         # Botão de download para CARRÃO
-        csv_carrao_detalhes = convert_df_to_csv(df_carrao_final)
+        csv_carrao = convert_df_to_csv(df_carrao_final)
         st.download_button(
             label="Download Detalhes CARRÃO como CSV",
-            data=csv_carrao_detalhes,
+            data=csv_carrao,
             file_name='detalhes_carrao.csv',
             mime='text/csv',
-            key='download_carrao'
+            key='download_carrao_new'
         )
     else:
         st.info("Não há dados de CARRÃO na planilha para exibir detalhes.") 
