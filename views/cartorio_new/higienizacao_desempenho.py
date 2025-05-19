@@ -390,7 +390,7 @@ def exibir_higienizacao_desempenho():
     # --- Merge Final com a Base --- 
     data_base = {
         'MESA': ['MESA 8', 'MESA 7', 'MESA 6', 'MESA 5', 'MESA 4', 'MESA 3', 'MESA 2', 'MESA 1', 'MESA 0', 'CABINES', 'CARRÃO'],
-        'PASTAS TOTAIS': [105, 46, 46, 70, 70, 46, 66, 66, 49, 113, 123],
+        'PASTAS TOTAIS': [105, 46, 46, 70, 106, 46, 66, 66, 49, 113, 123],
         'CONSULTOR': ['NADYA', 'FELIPE', 'VITOR', 'BIANCA', 'DANYELE', 'LAYLA', 'LAYLA', 'JULIANE', 'JULIANE', 'STEFANY', 'Fernanda']
     }
     df_base = pd.DataFrame(data_base)
