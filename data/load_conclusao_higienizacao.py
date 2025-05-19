@@ -39,11 +39,50 @@ def load_conclusao_data(start_date=None, end_date=None):
         # Pega todos os dados da planilha como lista de listas
         all_values = sheet.get_all_values()
 
-        # Imprimir os cabeçalhos lidos da linha 2 (índice 1) para debug
-        print("[DEBUG] Cabeçalhos da planilha:", all_values[1])
-        df = pd.DataFrame(all_values[2:], columns=all_values[1]) # Usa linha 2 como cabeçalho, dados a partir da linha 3
+        # Imprimir os primeiros valores da planilha para debug
+        print("[DEBUG] Verificando formato da planilha:")
+        if len(all_values) >= 3:
+            print(f"Linha 1: {all_values[0]}")
+            print(f"Linha 2: {all_values[1]}")
+            print(f"Linha 3: {all_values[2]}")
+        else:
+            print(f"A planilha tem apenas {len(all_values)} linhas.")
 
-        # Verifica se as colunas esperadas existem após carregar com cabeçalho correto
+        # Verificar se a primeira linha é o cabeçalho (caso comum) ou se a segunda linha é
+        linha_cabecalho = 1  # Assumir segunda linha como padrão
+        
+        # Tentar determinar qual linha contém os cabeçalhos
+        for i in range(min(3, len(all_values))):
+            possible_headers = all_values[i]
+            # Verificar se esta linha parece um cabeçalho
+            header_indicators = ['data', 'responsavel', 'nome', 'família', 'mesa', 'status']
+            matches = sum(1 for indicator in header_indicators if any(indicator.lower() in str(cell).lower() for cell in possible_headers))
+            if matches >= 3:  # Se encontrar pelo menos 3 indicadores de cabeçalho
+                linha_cabecalho = i
+                print(f"[INFO] Linha {i+1} parece conter os cabeçalhos com {matches} matches")
+                break
+        
+        # Usar a linha identificada como cabeçalho
+        headers = all_values[linha_cabecalho]
+        data_rows = all_values[linha_cabecalho+1:]
+        print(f"[DEBUG] Usando linha {linha_cabecalho+1} como cabeçalho: {headers}")
+        
+        # Criar DataFrame com os cabeçalhos identificados
+        df = pd.DataFrame(data_rows, columns=headers)
+        
+        # Verificar se as colunas essenciais existem
+        colunas_essenciais = ['responsavel', 'mesa']
+        for col in colunas_essenciais:
+            matches = [header for header in df.columns if col.lower() in header.lower()]
+            if matches:
+                print(f"[INFO] Coluna '{col}' encontrada como '{matches[0]}'")
+                # Se encontrou, renomear para o nome esperado
+                df = df.rename(columns={matches[0]: col})
+            else:
+                print(f"[ERRO] Coluna essencial '{col}' não encontrada. Planilha pode estar em formato incorreto.")
+                # Se for uma coluna realmente essencial, considerar retornar None
+        
+        # Verificar se as colunas esperadas existem após carregar com cabeçalho correto
         colunas_necessarias = [
             'data',
             'responsavel',

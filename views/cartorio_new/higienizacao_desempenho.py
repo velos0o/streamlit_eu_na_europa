@@ -482,11 +482,36 @@ def exibir_higienizacao_desempenho():
     # --- Exibir a Tabela Principal (SEM CABINES) --- 
     df_final_sem_cabines = df_final[df_final['MESA'] != 'CABINES'].copy()
 
+    # Verificar se df_final tem as colunas necessárias
+    if 'HIGINIZAÇÃO COM ÊXITO' not in df_final.columns:
+        print("ALERTA: Coluna 'HIGINIZAÇÃO COM ÊXITO' não encontrada no DataFrame final!")
+        # Adicionar a coluna ausente
+        df_final['HIGINIZAÇÃO COM ÊXITO'] = 0
+    
+    # Nos casos em que não há dados reais, mostrar mensagem amigável
+    if df_final_sem_cabines.empty or df_final['HIGINIZAÇÃO COM ÊXITO'].sum() == 0:
+        st.warning("""
+        Não foi possível carregar os dados da planilha. Isso pode ocorrer por algumas razões:
+        
+        1. A planilha pode estar com formato diferente do esperado
+        2. Os cabeçalhos da planilha podem ter sido alterados
+        3. Pode haver um problema de conexão com o Google Sheets
+        
+        Por favor, verifique a planilha e tente novamente.
+        """)
+        
+        # Mostrar tabela básica com as mesas e pastas totais (pelo menos isso estará disponível)
+        st.markdown("### Dados Básicos (Metas por Mesa)")
+        df_base_display = df_base.copy()
+        st.dataframe(df_base_display, hide_index=True, use_container_width=True)
+        return  # Parar a execução da função
+
     # Debug: Mostrar dados sem CABINES
     print("\n=== DEBUG: Dados sem CABINES ===")
     print("Contagem por MESA:")
     print(df_final_sem_cabines.groupby('MESA')['HIGINIZAÇÃO COM ÊXITO'].sum())
 
+    # --- Continuação normal do código se houver dados ---
     if not df_final_sem_cabines.empty:
         # Calcular totais
         df_total_principal = df_final_sem_cabines.select_dtypes(include=np.number).sum().to_frame().T
@@ -496,64 +521,23 @@ def exibir_higienizacao_desempenho():
         # Recalcular percentuais para a linha de total
         try:
             if df_total_principal['PASTAS TOTAIS'].iloc[0] > 0:
-                if 'HIGINIZAÇÃO COM ÊXITO' in df_total_principal.columns:
-                    df_total_principal['CONVERSÃO (%)'] = (
-                        df_total_principal['HIGINIZAÇÃO COM ÊXITO'] / df_total_principal['PASTAS TOTAIS'] * 100
-                    ).round(2)
-                else:
-                    df_total_principal['CONVERSÃO (%)'] = 0
+                # Verificar se a coluna HIGINIZAÇÃO COM ÊXITO existe
+                if 'HIGINIZAÇÃO COM ÊXITO' not in df_total_principal.columns:
+                    print("ALERTA: Criando coluna 'HIGINIZAÇÃO COM ÊXITO' em df_total_principal")
+                    df_total_principal['HIGINIZAÇÃO COM ÊXITO'] = 0
                     
-                if 'Pasta C/Emissão Concluída' in df_total_principal.columns:
-                    df_total_principal['Taxa Emissão Concluída (%)'] = (
-                        df_total_principal['Pasta C/Emissão Concluída'] / df_total_principal['PASTAS TOTAIS'] * 100
-                    ).round(2)
-                else:
-                    df_total_principal['Taxa Emissão Concluída (%)'] = 0
-            else:
-                df_total_principal['CONVERSÃO (%)'] = 0
-                df_total_principal['Taxa Emissão Concluída (%)'] = 0
-        except Exception as e:
-            print(f"ERRO ao calcular percentuais: {str(e)}")
-            df_total_principal['CONVERSÃO (%)'] = 0
-            df_total_principal['Taxa Emissão Concluída (%)'] = 0
-            
-        # Concatenar com os dados originais
-        df_display_principal = pd.concat([df_final_sem_cabines, df_total_principal], ignore_index=True)
-
-        # Debug: Mostrar dados finais
-        print("\n=== DEBUG: Dados Finais para Exibição ===")
-        print("Totais calculados:")
-        print("Colunas disponíveis em df_total_principal:")
-        print(df_total_principal.columns.tolist())  # Verificar quais colunas realmente existem
-        
-        # Verificar se as colunas necessárias existem
-        required_columns = ['HIGINIZAÇÃO COM ÊXITO', 'PASTAS TOTAIS', 'Pasta C/Emissão Concluída']
-        missing_columns = [col for col in required_columns if col not in df_total_principal.columns]
-        if missing_columns:
-            print(f"ALERTA: Colunas ausentes: {missing_columns}")
-            # Adicionar colunas faltantes com zeros
-            for col in missing_columns:
-                df_total_principal[col] = 0
+                df_total_principal['CONVERSÃO (%)'] = (
+                    df_total_principal['HIGINIZAÇÃO COM ÊXITO'] / df_total_principal['PASTAS TOTAIS'] * 100
+                ).round(2)
                 
-        if 'HIGINIZAÇÃO COM ÊXITO' in df_total_principal.columns and 'PASTAS TOTAIS' in df_total_principal.columns:
-            print(df_total_principal[['MESA', 'HIGINIZAÇÃO COM ÊXITO', 'PASTAS TOTAIS']])
-        
-        # Recalcular percentuais de forma segura
-        try:
-            if df_total_principal['PASTAS TOTAIS'].iloc[0] > 0:
-                if 'HIGINIZAÇÃO COM ÊXITO' in df_total_principal.columns:
-                    df_total_principal['CONVERSÃO (%)'] = (
-                        df_total_principal['HIGINIZAÇÃO COM ÊXITO'] / df_total_principal['PASTAS TOTAIS'] * 100
-                    ).round(2)
-                else:
-                    df_total_principal['CONVERSÃO (%)'] = 0
+                # Verificar se a coluna Pasta C/Emissão Concluída existe
+                if 'Pasta C/Emissão Concluída' not in df_total_principal.columns:
+                    print("ALERTA: Criando coluna 'Pasta C/Emissão Concluída' em df_total_principal")
+                    df_total_principal['Pasta C/Emissão Concluída'] = 0
                     
-                if 'Pasta C/Emissão Concluída' in df_total_principal.columns:
-                    df_total_principal['Taxa Emissão Concluída (%)'] = (
-                        df_total_principal['Pasta C/Emissão Concluída'] / df_total_principal['PASTAS TOTAIS'] * 100
-                    ).round(2)
-                else:
-                    df_total_principal['Taxa Emissão Concluída (%)'] = 0
+                df_total_principal['Taxa Emissão Concluída (%)'] = (
+                    df_total_principal['Pasta C/Emissão Concluída'] / df_total_principal['PASTAS TOTAIS'] * 100
+                ).round(2)
             else:
                 df_total_principal['CONVERSÃO (%)'] = 0
                 df_total_principal['Taxa Emissão Concluída (%)'] = 0
@@ -568,6 +552,12 @@ def exibir_higienizacao_desempenho():
         # --- Calcular e exibir totais em faixas ---
         # Calcular total de Pasta C/Emissão Concluída para MESAS 1-8
         mesas_1_8_list = [f'MESA {i}' for i in range(1, 9)]
+        
+        # Verificar se a coluna Pasta C/Emissão Concluída existe em df_final
+        if 'Pasta C/Emissão Concluída' not in df_final.columns:
+            print("ALERTA: Criando coluna 'Pasta C/Emissão Concluída' em df_final")
+            df_final['Pasta C/Emissão Concluída'] = 0
+            
         total_mesas_1_8 = df_final[df_final['MESA'].isin(mesas_1_8_list)]['Pasta C/Emissão Concluída'].sum()
 
         # Estilos para a faixa de totais
@@ -629,6 +619,11 @@ def exibir_higienizacao_desempenho():
     # --- Exibir a Tabela de CABINES --- 
     df_cabines_final = df_final[df_final['MESA'] == 'CABINES'].copy()
     if not df_cabines_final.empty:
+        # Verificar se a coluna Pasta C/Emissão Concluída existe
+        if 'Pasta C/Emissão Concluída' not in df_cabines_final.columns:
+            print("ALERTA: Criando coluna 'Pasta C/Emissão Concluída' em df_cabines_final")
+            df_cabines_final['Pasta C/Emissão Concluída'] = 0
+            
         # Calcular total de Pasta C/Emissão Concluída para CABINES
         total_cabines = df_cabines_final['Pasta C/Emissão Concluída'].sum()
 
@@ -670,6 +665,11 @@ def exibir_higienizacao_desempenho():
     # --- Seção CARRÃO ---
     df_carrao_final = df_final[df_final['MESA'] == 'CARRÃO'].copy()
     if not df_carrao_final.empty:
+        # Verificar se a coluna Pasta C/Emissão Concluída existe
+        if 'Pasta C/Emissão Concluída' not in df_carrao_final.columns:
+            print("ALERTA: Criando coluna 'Pasta C/Emissão Concluída' em df_carrao_final")
+            df_carrao_final['Pasta C/Emissão Concluída'] = 0
+            
         # Calcular total de Pasta C/Emissão Concluída para CARRÃO
         total_carrao = df_carrao_final['Pasta C/Emissão Concluída'].sum()
 
