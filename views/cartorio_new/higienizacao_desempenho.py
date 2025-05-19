@@ -494,25 +494,76 @@ def exibir_higienizacao_desempenho():
         df_total_principal['CONSULTOR'] = ''  # Campo texto não deve ser somado
         
         # Recalcular percentuais para a linha de total
-        if df_total_principal['PASTAS TOTAIS'].iloc[0] > 0:
-            df_total_principal['CONVERSÃO (%)'] = (
-                df_total_principal['HIGINIZAÇÃO COM ÊXITO'] / df_total_principal['PASTAS TOTAIS'] * 100
-            ).round(2)
-            df_total_principal['Taxa Emissão Concluída (%)'] = (
-                df_total_principal['Pasta C/Emissão Concluída'] / df_total_principal['PASTAS TOTAIS'] * 100
-            ).round(2)
-
+        try:
+            if df_total_principal['PASTAS TOTAIS'].iloc[0] > 0:
+                if 'HIGINIZAÇÃO COM ÊXITO' in df_total_principal.columns:
+                    df_total_principal['CONVERSÃO (%)'] = (
+                        df_total_principal['HIGINIZAÇÃO COM ÊXITO'] / df_total_principal['PASTAS TOTAIS'] * 100
+                    ).round(2)
+                else:
+                    df_total_principal['CONVERSÃO (%)'] = 0
+                    
+                if 'Pasta C/Emissão Concluída' in df_total_principal.columns:
+                    df_total_principal['Taxa Emissão Concluída (%)'] = (
+                        df_total_principal['Pasta C/Emissão Concluída'] / df_total_principal['PASTAS TOTAIS'] * 100
+                    ).round(2)
+                else:
+                    df_total_principal['Taxa Emissão Concluída (%)'] = 0
+            else:
+                df_total_principal['CONVERSÃO (%)'] = 0
+                df_total_principal['Taxa Emissão Concluída (%)'] = 0
+        except Exception as e:
+            print(f"ERRO ao calcular percentuais: {str(e)}")
+            df_total_principal['CONVERSÃO (%)'] = 0
+            df_total_principal['Taxa Emissão Concluída (%)'] = 0
+            
         # Concatenar com os dados originais
         df_display_principal = pd.concat([df_final_sem_cabines, df_total_principal], ignore_index=True)
 
         # Debug: Mostrar dados finais
         print("\n=== DEBUG: Dados Finais para Exibição ===")
         print("Totais calculados:")
-        print(df_total_principal[['MESA', 'HIGINIZAÇÃO COM ÊXITO', 'CONVERSÃO (%)']])
+        print("Colunas disponíveis em df_total_principal:")
+        print(df_total_principal.columns.tolist())  # Verificar quais colunas realmente existem
         
-        # Formatar percentuais como strings com %
-        df_display_principal['CONVERSÃO (%)'] = df_display_principal['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
-        df_display_principal['Taxa Emissão Concluída (%)'] = df_display_principal['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+        # Verificar se as colunas necessárias existem
+        required_columns = ['HIGINIZAÇÃO COM ÊXITO', 'PASTAS TOTAIS', 'Pasta C/Emissão Concluída']
+        missing_columns = [col for col in required_columns if col not in df_total_principal.columns]
+        if missing_columns:
+            print(f"ALERTA: Colunas ausentes: {missing_columns}")
+            # Adicionar colunas faltantes com zeros
+            for col in missing_columns:
+                df_total_principal[col] = 0
+                
+        if 'HIGINIZAÇÃO COM ÊXITO' in df_total_principal.columns and 'PASTAS TOTAIS' in df_total_principal.columns:
+            print(df_total_principal[['MESA', 'HIGINIZAÇÃO COM ÊXITO', 'PASTAS TOTAIS']])
+        
+        # Recalcular percentuais de forma segura
+        try:
+            if df_total_principal['PASTAS TOTAIS'].iloc[0] > 0:
+                if 'HIGINIZAÇÃO COM ÊXITO' in df_total_principal.columns:
+                    df_total_principal['CONVERSÃO (%)'] = (
+                        df_total_principal['HIGINIZAÇÃO COM ÊXITO'] / df_total_principal['PASTAS TOTAIS'] * 100
+                    ).round(2)
+                else:
+                    df_total_principal['CONVERSÃO (%)'] = 0
+                    
+                if 'Pasta C/Emissão Concluída' in df_total_principal.columns:
+                    df_total_principal['Taxa Emissão Concluída (%)'] = (
+                        df_total_principal['Pasta C/Emissão Concluída'] / df_total_principal['PASTAS TOTAIS'] * 100
+                    ).round(2)
+                else:
+                    df_total_principal['Taxa Emissão Concluída (%)'] = 0
+            else:
+                df_total_principal['CONVERSÃO (%)'] = 0
+                df_total_principal['Taxa Emissão Concluída (%)'] = 0
+        except Exception as e:
+            print(f"ERRO ao calcular percentuais: {str(e)}")
+            df_total_principal['CONVERSÃO (%)'] = 0
+            df_total_principal['Taxa Emissão Concluída (%)'] = 0
+            
+        # Atualizar df_display_principal com os novos valores
+        df_display_principal = pd.concat([df_final_sem_cabines, df_total_principal], ignore_index=True)
 
         # --- Calcular e exibir totais em faixas ---
         # Calcular total de Pasta C/Emissão Concluída para MESAS 1-8
@@ -654,38 +705,3 @@ def exibir_higienizacao_desempenho():
         )
     else:
         st.info("Não há dados de CARRÃO na planilha para exibir detalhes.") 
-
-    # Garantir que todos os valores numéricos sejam float ou int antes de exibir
-    def ensure_numeric_display(df):
-        # Lista de colunas que devem ser inteiras
-        int_columns = [
-            'PASTAS TOTAIS', 'HIGINIZAÇÃO COM ÊXITO', 'HIGINIZAÇÃO INCOMPLETA',
-            'HIGINIZAÇÃO TRATADAS', 'DISTRATO', 'Brasileiras Pendências',
-            'Brasileiras Pesquisas', 'Brasileiras Solicitadas', 'Brasileiras Emitida',
-            'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
-        ]
-        
-        # Lista de colunas que devem ser strings formatadas com %
-        percent_columns = ['CONVERSÃO (%)', 'Taxa Emissão Concluída (%)']
-        
-        # Lista de colunas que devem ser strings
-        string_columns = ['MESA', 'CONSULTOR']
-        
-        df_clean = df.copy()
-        
-        # Tratar colunas inteiras
-        for col in int_columns:
-            if col in df_clean.columns:
-                df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').fillna(0).astype(int)
-        
-        # Tratar colunas de porcentagem
-        for col in percent_columns:
-            if col in df_clean.columns:
-                df_clean[col] = df_clean[col].apply(lambda x: f"{float(str(x).replace('%', '')):.2f}%" if pd.notnull(x) else "0.00%")
-        
-        # Tratar colunas de texto
-        for col in string_columns:
-            if col in df_clean.columns:
-                df_clean[col] = df_clean[col].fillna('').astype(str)
-        
-        return df_clean
