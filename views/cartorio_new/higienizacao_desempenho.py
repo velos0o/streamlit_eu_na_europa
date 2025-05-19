@@ -631,3 +631,80 @@ def exibir_higienizacao_desempenho():
         st.info("Não há dados de CARRÃO na planilha para exibir detalhes.") 
 
     # Tabela de detalhes específica para incompletas removida anteriormente 
+
+    # Garantir que todos os valores numéricos sejam float ou int antes de exibir
+    def ensure_numeric_display(df):
+        # Lista de colunas que devem ser inteiras
+        int_columns = [
+            'PASTAS TOTAIS', 'HIGINIZAÇÃO COM ÊXITO', 'HIGINIZAÇÃO INCOMPLETA',
+            'HIGINIZAÇÃO TRATADAS', 'DISTRATO', 'Brasileiras Pendências',
+            'Brasileiras Pesquisas', 'Brasileiras Solicitadas', 'Brasileiras Emitida',
+            'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
+        ]
+        
+        # Lista de colunas que devem ser strings formatadas com %
+        percent_columns = ['CONVERSÃO (%)', 'Taxa Emissão Concluída (%)']
+        
+        # Lista de colunas que devem ser strings
+        string_columns = ['MESA', 'CONSULTOR']
+        
+        df_clean = df.copy()
+        
+        # Tratar colunas inteiras
+        for col in int_columns:
+            if col in df_clean.columns:
+                df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').fillna(0).astype(int)
+        
+        # Tratar colunas de porcentagem
+        for col in percent_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].apply(lambda x: f"{float(str(x).replace('%', '')):.2f}%" if pd.notnull(x) else "0.00%")
+        
+        # Tratar colunas de texto
+        for col in string_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].fillna('').astype(str)
+        
+        return df_clean
+
+    # Aplicar tratamento antes de exibir cada tabela
+    if not df_final_sem_cabines.empty:
+        # Tratar e exibir tabela principal (MESAS 1-8)
+        df_display_mesas = df_display_principal[
+            ~df_display_principal['MESA'].isin(['CABINES', 'CARRÃO', 'TOTAL'])
+        ].copy()
+        
+        df_total_mesas = df_display_mesas.select_dtypes(include=np.number).sum().to_frame().T
+        df_total_mesas['MESA'] = 'TOTAL'
+        df_total_mesas['CONSULTOR'] = ''
+        
+        if df_total_mesas['PASTAS TOTAIS'].iloc[0] > 0:
+            df_total_mesas['CONVERSÃO (%)'] = (
+                df_total_mesas['HIGINIZAÇÃO COM ÊXITO'] / df_total_mesas['PASTAS TOTAIS'] * 100
+            ).round(2)
+            df_total_mesas['Taxa Emissão Concluída (%)'] = (
+                df_total_mesas['Pasta C/Emissão Concluída'] / df_total_mesas['PASTAS TOTAIS'] * 100
+            ).round(2)
+        
+        df_display_mesas_final = pd.concat([df_display_mesas, df_total_mesas], ignore_index=True)
+        df_display_mesas_final = ensure_numeric_display(df_display_mesas_final)
+        
+        st.dataframe(df_display_mesas_final, hide_index=True, use_container_width=True)
+
+    # Tratar e exibir tabela CABINES
+    if not df_cabines_final.empty:
+        df_total_cabines = df_cabines_final.select_dtypes(include=np.number).sum().to_frame().T
+        df_total_cabines['MESA'] = 'TOTAL'
+        df_display_cabines = pd.concat([df_cabines_final, df_total_cabines], ignore_index=True)
+        df_display_cabines = ensure_numeric_display(df_display_cabines)
+        
+        st.dataframe(df_display_cabines, hide_index=True, use_container_width=True)
+
+    # Tratar e exibir tabela CARRÃO
+    if not df_carrao_final.empty:
+        df_total_carrao = df_carrao_final.select_dtypes(include=np.number).sum().to_frame().T
+        df_total_carrao['MESA'] = 'TOTAL'
+        df_display_carrao = pd.concat([df_carrao_final, df_total_carrao], ignore_index=True)
+        df_display_carrao = ensure_numeric_display(df_display_carrao)
+        
+        st.dataframe(df_display_carrao, hide_index=True, use_container_width=True) 
