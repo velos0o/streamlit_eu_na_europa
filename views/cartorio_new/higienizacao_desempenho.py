@@ -630,8 +630,6 @@ def exibir_higienizacao_desempenho():
     else:
         st.info("Não há dados de CARRÃO na planilha para exibir detalhes.") 
 
-    # Tabela de detalhes específica para incompletas removida anteriormente 
-
     # Garantir que todos os valores numéricos sejam float ou int antes de exibir
     def ensure_numeric_display(df):
         # Lista de colunas que devem ser inteiras
@@ -691,8 +689,31 @@ def exibir_higienizacao_desempenho():
         
         st.dataframe(df_display_mesas_final, hide_index=True, use_container_width=True)
 
+        # Botão de download para tabela principal (MESAS 1-8)
+        csv_principal = convert_df_to_csv(df_display_mesas_final)
+        st.download_button(
+            label="Download Tabela MESAS 1-8 como CSV",
+            data=csv_principal,
+            file_name='desempenho_higienizacao_mesas_1_8.csv',
+            mime='text/csv',
+            key='download_mesas_1_8'
+        )
+        st.markdown("---")
+
     # Tratar e exibir tabela CABINES
     if not df_cabines_final.empty:
+        # Calcular total de Pasta C/Emissão Concluída para CABINES
+        total_cabines = df_cabines_final['Pasta C/Emissão Concluída'].sum()
+
+        # Exibir faixa com total das CABINES
+        st.markdown(f"""
+        <div style="{faixa_style}">
+            <h4 style="{titulo_style}">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (CABINES)</h4>
+            <p style="{contagem_style}">{int(total_cabines)} PASTAS</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("---")
+
         df_total_cabines = df_cabines_final.select_dtypes(include=np.number).sum().to_frame().T
         df_total_cabines['MESA'] = 'TOTAL'
         df_display_cabines = pd.concat([df_cabines_final, df_total_cabines], ignore_index=True)
@@ -700,11 +721,50 @@ def exibir_higienizacao_desempenho():
         
         st.dataframe(df_display_cabines, hide_index=True, use_container_width=True)
 
+        # Botão de download para CABINES
+        csv_cabines_detalhes = convert_df_to_csv(df_cabines_final)
+        st.download_button(
+            label="Download Detalhes Cabines como CSV",
+            data=csv_cabines_detalhes,
+            file_name='detalhes_cabines.csv',
+            mime='text/csv',
+            key='download_cabines'
+        )
+        st.markdown("---")
+    else:
+        st.info("Não há dados de CABINES na planilha para exibir detalhes.") 
+
     # Tratar e exibir tabela CARRÃO
     if not df_carrao_final.empty:
+        # Calcular total de Pasta C/Emissão Concluída para CARRÃO
+        total_carrao = df_carrao_final['Pasta C/Emissão Concluída'].sum()
+
+        # Exibir faixa com total do CARRÃO
+        st.markdown(f"""
+        <div style="{faixa_style}">
+            <h4 style="{titulo_style}">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (CARRÃO)</h4>
+            <p style="{contagem_style}">{int(total_carrao)} PASTAS</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("---")
+
         df_total_carrao = df_carrao_final.select_dtypes(include=np.number).sum().to_frame().T
         df_total_carrao['MESA'] = 'TOTAL'
         df_display_carrao = pd.concat([df_carrao_final, df_total_carrao], ignore_index=True)
         df_display_carrao = ensure_numeric_display(df_display_carrao)
         
-        st.dataframe(df_display_carrao, hide_index=True, use_container_width=True) 
+        st.dataframe(df_display_carrao, hide_index=True, use_container_width=True)
+
+        # Botão de download para CARRÃO
+        csv_carrao_detalhes = convert_df_to_csv(df_carrao_final)
+        st.download_button(
+            label="Download Detalhes CARRÃO como CSV",
+            data=csv_carrao_detalhes,
+            file_name='detalhes_carrao.csv',
+            mime='text/csv',
+            key='download_carrao'
+        )
+    else:
+        st.info("Não há dados de CARRÃO na planilha para exibir detalhes.") 
+
+    st.markdown("---") 
