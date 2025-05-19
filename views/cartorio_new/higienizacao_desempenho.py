@@ -11,6 +11,11 @@ def exibir_higienizacao_desempenho():
     Exibe a tabela de desempenho da higienização por mesa e consultor,
     com opção de filtro por data e dados de emissões do Bitrix.
     """
+    # Função auxiliar para converter DataFrame para CSV
+    @st.cache_data
+    def convert_df_to_csv(df):
+        return df.to_csv(index=False).encode('utf-8')
+
     st.subheader("Desempenho da Higienização por Mesa")
 
     # --- Filtros --- 
@@ -39,10 +44,17 @@ def exibir_higienizacao_desempenho():
             start_date_to_load = data_inicio_filtro
             end_date_to_load = data_fim_filtro
             st.info(f"Filtro de data aplicado: {start_date_to_load.strftime('%d/%m/%Y')} a {end_date_to_load.strftime('%d/%m/%Y')}")
-        elif data_inicio_filtro or data_fim_filtro: # Se apenas uma data for preenchida
+            
+            # Debug: Informar sobre o filtro de data
+            print("\n=== DEBUG: Filtro de Data ===")
+            print(f"Aplicando filtro de data: {start_date_to_load.strftime('%d/%m/%Y')} a {end_date_to_load.strftime('%d/%m/%Y')}")
+        elif data_inicio_filtro or data_fim_filtro:
             st.warning("Por favor, selecione ambas as datas (início e fim) para aplicar o filtro de data.")
-            # Considerar não aplicar o filtro se apenas uma data estiver definida
-            # Ou definir um comportamento padrão (ex: usar a data preenchida como início e hoje como fim)
+            print("\n=== DEBUG: Tentativa de filtro de data incompleta ===")
+            print(f"Data início: {data_inicio_filtro}")
+            print(f"Data fim: {data_fim_filtro}")
+    else:
+        print("\n=== DEBUG: Sem filtro de data aplicado ===")
 
     # --- Carregar Dados (Necessário antes dos filtros por família para popular selectbox) ---
     # 1. Dados da Planilha de Conclusão
@@ -56,12 +68,20 @@ def exibir_higienizacao_desempenho():
              df_conclusao_raw = pd.DataFrame() # Continuar com DF vazio
 
         # Garantir colunas mesmo se vazio
-        colunas_planilha_esperadas = ['responsavel', 'mesa', 'id_familia', 'nome_familia', 'higienizacao_exito', 'higienizacao_incompleta', 'higienizacao_tratadas']
+        colunas_planilha_esperadas = [
+            'responsavel', 'mesa', 'id_familia', 'nome_familia', 
+            'higienizacao_exito', 'higienizacao_incompleta', 'higienizacao_tratadas',
+            'higienizacao_distrato'  # Nova coluna adicionada
+        ]
         for col in colunas_planilha_esperadas:
             if col not in df_conclusao_raw.columns:
                 df_conclusao_raw[col] = None 
 
-        colunas_planilha = ['responsavel', 'mesa', 'id_familia', 'nome_familia', 'higienizacao_exito', 'higienizacao_incompleta', 'higienizacao_tratadas']
+        colunas_planilha = [
+            'responsavel', 'mesa', 'id_familia', 'nome_familia', 
+            'higienizacao_exito', 'higienizacao_incompleta', 'higienizacao_tratadas',
+            'higienizacao_distrato'  # Nova coluna adicionada
+        ]
         df_conclusao_raw = df_conclusao_raw[colunas_planilha].copy()
         df_conclusao_raw = df_conclusao_raw.dropna(subset=['id_familia']) 
 
@@ -294,11 +314,40 @@ def exibir_higienizacao_desempenho():
 
     # --- Agregação Final por Mesa e Consultor --- 
     agg_dict = {
-        'higienizacao_exito': 'sum', 'higienizacao_incompleta': 'sum', 'higienizacao_tratadas': 'sum',
-        'Brasileiras Pendências': 'sum', 'Brasileiras Pesquisas': 'sum', 'Brasileiras Solicitadas': 'sum',
-        'Brasileiras Emitida': 'sum', 'Pasta C/Emissão Concluída': 'sum', 'Brasileiras Dispensada': 'sum'
+        'higienizacao_exito': 'sum',
+        'higienizacao_incompleta': 'sum',
+        'higienizacao_tratadas': 'sum',
+        'higienizacao_distrato': 'sum',  # Nova coluna adicionada
+        'Brasileiras Pendências': 'sum',
+        'Brasileiras Pesquisas': 'sum',
+        'Brasileiras Solicitadas': 'sum',
+        'Brasileiras Emitida': 'sum',
+        'Pasta C/Emissão Concluída': 'sum',
+        'Brasileiras Dispensada': 'sum'
     }
+
+    # Debug: Imprimir dados antes da agregação
+    print("\n=== DEBUG: Dados antes da agregação ===")
+    print(f"Total de registros em df_merged: {len(df_merged)}")
+    print("\nContagens por status:")
+    if 'higienizacao_exito' in df_merged.columns:
+        print(f"Higienização com Êxito (soma total): {df_merged['higienizacao_exito'].sum()}")
+        # Mostrar contagem por mesa
+        print("\nContagem de Êxito por Mesa:")
+        print(df_merged.groupby('mesa')['higienizacao_exito'].sum())
+    else:
+        print("Coluna 'higienizacao_exito' não encontrada!")
+    print("=== FIM DEBUG ===\n")
+
     df_agregado_final = df_merged.groupby(['mesa', 'responsavel']).agg(agg_dict).reset_index()
+
+    # Debug: Imprimir dados após agregação
+    print("\n=== DEBUG: Dados após agregação ===")
+    print(f"Total de registros em df_agregado_final: {len(df_agregado_final)}")
+    print("\nSoma total de higienização com êxito após agregação:")
+    if 'higienizacao_exito' in df_agregado_final.columns:
+        print(df_agregado_final['higienizacao_exito'].sum())
+    print("=== FIM DEBUG ===\n")
 
     # --- Merge Final com a Base --- 
     data_base = {
@@ -308,31 +357,54 @@ def exibir_higienizacao_desempenho():
     }
     df_base = pd.DataFrame(data_base)
 
-    df_agregado_final = df_agregado_final.rename(columns={
-        'mesa': 'MESA', 'responsavel': 'CONSULTOR',
+    # Debug: Mostrar dados antes do merge
+    print("\n=== DEBUG: Dados antes do merge final ===")
+    print("df_base:")
+    print(df_base)
+    print("\ndf_agregado_final antes do rename:")
+    print(df_agregado_final)
+
+    # Primeiro, agregar os dados por MESA (somando todas as métricas)
+    metricas_para_somar = [
+        'higienizacao_exito', 'higienizacao_incompleta', 'higienizacao_tratadas',
+        'higienizacao_distrato', 'Brasileiras Pendências', 'Brasileiras Pesquisas',
+        'Brasileiras Solicitadas', 'Brasileiras Emitida', 'Pasta C/Emissão Concluída',
+        'Brasileiras Dispensada'
+    ]
+    
+    df_agregado_por_mesa = df_agregado_final.groupby('mesa')[metricas_para_somar].sum().reset_index()
+
+    # Debug: Mostrar agregação por mesa
+    print("\nAgregação por mesa (antes do rename):")
+    print(df_agregado_por_mesa)
+
+    # Renomear colunas
+    df_agregado_por_mesa = df_agregado_por_mesa.rename(columns={
+        'mesa': 'MESA',
         'higienizacao_exito': 'HIGINIZAÇÃO COM ÊXITO',
         'higienizacao_incompleta': 'HIGINIZAÇÃO INCOMPLETA',
-        'higienizacao_tratadas': 'HIGINIZAÇÃO TRATADAS'
+        'higienizacao_tratadas': 'HIGINIZAÇÃO TRATADAS',
+        'higienizacao_distrato': 'DISTRATO'
     })
-    df_final = pd.merge(df_base, df_agregado_final, on=['MESA', 'CONSULTOR'], how='left')
 
-    colunas_contagem_numericas = [
-        'PASTAS TOTAIS', # Adicionado para garantir que seja tratado como numérico e preenchido
-        'HIGINIZAÇÃO COM ÊXITO', 'HIGINIZAÇÃO INCOMPLETA', 'HIGINIZAÇÃO TRATADAS',
-        'Brasileiras Pendências', 'Brasileiras Pesquisas', 'Brasileiras Solicitadas',
-        'Brasileiras Emitida', 'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
-    ]
-    for col in colunas_contagem_numericas:
-         if col not in df_final.columns: # Adiciona a coluna com 0 se não existir do merge/base
-             df_final[col] = 0
-         df_final[col] = df_final[col].fillna(0)
-         # Tentar converter para int, mas se falhar (ex: se já for float com decimais), manter como está ou float
-         try:
-             df_final[col] = df_final[col].astype(int)
-         except ValueError:
-             df_final[col] = df_final[col].astype(float) # ou apenas deixar como está após fillna(0)
+    # Debug: Mostrar após rename
+    print("\nAgregação por mesa (após rename):")
+    print(df_agregado_por_mesa)
 
-    # --- Adicionar Coluna de Conversão ---
+    # Fazer o merge com a base
+    df_final = pd.merge(df_base, df_agregado_por_mesa, on='MESA', how='left')
+
+    # Preencher NaN com 0
+    colunas_numericas = df_final.select_dtypes(include=['float64', 'int64']).columns
+    df_final[colunas_numericas] = df_final[colunas_numericas].fillna(0)
+
+    # Debug: Mostrar resultado final do merge
+    print("\nResultado final do merge:")
+    print(df_final)
+    print("\nSoma de HIGINIZAÇÃO COM ÊXITO:")
+    print(df_final['HIGINIZAÇÃO COM ÊXITO'].sum())
+
+    # --- Calcular métricas ---
     df_final['CONVERSÃO (%)'] = np.where(
         df_final['PASTAS TOTAIS'] > 0,
         (df_final['HIGINIZAÇÃO COM ÊXITO'] / df_final['PASTAS TOTAIS']) * 100,
@@ -340,7 +412,6 @@ def exibir_higienizacao_desempenho():
     )
     df_final['CONVERSÃO (%)'] = df_final['CONVERSÃO (%)'].fillna(0).round(2)
 
-    # --- Adicionar Coluna de Taxa Emissão Concluída ---
     df_final['Taxa Emissão Concluída (%)'] = np.where(
         df_final['PASTAS TOTAIS'] > 0,
         (df_final['Pasta C/Emissão Concluída'] / df_final['PASTAS TOTAIS']) * 100,
@@ -348,78 +419,124 @@ def exibir_higienizacao_desempenho():
     )
     df_final['Taxa Emissão Concluída (%)'] = df_final['Taxa Emissão Concluída (%)'].fillna(0).round(2)
 
+    # Definir ordem das colunas
     ordem_colunas = [
         'MESA', 'PASTAS TOTAIS', 'CONSULTOR',
-        'HIGINIZAÇÃO COM ÊXITO', 'HIGINIZAÇÃO INCOMPLETA', 'HIGINIZAÇÃO TRATADAS', 'CONVERSÃO (%)',
+        'HIGINIZAÇÃO COM ÊXITO', 'HIGINIZAÇÃO INCOMPLETA', 'HIGINIZAÇÃO TRATADAS',
+        'DISTRATO', 'CONVERSÃO (%)',
         'Brasileiras Pendências', 'Brasileiras Pesquisas', 'Brasileiras Solicitadas',
-        'Brasileiras Emitida', 'Pasta C/Emissão Concluída', 'Taxa Emissão Concluída (%)', 'Brasileiras Dispensada'
+        'Brasileiras Emitida', 'Pasta C/Emissão Concluída', 'Taxa Emissão Concluída (%)',
+        'Brasileiras Dispensada'
     ]
-    # Garantir que todas as colunas em ordem_colunas existam em df_final, adicionando-as com 0 ou formato apropriado se necessário
-    for col_ordem in ordem_colunas:
-        if col_ordem not in df_final.columns:
-            df_final[col_ordem] = 0
-            if col_ordem == 'CONVERSÃO (%)' or col_ordem == 'Taxa Emissão Concluída (%)':
-                 df_final[col_ordem] = df_final[col_ordem].astype(float).round(2)
-            else: 
-                 df_final[col_ordem] = df_final[col_ordem].astype(int)
+
+    # Garantir que todas as colunas existam
+    for col in ordem_colunas:
+        if col not in df_final.columns:
+            if col in ['CONVERSÃO (%)', 'Taxa Emissão Concluída (%)']:
+                df_final[col] = 0.0
+            else:
+                df_final[col] = 0
 
     df_final = df_final[ordem_colunas]
-    
-    # --- FIM DO PROCESSAMENTO DE DADOS MOVIDO ---
 
-
-    # --- Calcular Contagens para as Faixas (AGORA USANDO df_final) ---
-    contagem_total_mesas_1_8_faixa = 0
-    if not df_final.empty and 'HIGINIZAÇÃO COM ÊXITO' in df_final.columns:
-        mesas_1_8_list_faixa = [f'MESA {i}' for i in range(1, 9)]
-        df_mesas_1_8_faixa_filtrado = df_final[df_final['MESA'].isin(mesas_1_8_list_faixa)]
-        contagem_total_mesas_1_8_faixa = df_mesas_1_8_faixa_filtrado['HIGINIZAÇÃO COM ÊXITO'].sum()
-    
-    faixa_style = "background-color: #FFA726; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
-    titulo_style = "color: white; margin: 0; font-size: 1.1em; font-weight: bold;"
-    contagem_style = "color: white; font-size: 2em; font-weight: bolder; margin: 8px 0 0 0;"
-
-    st.markdown(f"""
-    <div style="{faixa_style}">
-        <h4 style="{titulo_style}">TOTAL DE HIGIENIZAÇÕES COM ÊXITO (MESAS 1-8)</h4>
-        <p style="{contagem_style}">{contagem_total_mesas_1_8_faixa} PASTAS</p>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown("--- ")
+    # Debug: Mostrar dados após cálculos
+    print("\n=== DEBUG: Dados após cálculos ===")
+    print("df_final com todas as colunas:")
+    print(df_final)
 
     # --- Exibir a Tabela Principal (SEM CABINES) --- 
     df_final_sem_cabines = df_final[df_final['MESA'] != 'CABINES'].copy()
+
+    # Debug: Mostrar dados sem CABINES
+    print("\n=== DEBUG: Dados sem CABINES ===")
+    print("Contagem por MESA:")
+    print(df_final_sem_cabines.groupby('MESA')['HIGINIZAÇÃO COM ÊXITO'].sum())
+
     if not df_final_sem_cabines.empty:
+        # Calcular totais
         df_total_principal = df_final_sem_cabines.select_dtypes(include=np.number).sum().to_frame().T
-        df_total_principal['MESA'] = 'TOTAL' 
+        df_total_principal['MESA'] = 'TOTAL'
+        df_total_principal['CONSULTOR'] = ''  # Campo texto não deve ser somado
+        
+        # Recalcular percentuais para a linha de total
+        if df_total_principal['PASTAS TOTAIS'].iloc[0] > 0:
+            df_total_principal['CONVERSÃO (%)'] = (
+                df_total_principal['HIGINIZAÇÃO COM ÊXITO'] / df_total_principal['PASTAS TOTAIS'] * 100
+            ).round(2)
+            df_total_principal['Taxa Emissão Concluída (%)'] = (
+                df_total_principal['Pasta C/Emissão Concluída'] / df_total_principal['PASTAS TOTAIS'] * 100
+            ).round(2)
+
+        # Concatenar com os dados originais
         df_display_principal = pd.concat([df_final_sem_cabines, df_total_principal], ignore_index=True)
-        
-        # Corrigir CONVERSÃO (%) na linha TOTAL para a tabela principal
-        if 'TOTAL' in df_display_principal['MESA'].values:
-            total_row_idx_principal = df_display_principal[df_display_principal['MESA'] == 'TOTAL'].index
-            if not total_row_idx_principal.empty:
-                idx_p = total_row_idx_principal[0]
-                sum_hig_exito_p = df_display_principal.loc[idx_p, 'HIGINIZAÇÃO COM ÊXITO']
-                sum_pastas_totais_p = df_display_principal.loc[idx_p, 'PASTAS TOTAIS']
-                df_display_principal.loc[idx_p, 'CONVERSÃO (%)'] = \
-                    (sum_hig_exito_p / sum_pastas_totais_p * 100).round(2) if sum_pastas_totais_p > 0 else 0
-                
-                # Calcular Taxa Emissão Concluída (%) na linha TOTAL para a tabela principal
-                sum_emissao_concluida_p = df_display_principal.loc[idx_p, 'Pasta C/Emissão Concluída']
-                df_display_principal.loc[idx_p, 'Taxa Emissão Concluída (%)'] = \
-                    (sum_emissao_concluida_p / sum_pastas_totais_p * 100).round(2) if sum_pastas_totais_p > 0 else 0
 
-        for col_obj in df_display_principal.select_dtypes(include='object').columns:
-            if col_obj != 'MESA': 
-                 df_display_principal[col_obj] = df_display_principal[col_obj].fillna('')
+        # Debug: Mostrar dados finais
+        print("\n=== DEBUG: Dados Finais para Exibição ===")
+        print("Totais calculados:")
+        print(df_total_principal[['MESA', 'HIGINIZAÇÃO COM ÊXITO', 'CONVERSÃO (%)']])
         
-        # Formatar CONVERSÃO (%) e Taxa Emissão Concluída (%) como string com % no final ANTES de exibir
-        if 'CONVERSÃO (%)' in df_display_principal.columns:
-            df_display_principal['CONVERSÃO (%)'] = df_display_principal['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
-        if 'Taxa Emissão Concluída (%)' in df_display_principal.columns:
-            df_display_principal['Taxa Emissão Concluída (%)'] = df_display_principal['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+        # Formatar percentuais como strings com %
+        df_display_principal['CONVERSÃO (%)'] = df_display_principal['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
+        df_display_principal['Taxa Emissão Concluída (%)'] = df_display_principal['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
 
-        st.dataframe(df_display_principal, hide_index=True, use_container_width=True)
+        # --- Calcular e exibir totais em faixas ---
+        # Calcular total de Pasta C/Emissão Concluída para MESAS 1-8
+        mesas_1_8_list = [f'MESA {i}' for i in range(1, 9)]
+        total_mesas_1_8 = df_final[df_final['MESA'].isin(mesas_1_8_list)]['Pasta C/Emissão Concluída'].sum()
+
+        # Estilos para a faixa de totais
+        faixa_style = "background-color: #FFA726; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+        titulo_style = "color: white; margin: 0; font-size: 1.1em; font-weight: bold;"
+        contagem_style = "color: white; font-size: 2em; font-weight: bolder; margin: 8px 0 0 0;"
+
+        # Exibir faixa com total das MESAS 1-8
+        st.markdown(f"""
+        <div style="{faixa_style}">
+            <h4 style="{titulo_style}">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (MESAS 1-8)</h4>
+            <p style="{contagem_style}">{int(total_mesas_1_8)} PASTAS</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("---")
+
+        # Exibir a tabela principal (sem CABINES e sem CARRÃO)
+        df_display_mesas = df_display_principal[
+            ~df_display_principal['MESA'].isin(['CABINES', 'CARRÃO', 'TOTAL'])
+        ].copy()
+        
+        # Recalcular totais apenas para MESAS 1-8
+        df_total_mesas = df_display_mesas.select_dtypes(include=np.number).sum().to_frame().T
+        df_total_mesas['MESA'] = 'TOTAL'
+        df_total_mesas['CONSULTOR'] = ''
+        
+        # Recalcular percentuais para a linha de total
+        if df_total_mesas['PASTAS TOTAIS'].iloc[0] > 0:
+            df_total_mesas['CONVERSÃO (%)'] = (
+                df_total_mesas['HIGINIZAÇÃO COM ÊXITO'] / df_total_mesas['PASTAS TOTAIS'] * 100
+            ).round(2)
+            df_total_mesas['Taxa Emissão Concluída (%)'] = (
+                df_total_mesas['Pasta C/Emissão Concluída'] / df_total_mesas['PASTAS TOTAIS'] * 100
+            ).round(2)
+
+        # Formatar percentuais do total
+        df_total_mesas['CONVERSÃO (%)'] = df_total_mesas['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
+        df_total_mesas['Taxa Emissão Concluída (%)'] = df_total_mesas['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+
+        # Concatenar mesas com seu total
+        df_display_mesas_final = pd.concat([df_display_mesas, df_total_mesas], ignore_index=True)
+
+        # Exibir tabela das MESAS 1-8
+        st.dataframe(df_display_mesas_final, hide_index=True, use_container_width=True)
+
+        # Botão de download para tabela principal (MESAS 1-8)
+        csv_principal = convert_df_to_csv(df_display_mesas_final)
+        st.download_button(
+            label="Download Tabela MESAS 1-8 como CSV",
+            data=csv_principal,
+            file_name='desempenho_higienizacao_mesas_1_8.csv',
+            mime='text/csv',
+            key='download_mesas_1_8'
+        )
+        st.markdown("---")
     else:
         st.info("Não há dados para exibir na tabela principal com os filtros atuais.")
 
@@ -433,125 +550,82 @@ def exibir_higienizacao_desempenho():
     )
     st.markdown("--- ") 
 
-    # --- Calcular Contagem para Faixa de Cabines (AGORA USANDO df_final) ---
-    contagem_cabines_exito_faixa = 0
-    if not df_final.empty and 'HIGINIZAÇÃO COM ÊXITO' in df_final.columns:
-        df_cabines_faixa_filtrado = df_final[df_final['MESA'] == 'CABINES']
-        contagem_cabines_exito_faixa = df_cabines_faixa_filtrado['HIGINIZAÇÃO COM ÊXITO'].sum()
-
-    st.markdown(f"""
-    <div style="{faixa_style}">
-        <h4 style="{titulo_style}">TOTAL DE HIGIENIZAÇÕES COM ÊXITO (CABINES)</h4>
-        <p style="{contagem_style}">{contagem_cabines_exito_faixa} PASTAS</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # --- Tabela Detalhada para CABINES (TODOS os status) --- 
+    # --- Exibir a Tabela de CABINES --- 
     df_cabines_final = df_final[df_final['MESA'] == 'CABINES'].copy()
     if not df_cabines_final.empty:
-        st.markdown("--- ") 
+        # Calcular total de Pasta C/Emissão Concluída para CABINES
+        total_cabines = df_cabines_final['Pasta C/Emissão Concluída'].sum()
+
+        # Exibir faixa com total das CABINES
+        st.markdown(f"""
+        <div style="{faixa_style}">
+            <h4 style="{titulo_style}">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (CABINES)</h4>
+            <p style="{contagem_style}">{int(total_cabines)} PASTAS</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("---")
+
         if 'PASTAS TOTAIS' in df_cabines_final.columns:
-            # Assegurar que PASTAS TOTAIS seja numérico antes de usar na linha de total para cabines
             df_cabines_final.loc[:, 'PASTAS TOTAIS'] = pd.to_numeric(df_cabines_final['PASTAS TOTAIS'], errors='coerce').fillna(0).astype(int)
 
         df_total_cabines = df_cabines_final.select_dtypes(include=np.number).sum().to_frame().T
-        df_total_cabines['MESA'] = 'TOTAL' 
+        df_total_cabines['MESA'] = 'TOTAL'
         df_display_cabines = pd.concat([df_cabines_final, df_total_cabines], ignore_index=True)
 
-        # Corrigir CONVERSÃO (%) na linha TOTAL para a tabela de cabines
-        if 'TOTAL' in df_display_cabines['MESA'].values:
-            total_row_idx_cabines = df_display_cabines[df_display_cabines['MESA'] == 'TOTAL'].index
-            if not total_row_idx_cabines.empty:
-                idx_c = total_row_idx_cabines[0]
-                sum_hig_exito_c = df_display_cabines.loc[idx_c, 'HIGINIZAÇÃO COM ÊXITO']
-                sum_pastas_totais_c = df_display_cabines.loc[idx_c, 'PASTAS TOTAIS']
-                df_display_cabines.loc[idx_c, 'CONVERSÃO (%)'] = \
-                    (sum_hig_exito_c / sum_pastas_totais_c * 100).round(2) if sum_pastas_totais_c > 0 else 0
-
-                # Calcular Taxa Emissão Concluída (%) na linha TOTAL para a tabela de cabines
-                sum_emissao_concluida_c = df_display_cabines.loc[idx_c, 'Pasta C/Emissão Concluída']
-                df_display_cabines.loc[idx_c, 'Taxa Emissão Concluída (%)'] = \
-                    (sum_emissao_concluida_c / sum_pastas_totais_c * 100).round(2) if sum_pastas_totais_c > 0 else 0
-
-        for col_obj_cab in df_display_cabines.select_dtypes(include='object').columns:
-            if col_obj_cab != 'MESA': 
-                 df_display_cabines[col_obj_cab] = df_display_cabines[col_obj_cab].fillna('')
-
-        # Formatar CONVERSÃO (%) e Taxa Emissão Concluída (%) como string com % no final ANTES de exibir
-        if 'CONVERSÃO (%)' in df_display_cabines.columns:
-            df_display_cabines['CONVERSÃO (%)'] = df_display_cabines['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
-        if 'Taxa Emissão Concluída (%)' in df_display_cabines.columns:
-            df_display_cabines['Taxa Emissão Concluída (%)'] = df_display_cabines['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+        # Formatar percentuais
+        df_display_cabines['CONVERSÃO (%)'] = df_display_cabines['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
+        df_display_cabines['Taxa Emissão Concluída (%)'] = df_display_cabines['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
         
         st.dataframe(df_display_cabines, hide_index=True, use_container_width=True)
         
         csv_cabines_detalhes = convert_df_to_csv(df_cabines_final)
         st.download_button(
-            label="Download Detalhes Cabines (Todos Status) como CSV", data=csv_cabines_detalhes,
-            file_name='detalhes_cabines_todos_status.csv', mime='text/csv', key='download_cabines_detalhes'
+            label="Download Detalhes Cabines como CSV",
+            data=csv_cabines_detalhes,
+            file_name='detalhes_cabines.csv',
+            mime='text/csv',
+            key='download_cabines'
         )
     else:
         st.info("Não há dados de CABINES na planilha para exibir detalhes.") 
 
-    st.markdown("--- ") # Separador antes da nova seção CARRÃO
+    st.markdown("---")
 
-    # --- Seção Detalhada: CARRÃO ---
-    # Calcular Contagem para Faixa de CARRÃO (AGORA USANDO df_final)
-    contagem_carrao_exito_faixa = 0
-    if not df_final.empty and 'HIGINIZAÇÃO COM ÊXITO' in df_final.columns:
-        df_carrao_faixa_filtrado = df_final[df_final['MESA'] == 'CARRÃO']
-        if not df_carrao_faixa_filtrado.empty: # Checar se o filtro resultou em algo
-            contagem_carrao_exito_faixa = df_carrao_faixa_filtrado['HIGINIZAÇÃO COM ÊXITO'].sum()
-
-    st.markdown(f"""
-    <div style="{faixa_style}">
-        <h4 style="{titulo_style}">TOTAL DE HIGIENIZAÇÕES COM ÊXITO (CARRÃO)</h4>
-        <p style="{contagem_style}">{contagem_carrao_exito_faixa} PASTAS</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # --- Tabela Detalhada para CARRÃO (TODOS os status) --- 
+    # --- Seção CARRÃO ---
     df_carrao_final = df_final[df_final['MESA'] == 'CARRÃO'].copy()
-
     if not df_carrao_final.empty:
-        st.markdown("--- ") 
+        # Calcular total de Pasta C/Emissão Concluída para CARRÃO
+        total_carrao = df_carrao_final['Pasta C/Emissão Concluída'].sum()
+
+        # Exibir faixa com total do CARRÃO
+        st.markdown(f"""
+        <div style="{faixa_style}">
+            <h4 style="{titulo_style}">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (CARRÃO)</h4>
+            <p style="{contagem_style}">{int(total_carrao)} PASTAS</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("---")
+
         if 'PASTAS TOTAIS' in df_carrao_final.columns:
             df_carrao_final.loc[:, 'PASTAS TOTAIS'] = pd.to_numeric(df_carrao_final['PASTAS TOTAIS'], errors='coerce').fillna(0).astype(int)
 
         df_total_carrao = df_carrao_final.select_dtypes(include=np.number).sum().to_frame().T
-        df_total_carrao['MESA'] = 'TOTAL' 
+        df_total_carrao['MESA'] = 'TOTAL'
         df_display_carrao = pd.concat([df_carrao_final, df_total_carrao], ignore_index=True)
 
-        # Corrigir CONVERSÃO (%) e Taxa Emissão Concluída (%) na linha TOTAL para a tabela de CARRÃO
-        if 'TOTAL' in df_display_carrao['MESA'].values:
-            total_row_idx_carrao = df_display_carrao[df_display_carrao['MESA'] == 'TOTAL'].index
-            if not total_row_idx_carrao.empty:
-                idx_cr = total_row_idx_carrao[0]
-                sum_hig_exito_cr = df_display_carrao.loc[idx_cr, 'HIGINIZAÇÃO COM ÊXITO']
-                sum_pastas_totais_cr = df_display_carrao.loc[idx_cr, 'PASTAS TOTAIS']
-                df_display_carrao.loc[idx_cr, 'CONVERSÃO (%)'] = \
-                    (sum_hig_exito_cr / sum_pastas_totais_cr * 100).round(2) if sum_pastas_totais_cr > 0 else 0
-
-                sum_emissao_concluida_cr = df_display_carrao.loc[idx_cr, 'Pasta C/Emissão Concluída']
-                df_display_carrao.loc[idx_cr, 'Taxa Emissão Concluída (%)'] = \
-                    (sum_emissao_concluida_cr / sum_pastas_totais_cr * 100).round(2) if sum_pastas_totais_cr > 0 else 0
-
-        for col_obj_cr in df_display_carrao.select_dtypes(include='object').columns:
-            if col_obj_cr != 'MESA': 
-                 df_display_carrao[col_obj_cr] = df_display_carrao[col_obj_cr].fillna('')
-
-        # Formatar CONVERSÃO (%) e Taxa Emissão Concluída (%) como string com % no final ANTES de exibir
-        if 'CONVERSÃO (%)' in df_display_carrao.columns:
-            df_display_carrao['CONVERSÃO (%)'] = df_display_carrao['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
-        if 'Taxa Emissão Concluída (%)' in df_display_carrao.columns:
-            df_display_carrao['Taxa Emissão Concluída (%)'] = df_display_carrao['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+        # Formatar percentuais
+        df_display_carrao['CONVERSÃO (%)'] = df_display_carrao['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
+        df_display_carrao['Taxa Emissão Concluída (%)'] = df_display_carrao['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
         
         st.dataframe(df_display_carrao, hide_index=True, use_container_width=True)
         
-        csv_carrao_detalhes = convert_df_to_csv(df_carrao_final) # Reutiliza a função convert_df_to_csv
+        csv_carrao_detalhes = convert_df_to_csv(df_carrao_final)
         st.download_button(
-            label="Download Detalhes CARRÃO (Todos Status) como CSV", data=csv_carrao_detalhes,
-            file_name='detalhes_carrao_todos_status.csv', mime='text/csv', key='download_carrao_detalhes'
+            label="Download Detalhes CARRÃO como CSV",
+            data=csv_carrao_detalhes,
+            file_name='detalhes_carrao.csv',
+            mime='text/csv',
+            key='download_carrao'
         )
     else:
         st.info("Não há dados de CARRÃO na planilha para exibir detalhes.") 

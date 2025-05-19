@@ -174,16 +174,82 @@ def load_conclusao_data(start_date=None, end_date=None):
         # else: # Removido ou comentado
         #     print("Coluna 'status' não encontrada para debug.") # Removido ou comentado
 
-        # Define critérios para as novas colunas (ajuste conforme necessário)
-        # status_sucesso = ['CARDS VALIDADOS', 'HIGIENIZAÇÃO COMPLETA', 'CARDS CRIADOS BITRIX'] # Linha original
-        # status_sucesso = ['CARDS VALIDADOS', 'HIGIENIZAÇÃO COMPLETA'] # Modificação anterior
-        status_sucesso = ['CARDS VALIDADOS', 'HIGIENIZAÇÃO COMPLETA', 'CARDS CRIADOS BITRIX'] # CORRIGIDO conforme definição do usuário
-        status_incompleto = ['PENDENTE *ATENÇÃO']
+        # Define critérios para as novas colunas
+        status_sucesso = [
+            'CARDS VALIDADOS',
+            'HIGIENIZAÇÃO COMPLETA',
+            'CARDS CRIADOS BITRIX'
+        ]
+        
+        status_incompleto = [
+            'PENDENTE *ATENÇÃO',
+            'HIGIENIZAÇÃO DEVOLVIDA - INCOMPLETO'
+        ]
+        
+        status_distrato = [
+            'DISTRATO'
+        ]
 
-        # Utilizar .loc para evitar SettingWithCopyWarning
+        # Normalizar status para uppercase para evitar problemas de case
+        if 'status' in df.columns:
+            df['status'] = df['status'].str.upper()
+            # Normalizar também os arrays de status
+            status_sucesso = [s.upper() for s in status_sucesso]
+            status_incompleto = [s.upper() for s in status_incompleto]
+            status_distrato = [s.upper() for s in status_distrato]
+
+        # Debug: Imprimir valores únicos e contagens por status
+        print("\n=== DEBUG: Análise de Status ===")
+        if 'status' in df.columns:
+            print("\nValores únicos na coluna 'status' (após normalização):")
+            status_counts = df['status'].value_counts()
+            print(status_counts)
+            
+            print("\nContagem por categoria de status:")
+            print(f"Status de Sucesso encontrados:")
+            for status in status_sucesso:
+                count = df[df['status'] == status].shape[0]
+                print(f"- {status}: {count}")
+            
+            print(f"\nStatus Incompletos encontrados:")
+            for status in status_incompleto:
+                count = df[df['status'] == status].shape[0]
+                print(f"- {status}: {count}")
+            
+            print(f"\nStatus Distrato encontrados:")
+            for status in status_distrato:
+                count = df[df['status'] == status].shape[0]
+                print(f"- {status}: {count}")
+            
+            print("\nStatus não mapeados:")
+            todos_status_mapeados = status_sucesso + status_incompleto + status_distrato
+            status_nao_mapeados = df[~df['status'].isin(todos_status_mapeados)]['status'].unique()
+            print(status_nao_mapeados)
+        else:
+            print("ERRO: Coluna 'status' não encontrada no DataFrame")
+        print("=== FIM DEBUG ===\n")
+
+        # Criar colunas de status usando .loc para evitar SettingWithCopyWarning
         df.loc[:, 'higienizacao_exito'] = df['status'].isin(status_sucesso)
         df.loc[:, 'higienizacao_incompleta'] = df['status'].isin(status_incompleto)
-        df.loc[:, 'higienizacao_tratadas'] = 1 # Coluna auxiliar para contagem
+        df.loc[:, 'higienizacao_distrato'] = df['status'].isin(status_distrato)
+        
+        # higienizacao_tratadas agora conta todos os registros exceto DISTRATO
+        df.loc[:, 'higienizacao_tratadas'] = ~df['status'].isin(status_distrato)
+
+        # Debug: Imprimir contagens finais
+        print("\n=== DEBUG: Contagens Finais ===")
+        print(f"Total de registros: {len(df)}")
+        print(f"Higienização com Êxito: {df['higienizacao_exito'].sum()}")
+        print(f"Higienização Incompleta: {df['higienizacao_incompleta'].sum()}")
+        print(f"Higienização Distrato: {df['higienizacao_distrato'].sum()}")
+        print(f"Higienização Tratadas: {df['higienizacao_tratadas'].sum()}")
+        print("=== FIM DEBUG ===\n")
+
+        # Converter booleanos para inteiros (True = 1, False = 0) para facilitar agregações
+        colunas_bool = ['higienizacao_exito', 'higienizacao_incompleta', 'higienizacao_distrato', 'higienizacao_tratadas']
+        for col in colunas_bool:
+            df[col] = df[col].astype(int)
 
         # return df # Retorna o DataFrame processado, mas NÃO agregado
         return df # Retorna o DataFrame processado, mas NÃO agregado
