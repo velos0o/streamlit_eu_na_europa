@@ -6,6 +6,41 @@ from datetime import datetime, timedelta, date
 import re # Para extrair ID da opção do selectbox
 import numpy as np # Para operações numéricas
 
+# Função auxiliar para garantir tipos numéricos corretos para exibição
+def ensure_numeric_display(df):
+    # Lista de colunas que devem ser inteiras
+    int_columns = [
+        'PASTAS TOTAIS', 'HIGINIZAÇÃO COM ÊXITO', 'HIGINIZAÇÃO INCOMPLETA',
+        'HIGINIZAÇÃO TRATADAS', 'DISTRATO', 'Brasileiras Pendências',
+        'Brasileiras Pesquisas', 'Brasileiras Solicitadas', 'Brasileiras Emitida',
+        'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
+    ]
+    
+    # Lista de colunas que devem ser strings formatadas com %
+    percent_columns = ['CONVERSÃO (%)', 'Taxa Emissão Concluída (%)']
+    
+    # Lista de colunas que devem ser strings
+    string_columns = ['MESA', 'CONSULTOR']
+    
+    df_clean = df.copy()
+    
+    # Tratar colunas inteiras
+    for col in int_columns:
+        if col in df_clean.columns:
+            df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').fillna(0).astype(int)
+    
+    # Tratar colunas de porcentagem
+    for col in percent_columns:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].apply(lambda x: f"{float(str(x).replace('%', '')):.2f}%" if pd.notnull(x) else "0.00%")
+    
+    # Tratar colunas de texto
+    for col in string_columns:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].fillna('').astype(str)
+    
+    return df_clean
+
 def exibir_higienizacao_desempenho():
     """
     Exibe a tabela de desempenho da higienização por mesa e consultor,
@@ -539,16 +574,6 @@ def exibir_higienizacao_desempenho():
         st.markdown("---")
     else:
         st.info("Não há dados para exibir na tabela principal com os filtros atuais.")
-
-    @st.cache_data
-    def convert_df_to_csv(df):
-        return df.to_csv(index=False).encode('utf-8')
-    csv_principal = convert_df_to_csv(df_final_sem_cabines) 
-    st.download_button(
-        label="Download Tabela Principal como CSV", data=csv_principal,
-        file_name='desempenho_higienizacao_mesas.csv', mime='text/csv', key='download_principal'
-    )
-    st.markdown("--- ") 
 
     # --- Exibir a Tabela de CABINES --- 
     df_cabines_final = df_final[df_final['MESA'] == 'CABINES'].copy()
