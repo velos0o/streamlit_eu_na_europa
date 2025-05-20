@@ -16,7 +16,7 @@ def ensure_numeric_display(df):
         'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
     ]
     
-    # Lista de colunas que devem ser strings formatadas com %
+    # Lista de colunas que devem ser float (percentuais)
     percent_columns = ['CONVERSÃO (%)', 'Taxa Emissão Concluída (%)']
     
     # Lista de colunas que devem ser strings
@@ -29,13 +29,16 @@ def ensure_numeric_display(df):
         if col in df_clean.columns:
             df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').fillna(0).astype(int)
     
-    # Tratar colunas de porcentagem
+    # Tratar colunas de porcentagem - manter como float em vez de strings
     for col in percent_columns:
         if col in df_clean.columns:
-            # Primeiro garantir que são números
-            df_clean[col] = pd.to_numeric(df_clean[col].astype(str).str.replace('%', '').str.strip(), errors='coerce').fillna(0)
-            # Depois formatar como string com 2 casas decimais e %
-            df_clean[col] = df_clean[col].apply(lambda x: f"{x:.2f}%")
+            # Remover o símbolo "%" se existir e converter para número
+            if df_clean[col].dtype == object:
+                df_clean[col] = pd.to_numeric(df_clean[col].astype(str).str.replace('%', '').str.strip(), errors='coerce').fillna(0)
+            else:
+                df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').fillna(0)
+            # Arredondar para 2 casas decimais, mas manter como float (sem converter para string)
+            df_clean[col] = df_clean[col].round(2)
     
     # Tratar colunas de texto
     for col in string_columns:
@@ -63,12 +66,12 @@ def exibir_higienizacao_desempenho():
     col_data1, col_data2, col_data_check = st.columns([2,2,1])
     
     with col_data1:
-        data_inicio_filtro = st.date_input("Data Início (Opcional)", value=None) # Inicia como None
+        data_inicio_filtro = st.date_input("Data Início (Opcional)", value=None, key="data_inicio_filtro") # Inicia como None
     with col_data2:
-        data_fim_filtro = st.date_input("Data Fim (Opcional)", value=None) # Inicia como None
+        data_fim_filtro = st.date_input("Data Fim (Opcional)", value=None, key="data_fim_filtro") # Inicia como None
     with col_data_check:
         st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) # Espaçador
-        aplicar_filtro_data = st.checkbox("Aplicar Datas", value=False, help="Marque para filtrar os dados da planilha pelo período selecionado.")
+        aplicar_filtro_data = st.checkbox("Aplicar Datas", value=False, help="Marque para filtrar os dados da planilha pelo período selecionado.", key="aplicar_filtro_data")
 
     # Variáveis para passar para a função de carregamento
     start_date_to_load = None
@@ -176,32 +179,84 @@ def exibir_higienizacao_desempenho():
     # --- Filtro de Responsável ---
     # Obter lista de responsáveis únicos
     responsaveis_unicos = []
+    responsaveis_mapeamento = {}  # Para mapear nomes normalizados -> originais
+    
+    # Dicionário de correções para casos específicos com variação ortográfica
+    correcoes_ortograficas = {
+        "DANYELLE": "DANYELE",  # Variações da mesma pessoa
+        "VITOR": "VICTOR",      # Casos onde podem ser a mesma pessoa
+        "VICTOR": "VICTOR"
+    }
+
+    # Função para normalizar nomes (extrair apenas primeiro nome)
+    def normalizar_nome(nome):
+        if not nome or not isinstance(nome, str):
+            return ""
+        # Pegar apenas o primeiro nome 
+        primeiro_nome = nome.strip().split()[0].upper()
+        
+        # Aplicar correções ortográficas se existirem
+        if primeiro_nome in correcoes_ortograficas:
+            primeiro_nome = correcoes_ortograficas[primeiro_nome]
+            
+        return primeiro_nome
     
     # Da tabela de conclusão
     if not df_conclusao_raw.empty and 'responsavel' in df_conclusao_raw.columns:
         responsaveis_planilha = df_conclusao_raw['responsavel'].dropna().unique().tolist()
-        responsaveis_unicos.extend(responsaveis_planilha)
+        for resp in responsaveis_planilha:
+            if not resp or str(resp).strip() == '':
+                continue
+            nome_norm = normalizar_nome(resp)
+            if nome_norm:
+                # Mapear o nome normalizado para o original
+                if nome_norm not in responsaveis_mapeamento:
+                    responsaveis_mapeamento[nome_norm] = [resp]
+                elif resp not in responsaveis_mapeamento[nome_norm]:
+                    responsaveis_mapeamento[nome_norm].append(resp)
     
     # Do Bitrix
     if not df_cartorio.empty and 'ASSIGNED_BY_NAME' in df_cartorio.columns:
         responsaveis_bitrix = df_cartorio['ASSIGNED_BY_NAME'].dropna().unique().tolist()
-        responsaveis_unicos.extend(responsaveis_bitrix)
+        for resp in responsaveis_bitrix:
+            if not resp or str(resp).strip() == '':
+                continue
+            nome_norm = normalizar_nome(resp)
+            if nome_norm:
+                # Mapear o nome normalizado para o original
+                if nome_norm not in responsaveis_mapeamento:
+                    responsaveis_mapeamento[nome_norm] = [resp]
+                elif resp not in responsaveis_mapeamento[nome_norm]:
+                    responsaveis_mapeamento[nome_norm].append(resp)
     
-    # Remover duplicatas e ordenar
-    responsaveis_unicos = sorted(list(set([r for r in responsaveis_unicos if r and str(r).strip() != ''])))
+    # Criar lista de nomes normalizados (apenas primeiro nome) para o filtro
+    responsaveis_unicos = sorted(list(responsaveis_mapeamento.keys()))
     
+    # Debug: mostrar o mapeamento de nomes
+    print("\n=== DEBUG: Mapeamento de nomes de responsáveis ===")
+    for nome_norm, variantes in responsaveis_mapeamento.items():
+        print(f"{nome_norm}: {variantes}")
+    print("=== FIM DEBUG ===\n")
+    
+    # Preparar a mensagem de ajuda com as correções aplicadas
+    correcoes_info = ", ".join([f"{k} → {v}" for k, v in correcoes_ortograficas.items() if k != v])
+    mensagem_ajuda = f"Selecione o responsável pelo primeiro nome. Variações de sobrenome e algumas correções ortográficas ({correcoes_info}) foram unificadas."
+    
+    # Seleção de responsável usando o nome normalizado
     filtro_responsaveis = st.multiselect(
         "Filtrar por Responsável",
         options=responsaveis_unicos,
         default=[],
-        placeholder="Selecione um ou mais responsáveis"
+        placeholder="Selecione um ou mais responsáveis",
+        key="filtro_responsaveis_higienizacao",
+        help=mensagem_ajuda
     )
 
     # --- Widgets de Filtro por Família --- 
     col_filtros1, col_filtros2 = st.columns(2)
     
     with col_filtros1:
-        filtro_id_familia = st.text_input("ID da Família (exato)", key="filtro_id_fam")
+        filtro_id_familia = st.text_input("ID da Família (exato)", key="filtro_id_familia_higienizacao")
         filtro_id_familia = filtro_id_familia.strip() 
 
     with col_filtros2:
@@ -220,7 +275,7 @@ def exibir_higienizacao_desempenho():
         filtro_nome_familia_selecionado = st.selectbox(
             "Nome da Família (\\ Responsável \\ ID)", 
             options=opcoes_familia, 
-            key="filtro_nome_fam"
+            key="filtro_nome_familia_higienizacao"
         )
 
     # --- Aplicar Filtros por Família (afeta df_conclusao_raw e df_cartorio) --- 
@@ -265,16 +320,29 @@ def exibir_higienizacao_desempenho():
             
     # --- Aplicar Filtro de Responsável ---
     if filtro_responsaveis:
-        # Filtrar df_conclusao_raw por responsável
-        if not df_conclusao_raw.empty and 'responsavel' in df_conclusao_raw.columns:
-            df_conclusao_raw = df_conclusao_raw[df_conclusao_raw['responsavel'].isin(filtro_responsaveis)].copy()
+        # Expandir os nomes normalizados para incluir todas as variações
+        nomes_expandidos = []
+        for nome_norm in filtro_responsaveis:
+            if nome_norm in responsaveis_mapeamento:
+                nomes_expandidos.extend(responsaveis_mapeamento[nome_norm])
         
-        # Filtrar df_cartorio por responsável
+        # Debug: mostrar os nomes expandidos
+        print("\n=== DEBUG: Nomes expandidos para filtro ===")
+        print(f"Nomes normalizados selecionados: {filtro_responsaveis}")
+        print(f"Nomes expandidos para filtro: {nomes_expandidos}")
+        print("=== FIM DEBUG ===\n")
+        
+        # Filtrar df_conclusao_raw por responsável (usando todas as variações)
+        if not df_conclusao_raw.empty and 'responsavel' in df_conclusao_raw.columns:
+            df_conclusao_raw = df_conclusao_raw[df_conclusao_raw['responsavel'].isin(nomes_expandidos)].copy()
+        
+        # Filtrar df_cartorio por responsável (usando todas as variações)
         if not df_cartorio.empty and 'ASSIGNED_BY_NAME' in df_cartorio.columns:
-            df_cartorio = df_cartorio[df_cartorio['ASSIGNED_BY_NAME'].isin(filtro_responsaveis)].copy()
+            df_cartorio = df_cartorio[df_cartorio['ASSIGNED_BY_NAME'].isin(nomes_expandidos)].copy()
         
         if df_conclusao_raw.empty and df_cartorio.empty:
-            st.warning(f"Nenhum dado encontrado para o(s) responsável(eis) selecionado(s): {', '.join(filtro_responsaveis)}")
+            nomes_str = ', '.join(filtro_responsaveis)
+            st.warning(f"Nenhum dado encontrado para o(s) responsável(eis) selecionado(s): {nomes_str}")
 
     # --- MOVER PROCESSAMENTO DE DADOS PARA ANTES DAS FAIXAS ---
 
@@ -435,6 +503,18 @@ def exibir_higienizacao_desempenho():
     # Preencher NaN com 0
     colunas_numericas = df_final.select_dtypes(include=['float64', 'int64']).columns
     df_final[colunas_numericas] = df_final[colunas_numericas].fillna(0)
+    
+    # Garantir que sejam números inteiros onde apropriado
+    colunas_inteiras = [
+        'HIGINIZAÇÃO COM ÊXITO', 'HIGINIZAÇÃO INCOMPLETA', 'HIGINIZAÇÃO TRATADAS', 
+        'DISTRATO', 'Brasileiras Pendências', 'Brasileiras Pesquisas', 
+        'Brasileiras Solicitadas', 'Brasileiras Emitida', 'Pasta C/Emissão Concluída',
+        'Brasileiras Dispensada'
+    ]
+    
+    for col in colunas_inteiras:
+        if col in df_final.columns:
+            df_final[col] = df_final[col].fillna(0).astype(int)
 
     # Debug: Mostrar resultado final do merge
     print("\nResultado final do merge:")
@@ -529,6 +609,7 @@ def exibir_higienizacao_desempenho():
                     print("ALERTA: Criando coluna 'HIGINIZAÇÃO COM ÊXITO' em df_total_principal")
                     df_total_principal['HIGINIZAÇÃO COM ÊXITO'] = 0
                     
+                # Calcular conversão como float, não como string formatado
                 df_total_principal['CONVERSÃO (%)'] = (
                     df_total_principal['HIGINIZAÇÃO COM ÊXITO'] / df_total_principal['PASTAS TOTAIS'] * 100
                 ).round(2)
@@ -538,16 +619,17 @@ def exibir_higienizacao_desempenho():
                     print("ALERTA: Criando coluna 'Pasta C/Emissão Concluída' em df_total_principal")
                     df_total_principal['Pasta C/Emissão Concluída'] = 0
                     
+                # Calcular taxa de emissão como float, não como string formatado
                 df_total_principal['Taxa Emissão Concluída (%)'] = (
                     df_total_principal['Pasta C/Emissão Concluída'] / df_total_principal['PASTAS TOTAIS'] * 100
                 ).round(2)
             else:
-                df_total_principal['CONVERSÃO (%)'] = 0
-                df_total_principal['Taxa Emissão Concluída (%)'] = 0
+                df_total_principal['CONVERSÃO (%)'] = 0.0
+                df_total_principal['Taxa Emissão Concluída (%)'] = 0.0
         except Exception as e:
             print(f"ERRO ao calcular percentuais: {str(e)}")
-            df_total_principal['CONVERSÃO (%)'] = 0
-            df_total_principal['Taxa Emissão Concluída (%)'] = 0
+            df_total_principal['CONVERSÃO (%)'] = 0.0
+            df_total_principal['Taxa Emissão Concluída (%)'] = 0.0
             
         # Atualizar df_display_principal com os novos valores
         df_display_principal = pd.concat([df_final_sem_cabines, df_total_principal], ignore_index=True)
@@ -561,6 +643,8 @@ def exibir_higienizacao_desempenho():
             print("ALERTA: Criando coluna 'Pasta C/Emissão Concluída' em df_final")
             df_final['Pasta C/Emissão Concluída'] = 0
             
+        # Garantir que é um número inteiro para evitar erros de exibição
+        df_final['Pasta C/Emissão Concluída'] = pd.to_numeric(df_final['Pasta C/Emissão Concluída'], errors='coerce').fillna(0).astype(int)
         total_mesas_1_8 = df_final[df_final['MESA'].isin(mesas_1_8_list)]['Pasta C/Emissão Concluída'].sum()
 
         # Estilos para a faixa de totais
@@ -605,8 +689,50 @@ def exibir_higienizacao_desempenho():
         # Aplicar formatação numérica a todo o DataFrame final
         df_display_mesas_final = ensure_numeric_display(df_display_mesas_final)
 
-        # Exibir tabela das MESAS 1-8
-        st.dataframe(df_display_mesas_final, hide_index=True, use_container_width=True)
+        # Renderizar como HTML em vez de st.dataframe para evitar problemas de PyArrow
+        st.markdown("""
+        <style>
+        table.dataframe {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 14px;
+        }
+        table.dataframe th {
+            background-color: #4a7bef;
+            color: white;
+            font-weight: bold;
+            text-align: center;
+            padding: 8px;
+            border: 1px solid #dddddd;
+        }
+        table.dataframe td {
+            text-align: center;
+            padding: 6px;
+            border: 1px solid #dddddd;
+        }
+        table.dataframe tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        table.dataframe tr:hover {
+            background-color: #ddd;
+        }
+        table.dataframe tr:last-child {
+            background-color: #ffd580;
+            font-weight: bold;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Formatar as colunas de porcentagem antes de converter para HTML
+        df_percent = df_display_mesas_final.copy()
+        if 'CONVERSÃO (%)' in df_percent.columns:
+            df_percent['CONVERSÃO (%)'] = df_percent['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
+        if 'Taxa Emissão Concluída (%)' in df_percent.columns:
+            df_percent['Taxa Emissão Concluída (%)'] = df_percent['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+        
+        # Converter para HTML e exibir
+        html_table = df_percent.to_html(index=False, classes='dataframe')
+        st.markdown(html_table, unsafe_allow_html=True)
 
         # Botão de download para tabela principal (MESAS 1-8)
         csv_principal = convert_df_to_csv(df_display_mesas_final)
@@ -615,7 +741,7 @@ def exibir_higienizacao_desempenho():
             data=csv_principal,
             file_name='desempenho_higienizacao_mesas_1_8.csv',
             mime='text/csv',
-            key='download_mesas_1_8_new'
+            key='download_mesas_1_8_csv'
         )
         st.markdown("---")
     else:
@@ -629,6 +755,8 @@ def exibir_higienizacao_desempenho():
             print("ALERTA: Criando coluna 'Pasta C/Emissão Concluída' em df_cabines_final")
             df_cabines_final['Pasta C/Emissão Concluída'] = 0
             
+        # Garantir que é um número inteiro para exibição
+        df_cabines_final['Pasta C/Emissão Concluída'] = pd.to_numeric(df_cabines_final['Pasta C/Emissão Concluída'], errors='coerce').fillna(0).astype(int)
         # Calcular total de Pasta C/Emissão Concluída para CABINES
         total_cabines = df_cabines_final['Pasta C/Emissão Concluída'].sum()
 
@@ -651,7 +779,16 @@ def exibir_higienizacao_desempenho():
         # Aplicar formatação numérica para garantir compatibilidade com Arrow
         df_display_cabines = ensure_numeric_display(df_display_cabines)
         
-        st.dataframe(df_display_cabines, hide_index=True, use_container_width=True)
+        # Formatar as colunas de porcentagem antes de converter para HTML
+        df_percent_cabines = df_display_cabines.copy()
+        if 'CONVERSÃO (%)' in df_percent_cabines.columns:
+            df_percent_cabines['CONVERSÃO (%)'] = df_percent_cabines['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
+        if 'Taxa Emissão Concluída (%)' in df_percent_cabines.columns:
+            df_percent_cabines['Taxa Emissão Concluída (%)'] = df_percent_cabines['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+        
+        # Converter para HTML e exibir
+        html_table_cabines = df_percent_cabines.to_html(index=False, classes='dataframe')
+        st.markdown(html_table_cabines, unsafe_allow_html=True)
         
         csv_cabines_detalhes = convert_df_to_csv(df_cabines_final)
         st.download_button(
@@ -659,7 +796,7 @@ def exibir_higienizacao_desempenho():
             data=csv_cabines_detalhes,
             file_name='detalhes_cabines.csv',
             mime='text/csv',
-            key='download_cabines_new'
+            key='download_cabines_csv'
         )
     else:
         st.info("Não há dados de CABINES na planilha para exibir detalhes.") 
@@ -674,6 +811,8 @@ def exibir_higienizacao_desempenho():
             print("ALERTA: Criando coluna 'Pasta C/Emissão Concluída' em df_carrao_final")
             df_carrao_final['Pasta C/Emissão Concluída'] = 0
             
+        # Garantir que é um número inteiro para exibição
+        df_carrao_final['Pasta C/Emissão Concluída'] = pd.to_numeric(df_carrao_final['Pasta C/Emissão Concluída'], errors='coerce').fillna(0).astype(int)
         # Calcular total de Pasta C/Emissão Concluída para CARRÃO
         total_carrao = df_carrao_final['Pasta C/Emissão Concluída'].sum()
 
@@ -696,7 +835,16 @@ def exibir_higienizacao_desempenho():
         # Aplicar formatação numérica para garantir compatibilidade com Arrow
         df_display_carrao = ensure_numeric_display(df_display_carrao)
         
-        st.dataframe(df_display_carrao, hide_index=True, use_container_width=True)
+        # Formatar as colunas de porcentagem antes de converter para HTML
+        df_percent_carrao = df_display_carrao.copy()
+        if 'CONVERSÃO (%)' in df_percent_carrao.columns:
+            df_percent_carrao['CONVERSÃO (%)'] = df_percent_carrao['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
+        if 'Taxa Emissão Concluída (%)' in df_percent_carrao.columns:
+            df_percent_carrao['Taxa Emissão Concluída (%)'] = df_percent_carrao['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
+        
+        # Converter para HTML e exibir
+        html_table_carrao = df_percent_carrao.to_html(index=False, classes='dataframe')
+        st.markdown(html_table_carrao, unsafe_allow_html=True)
         
         csv_carrao_detalhes = convert_df_to_csv(df_carrao_final)
         st.download_button(
@@ -704,7 +852,7 @@ def exibir_higienizacao_desempenho():
             data=csv_carrao_detalhes,
             file_name='detalhes_carrao.csv',
             mime='text/csv',
-            key='download_carrao_new'
+            key='download_carrao_csv'
         )
     else:
         st.info("Não há dados de CARRÃO na planilha para exibir detalhes.") 
