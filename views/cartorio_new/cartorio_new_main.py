@@ -60,12 +60,18 @@ def show_cartorio_new():
         exibir_producao(df_cartorio)
     elif subpagina_selecionada == "Certidões Pendentes por responsável":
         exibir_pendencias(df_cartorio)
-    elif subpagina_selecionada == "Produção ADM":
-        exibir_producao_adm(df_cartorio)
-    elif subpagina_selecionada == "Certidões Pendentes Por ADM":
-        exibir_pendencias_adm(df_cartorio)
     elif subpagina_selecionada == "Desempenho Conclusão de Pasta":
         exibir_higienizacao_desempenho()
+    elif subpagina_selecionada == "ADM":
+        # Submenu ADM
+        adm_subpagina = st.session_state.get('adm_subpagina', 'Produção ADM')
+        
+        if adm_subpagina == "Produção ADM":
+            exibir_producao_adm(df_cartorio)
+        elif adm_subpagina == "Certidões Pendentes por ADM":
+            exibir_pendencias_adm(df_cartorio)
+        else:
+            st.warning(f"Subpágina ADM desconhecida: {adm_subpagina}")
     else:
         st.warning(f"Subpágina desconhecida: {subpagina_selecionada}")
 

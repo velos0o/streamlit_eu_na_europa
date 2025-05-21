@@ -57,10 +57,15 @@ SUB_ROTAS_EMISSOES = {
     "funil_certidoes": "Funil Certidões",
     "emissoes_por_familia": "Emissões Por Família",
     "producao": "Produção",
-    "producao_adm": "Produção ADM",
+    "adm": "ADM",  # Novo submenu para ADM
     "certidoes_pendentes_responsavel": "Certidões Pendentes por responsável",
-    "certidoes_pendentes_adm": "Certidões Pendentes Por ADM",
     "desempenho_conclusao_pasta": "Desempenho Conclusão de Pasta"
+}
+
+# Novo mapeamento de sub-rotas para o submenu ADM
+SUB_ROTAS_ADM = {
+    "producao_adm": "Produção ADM",
+    "certidoes_pendentes_adm": "Certidões Pendentes por ADM"
 }
 
 # Mapeamento de sub-rotas para Comune (Novo) - REMOVIDO
@@ -116,6 +121,11 @@ if 'emissao_submenu_expanded' not in st.session_state:
     st.session_state.emissao_submenu_expanded = False
 if 'emissao_subpagina' not in st.session_state:
     st.session_state.emissao_subpagina = 'Funil Certidões' # Subpágina padrão ATUALIZADO
+# --- Estado para submenu ADM (novo) ---
+if 'adm_submenu_expanded' not in st.session_state:
+    st.session_state.adm_submenu_expanded = False
+if 'adm_subpagina' not in st.session_state:
+    st.session_state.adm_subpagina = 'Produção ADM' # Subpágina padrão
 # --- Estado para submenu Comune (Novo) --- REMOVIDO
 # if 'comune_submenu_expanded' not in st.session_state:
 #     st.session_state.comune_submenu_expanded = False
@@ -252,17 +262,18 @@ def ir_para_extracoes():
     if 'sub' in st.query_params:
         del st.query_params['sub']
         
-# Funções para alterar a página e controlar submenu
+# Função para resetar todos os submenus
 def reset_submenu():
     st.session_state.emissao_submenu_expanded = False
-    # st.session_state.comune_submenu_expanded = False # Resetar submenu Comune também - REMOVIDO
-    st.session_state.higienizacao_submenu_expanded = False # Resetar submenu Higienizações também
+    st.session_state.higienizacao_submenu_expanded = False
+    st.session_state.adm_submenu_expanded = False # Adicionado resetar submenu ADM também
 
 # --- NOVO: Função para toggle e navegação do submenu Emissões ---
 def toggle_emissao_submenu():
     print(f"DEBUG: toggle_emissao_submenu chamada. Expandido antes: {st.session_state.get('emissao_submenu_expanded')}") # DEBUG
     st.session_state.emissao_submenu_expanded = not st.session_state.get('emissao_submenu_expanded', False)
     st.session_state.higienizacao_submenu_expanded = False # Fecha submenu Higienizações
+    st.session_state.adm_submenu_expanded = False # Fecha submenu ADM
     
     print(f"DEBUG: toggle_emissao_submenu - Expandido depois: {st.session_state.emissao_submenu_expanded}") # DEBUG
     if st.session_state.emissao_submenu_expanded:
@@ -275,6 +286,23 @@ def toggle_emissao_submenu():
              st.session_state.emissao_subpagina = 'Funil Certidões'
              st.query_params['sub'] = 'funil_certidoes' 
         print(f"DEBUG: toggle_emissao_submenu - Subpágina definida para: {st.session_state.get('emissao_subpagina')}") # DEBUG
+
+# --- NOVO: Função para toggle e navegação do submenu ADM ---
+def toggle_adm_submenu():
+    print(f"DEBUG: toggle_adm_submenu chamada. Expandido antes: {st.session_state.get('adm_submenu_expanded')}")
+    st.session_state.adm_submenu_expanded = not st.session_state.get('adm_submenu_expanded', False)
+    
+    if st.session_state.adm_submenu_expanded:
+        st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+        st.session_state.emissao_subpagina = 'ADM'
+        st.query_params['page'] = 'cartorio_new'
+        st.query_params['sub'] = 'adm'
+        
+        current_subpage = st.session_state.get('adm_subpagina')
+        if current_subpage not in SUB_ROTAS_ADM.values():
+            st.session_state.adm_subpagina = 'Produção ADM'
+            st.query_params['sub_adm'] = 'producao_adm'
+        print(f"DEBUG: toggle_adm_submenu - Subpágina ADM definida para: {st.session_state.get('adm_subpagina')}")
 
 # --- NOVO: Funções on_click para sub-botões Emissões ---
 def ir_para_emissao_funil_certidoes():
@@ -298,31 +326,46 @@ def ir_para_emissao_producao():
     st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'producao'
 
-def ir_para_emissao_producao_adm():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras' 
-    st.session_state.emissao_subpagina = 'Produção ADM'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'producao_adm'
-
 def ir_para_emissao_certidoes_pendentes_responsavel():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras' # Garante que a página principal está correta
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Certidões Pendentes por responsável'
     st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'certidoes_pendentes_responsavel'
 
-# --- Função on_click para sub-botão Certidões Pendentes Por ADM ---
-def ir_para_emissao_certidoes_pendentes_adm():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'Certidões Pendentes Por ADM'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'certidoes_pendentes_adm'
-
-# --- Função on_click para sub-botão Desempenho Conclusão de Pasta ---
 def ir_para_emissao_desempenho_conclusao_pasta():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras' # Garante que a página principal está correta
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Desempenho Conclusão de Pasta'
     st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'desempenho_conclusao_pasta'
+
+def ir_para_emissao_adm():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'ADM'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'adm'
+    toggle_adm_submenu()
+
+def ir_para_adm_producao():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'ADM'
+    st.session_state.adm_subpagina = 'Produção ADM'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'adm'
+    st.query_params['sub_adm'] = 'producao_adm'
+
+def ir_para_adm_pendencias():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'ADM'
+    st.session_state.adm_subpagina = 'Certidões Pendentes por ADM'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'adm'
+    st.query_params['sub_adm'] = 'certidoes_pendentes_adm'
+
+# Função para verificar se um item do submenu ADM está ativo
+def is_adm_item_active(item_name):
+    return (st.session_state.get('pagina_atual') == 'Emissões Brasileiras' and 
+            st.session_state.get('emissao_subpagina') == 'ADM' and 
+            st.session_state.get('adm_subpagina') == item_name)
 
 # --- NOVO: Função para toggle e navegação do submenu Comune (Novo) --- REMOVIDO
 # def toggle_comune_submenu():
@@ -491,18 +534,73 @@ if st.session_state.get('emissao_submenu_expanded', False):
                     on_click=ir_para_emissao_producao,
                     use_container_width=True,
                     type="primary" if st.session_state.get('emissao_subpagina') == "Produção" else "secondary")
-        st.button("Produção ADM", key="subbtn_emissao_producao_adm",
-                    on_click=ir_para_emissao_producao_adm,
+        # Botão para o submenu ADM
+        st.button("ADM", key="subbtn_emissao_adm",
+                    on_click=ir_para_emissao_adm,
                     use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Produção ADM" else "secondary")
+                    type="primary" if st.session_state.get('emissao_subpagina') == "ADM" else "secondary")
+                    
+        # Submenu ADM - Agora exibido logo após o botão ADM
+        if st.session_state.get('adm_submenu_expanded'):
+            # Adicionar CSS para estilizar o expander
+            st.markdown("""
+            <style>
+            /* Estilização específica para o expander do ADM */
+            div[data-testid="stExpander"] {
+                border: 2px solid #3B82F6 !important;
+                border-radius: 8px !important;
+                background-color: #EBF5FF !important;
+                margin-top: 5px !important;
+                margin-bottom: 10px !important;
+            }
+            
+            /* Remover o ícone de expansão */
+            div[data-testid="stExpander"] > div:first-child > div:first-child svg {
+                display: none !important;
+            }
+            
+            /* Estilizar o título do expander */
+            div[data-testid="stExpander"] > div:first-child {
+                height: auto !important;
+                padding: 4px !important;
+                background-color: #EBF5FF !important;
+            }
+            
+            /* Garantir que o conteúdo interno também tenha fundo azul */
+            div[data-testid="stExpander"] > div:last-child {
+                background-color: #EBF5FF !important;
+                padding-top: 0 !important;
+            }
+            
+            /* Título centralizado */
+            div[data-testid="stExpander"] div[data-testid="stMarkdownContainer"] p {
+                text-align: left !important;
+                color: #2563EB !important;
+                font-weight: bold !important;
+                margin: 0 !important;
+                font-size: 0.9em !important;
+                padding-left: 8px !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # Usar o expander, mas sempre começar expandido e sem o ícone de expansão
+            with st.expander("Opções ADM", expanded=True):
+                # Botões do submenu
+                st.button("📊 Produção ADM", key="subbtn_adm_producao",
+                          on_click=ir_para_adm_producao,
+                          use_container_width=True,
+                          type="primary" if is_adm_item_active("Produção ADM") else "secondary")
+                
+                st.button("📝 Certidões Pendentes por ADM", key="subbtn_adm_pendencias",
+                          on_click=ir_para_adm_pendencias,
+                          use_container_width=True,
+                          type="primary" if is_adm_item_active("Certidões Pendentes por ADM") else "secondary")
+
         st.button("Certidões Pendentes por responsável", key="subbtn_emissao_certidoes_pendentes_responsavel",
                     on_click=ir_para_emissao_certidoes_pendentes_responsavel,
                     use_container_width=True,
                     type="primary" if st.session_state.get('emissao_subpagina') == "Certidões Pendentes por responsável" else "secondary")
-        st.button("Certidões Pendentes Por ADM", key="subbtn_emissao_certidoes_pendentes_adm",
-                    on_click=ir_para_emissao_certidoes_pendentes_adm,
-                    use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Certidões Pendentes Por ADM" else "secondary")
         st.button("Desempenho Conclusão de Pasta", key="subbtn_emissao_desempenho_conclusao_pasta",
                     on_click=ir_para_emissao_desempenho_conclusao_pasta,
                     use_container_width=True,
@@ -630,4 +728,4 @@ except Exception as e:
 # Rodapé do sidebar
 st.sidebar.markdown("---")
 render_sidebar_refresh_button()
-st.sidebar.markdown("Dashboard desenvolvido para análise de dados do CRM Bitrix24") 
+st.sidebar.markdown("Dashboard desenvolvido para análise de dados do CRM Bitrix24")
