@@ -1,0 +1,218 @@
+@use '../variables' as vars;
+@use '../mixins' as mix;
+
+// Estilos para a tabela de resumo por ADM
+.adm-resumo-table {
+  margin-top: map-get(vars.$spacing, 3);
+  margin-bottom: map-get(vars.$spacing, 5);
+  
+  .stDataFrame {
+    border-radius: map-get(vars.$border-radius, 'md');
+    overflow: hidden;
+    box-shadow: map-get(vars.$shadows, 'sm');
+    border: 1px solid vars.$gray-200;
+    
+    // Headers
+    thead tr th {
+      background-color: vars.$gray-100 !important;
+      color: vars.$gray-800 !important;
+      font-weight: 600 !important;
+      text-align: center !important;
+      padding: map-get(vars.$spacing, 2);
+      border-bottom: 2px solid vars.$gray-300;
+    }
+    
+    // Corpo da tabela
+    tbody tr {
+      transition: background-color 0.15s ease;
+      
+      &:hover {
+        background-color: rgba(vars.$primary, 0.05);
+      }
+      
+      &:nth-child(even) {
+        background-color: vars.$gray-50;
+      }
+      
+      // Células
+      td {
+        padding: map-get(vars.$spacing, 2);
+        border-bottom: 1px solid vars.$gray-200;
+        
+        // Primeira coluna (Nome ADM)
+        &:first-child {
+          font-weight: 500;
+          text-align: left;
+        }
+        
+        // Outras colunas numéricas
+        &:not(:first-child) {
+          text-align: center;
+          font-variant-numeric: tabular-nums;
+        }
+      }
+      
+      // Linha de totais (última linha)
+      &:last-child {
+        background-color: vars.$gray-100;
+        font-weight: 600;
+        
+        td {
+          border-top: 2px solid vars.$gray-300;
+        }
+      }
+    }
+  }
+}
+
+// Estilos para as métricas da seção de resumo
+.adm-resumo-metricas {
+  [data-testid="stHorizontalBlock"] {
+    display: flex;
+    gap: map-get(vars.$spacing, 2);
+    margin-bottom: map-get(vars.$spacing, 4);
+    
+    & > div {
+      background-color: white;
+      border-radius: map-get(vars.$border-radius, 'md');
+      padding: map-get(vars.$spacing, 3);
+      border: 1px solid vars.$gray-200;
+      box-shadow: map-get(vars.$shadows, 'sm');
+      transition: transform 0.2s ease;
+      
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: map-get(vars.$shadows, 'md');
+      }
+      
+      // Métricas individuais por ordem
+      &:nth-child(1) [data-testid="stMetricValue"] { color: vars.$gray-700 !important; } // Ativas
+      &:nth-child(2) [data-testid="stMetricValue"] { color: vars.$primary !important; } // Resolvidas
+      &:nth-child(3) [data-testid="stMetricValue"] { color: vars.$success !important; } // Percentual
+    }
+  }
+
+  // Estilização das métricas
+  [data-testid="stMetric"] {
+    label[data-testid="stMetricLabel"] p {
+      font-weight: 600 !important;
+      text-align: center !important;
+      font-size: map-get(vars.$font-sizes, 'sm');
+      color: vars.$gray-600 !important;
+    }
+    
+    div[data-testid="stMetricValue"] {
+      font-weight: 700 !important;
+      font-size: map-get(vars.$font-sizes, 'xl') !important;
+      text-align: center !important;
+    }
+  }
+}
+
+// Estilos para o gráfico de evolução das resoluções
+.adm-evolucao-grafico {
+  margin-top: map-get(vars.$spacing, 4);
+  margin-bottom: map-get(vars.$spacing, 5);
+  
+  // Estilizar o container do gráfico
+  .stChart {
+    background-color: white;
+    border-radius: map-get(vars.$border-radius, 'md');
+    padding: map-get(vars.$spacing, 3);
+    box-shadow: map-get(vars.$shadows, 'sm');
+    border: 1px solid vars.$gray-200;
+  }
+}
+
+// Estilos para os expansores de detalhes por tipo de pendência
+.adm-detalhes-pendencia {
+  margin-top: map-get(vars.$spacing, 4);
+  
+  // Estilização do expansor
+  [data-testid="stExpander"] {
+    background-color: white;
+    border-radius: map-get(vars.$border-radius, 'md');
+    margin-bottom: map-get(vars.$spacing, 3);
+    box-shadow: map-get(vars.$shadows, 'sm');
+    border: 1px solid vars.$gray-200;
+    overflow: hidden;
+    
+    // Título do expansor
+    [data-testid="stExpanderToggleIcon"] + div p {
+      font-weight: 600;
+      color: vars.$gray-700;
+    }
+  }
+  
+  // Métricas dentro dos expansores
+  [data-testid="stHorizontalBlock"] {
+    display: flex;
+    gap: map-get(vars.$spacing, 2);
+    
+    & > div {
+      background-color: vars.$gray-50;
+      border-radius: map-get(vars.$border-radius, 'md');
+      padding: map-get(vars.$spacing, 2);
+    }
+  }
+  
+  // Estilos para as tabelas dentro dos expansores
+  .stDataFrame {
+    margin-top: map-get(vars.$spacing, 3);
+    border-radius: map-get(vars.$border-radius, 'md');
+    overflow: hidden;
+    
+    thead tr th {
+      background-color: vars.$gray-100 !important;
+    }
+  }
+}
+
+// Ajustes para tema escuro
+@include mix.dark-mode {
+  .adm-resumo-metricas [data-testid="stHorizontalBlock"] > div {
+    background-color: vars.$gray-800;
+    border-color: vars.$gray-700;
+  }
+  
+  .adm-resumo-table .stDataFrame {
+    border-color: vars.$gray-700;
+    
+    thead tr th {
+      background-color: vars.$gray-800 !important;
+      color: white !important;
+      border-bottom-color: vars.$gray-600;
+    }
+    
+    tbody tr {
+      &:nth-child(even) {
+        background-color: rgba(vars.$gray-700, 0.3);
+      }
+      
+      &:hover {
+        background-color: rgba(vars.$primary, 0.2);
+      }
+      
+      td {
+        border-bottom-color: vars.$gray-700;
+      }
+      
+      &:last-child {
+        background-color: vars.$gray-800;
+        td {
+          border-top-color: vars.$gray-600;
+        }
+      }
+    }
+  }
+  
+  .adm-evolucao-grafico .stChart,
+  .adm-detalhes-pendencia [data-testid="stExpander"] {
+    background-color: vars.$gray-800;
+    border-color: vars.$gray-700;
+  }
+  
+  .adm-detalhes-pendencia [data-testid="stHorizontalBlock"] > div {
+    background-color: vars.$gray-900;
+  }
+} 

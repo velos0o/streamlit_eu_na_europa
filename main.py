@@ -56,6 +56,8 @@ ROTAS = {
 SUB_ROTAS_EMISSOES = {
     "funil_certidoes": "Funil Certidões",
     "emissoes_por_familia": "Emissões Por Família",
+    "producao": "Produção",
+    "producao_adm": "Produção ADM",
     "certidoes_pendentes_responsavel": "Certidões Pendentes por responsável",
     "certidoes_pendentes_adm": "Certidões Pendentes Por ADM",
     "desempenho_conclusao_pasta": "Desempenho Conclusão de Pasta"
@@ -290,6 +292,18 @@ def ir_para_emissao_emissoes_por_familia():
     st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'emissoes_por_familia'
 
+def ir_para_emissao_producao():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras' 
+    st.session_state.emissao_subpagina = 'Produção'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'producao'
+
+def ir_para_emissao_producao_adm():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras' 
+    st.session_state.emissao_subpagina = 'Produção ADM'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'producao_adm'
+
 def ir_para_emissao_certidoes_pendentes_responsavel():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras' # Garante que a página principal está correta
     st.session_state.emissao_subpagina = 'Certidões Pendentes por responsável'
@@ -473,6 +487,14 @@ if st.session_state.get('emissao_submenu_expanded', False):
                     on_click=ir_para_emissao_emissoes_por_familia,
                     use_container_width=True,
                     type="primary" if st.session_state.get('emissao_subpagina') == "Emissões Por Família" else "secondary")
+        st.button("Produção", key="subbtn_emissao_producao",
+                    on_click=ir_para_emissao_producao,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Produção" else "secondary")
+        st.button("Produção ADM", key="subbtn_emissao_producao_adm",
+                    on_click=ir_para_emissao_producao_adm,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Produção ADM" else "secondary")
         st.button("Certidões Pendentes por responsável", key="subbtn_emissao_certidoes_pendentes_responsavel",
                     on_click=ir_para_emissao_certidoes_pendentes_responsavel,
                     use_container_width=True,

@@ -53,6 +53,7 @@ def load_data():
         st.warning(f"Nenhum dado encontrado para as categorias 92 ou 94 na tabela {table_name}.") # Mensagem atualizada
         return pd.DataFrame()
     
+    print(f"[DEBUG] Colunas recebidas da API para {table_name} (antes do processamento): {df_items.columns.tolist()}") # Log Adicionado
     print(f"[DEBUG] Total de registros brutos recebidos da API (filtrados): {len(df_items)}")
     
     # --- Processamento Pós-Carregamento (verificações ainda importantes) ---

@@ -3,6 +3,10 @@ import pandas as pd
 from datetime import datetime, time
 import numpy as np # Adicionado para cálculos de desvio padrão
 import os # Importar os para manipulação de caminhos
+import requests # Adicionado para chamadas HTTP
+
+# Importar funções do novo utils
+from .utils import fetch_supabase_producao_data # Adicionado
 
 # Obter o diretório do arquivo atual
 _PRODUCAO_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,7 +24,7 @@ CAMPOS_DATA = {
 
     # EM ANDAMENTO
     'UF_CRM_34_DATA_AGUARDANDO_CARTORIO_ORIGEM': {'nome': 'DATA AGUARDANDO CART. ORIGEM (SPA)', 'categoria': 'EM ANDAMENTO'},
-    'UF_CRM_34_DATA_MONTAGEM_REQUERIMENTO_CARTORIO': {'nome': 'DATA MONTAGEM REQUERIMENTO (SPA)', 'categoria': 'EM ANDAMENTO'},
+    'UF_CRM_34_DATA_MONTAGEM_REQUERIMENTO': {'nome': 'DATA MONTAGEM REQUERIMENTO (SPA)', 'categoria': 'EM ANDAMENTO'},
     'UF_CRM_34_DATA_SOLICITAR_CARTORIO_ORIGEM': {'nome': 'DATA SOLICITAR CART. ORIGEM (SPA)', 'categoria': 'EM ANDAMENTO'},
     'UF_CRM_34_DATA_ASSINATURA_REQUERIMENTO': {'nome': 'DATA ASSINATURA REQUERIMENTO (SPA)', 'categoria': 'EM ANDAMENTO'},
     'UF_CRM_DATA_BUSCA_CRC_AUTOMACAO': {'nome': 'DATA BUSCA CRC (SPA)', 'categoria': 'EM ANDAMENTO'},
@@ -35,7 +39,7 @@ CAMPOS_DATA = {
 # Campos de responsável (usados para a tabela) - apenas a lista de nomes técnicos
 CAMPOS_RESPONSAVEL = [
     'UF_CRM_34_RESPONSAVEL_CERTIDAO_EMITIDA',
-    'UF_CRM_34_RESPONSAVEL_CERTIDAO_ENTREGUE',
+    'UF_CRM_34_RESPONSAVEL_DATA_CERTIDAO_ENTREGUE',
     'UF_CRM_RESPONSAVEL_AGUARDANDO_CARTORIO_DE_ORIGEM',
     'UF_CRM_34_RESPONSAVEL_MONTAGEM_REQUERIMENTO',
     'UF_CRM_34_RESPONSAVEL_SOLICITAR_CARTORIO_ORIGEM',
@@ -50,9 +54,9 @@ CAMPOS_RESPONSAVEL = [
 # Mapeia campos de responsável para os campos de data correspondentes
 MAPA_RESP_DATA = {
     'UF_CRM_34_RESPONSAVEL_CERTIDAO_EMITIDA': 'UF_CRM_34_DATA_CERTIDAO_EMITIDA',
-    'UF_CRM_34_RESPONSAVEL_CERTIDAO_ENTREGUE': 'UF_CRM_34_DATA_CERTIDAO_ENTREGUE',
+    'UF_CRM_34_RESPONSAVEL_DATA_CERTIDAO_ENTREGUE': 'UF_CRM_34_DATA_CERTIDAO_ENTREGUE',
     'UF_CRM_RESPONSAVEL_AGUARDANDO_CARTORIO_DE_ORIGEM': 'UF_CRM_34_DATA_AGUARDANDO_CARTORIO_ORIGEM',
-    'UF_CRM_34_RESPONSAVEL_MONTAGEM_REQUERIMENTO': 'UF_CRM_34_DATA_MONTAGEM_REQUERIMENTO_CARTORIO',
+    'UF_CRM_34_RESPONSAVEL_MONTAGEM_REQUERIMENTO': 'UF_CRM_34_DATA_MONTAGEM_REQUERIMENTO',
     'UF_CRM_34_RESPONSAVEL_SOLICITAR_CARTORIO_ORIGEM': 'UF_CRM_34_DATA_SOLICITAR_CARTORIO_ORIGEM',
     'UF_CRM_34_RESPONSAVEL_ASSINATURA_REQUERIMENTO': 'UF_CRM_34_DATA_ASSINATURA_REQUERIMENTO',
     'UF_CRM_34_RESPONSAVEL_DEVOLUCAO_ADM': 'UF_CRM_34_DATA_DEVOLUCAO_ADM',
@@ -61,6 +65,38 @@ MAPA_RESP_DATA = {
     'UF_CRM_RESPONSAVEL_BUSCA_CRC_AUTOMACAO': 'UF_CRM_DATA_BUSCA_CRC_AUTOMACAO',
     'UF_CRM_34_RESPONSAVEL_PESQUISA_BR': 'UF_CRM_34_DATA_PESQUISA_BR',
 }
+
+# --- Configurações do Supabase --- (REMOVIDO - MOVIDO PARA UTILS)
+# ATENÇÃO: Substitua pelos seus valores reais! Idealmente, use st.secrets ou variáveis de ambiente.
+# SUPABASE_URL = "https://mdjrgbclsayzvnniwarj.supabase.co"  # Substitua pelo URL base do seu projeto Supabase
+# SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kanJnYmNsc2F5enZubml3YXJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4NDAyMjMsImV4cCI6MjA2MzQxNjIyM30.c6WQMKBeupAlDs8MXNge06sdgp7Iw4AuvgpCIUrkukM"
+# SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kanJnYmNsc2F5enZubml3YXJqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Nzg0MDIyMywiZXhwIjoyMDYzNDE2MjIzfQ.aotXFfu8t0bXv5NoqCq50qaa0CKH8POAYZETd_W78R8"
+
+# --- Funções Auxiliares Supabase --- (REMOVIDO - MOVIDO PARA UTILS)
+# def fetch_supabase_producao_data(data_inicio_str, data_fim_str):
+#     """Busca dados da função RPC get_producao_adm_periodo no Supabase."""
+#     headers = {
+#         "apikey": SUPABASE_ANON_KEY,
+#         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+#         "Content-Type": "application/json",
+#         "Prefer": "return=representation"
+#     }
+#     payload = {
+#         "data_inicio": data_inicio_str,
+#         "data_fim": data_fim_str
+#     }
+#     try:
+#         rpc_url = f"{SUPABASE_URL}/rest/v1/rpc/get_producao_adm_periodo"
+#         response = requests.post(rpc_url, headers=headers, json=payload)
+#         response.raise_for_status()  # Levanta um erro para respostas HTTP 4xx/5xx
+#         return response.json()
+#     except requests.exceptions.HTTPError as http_err:
+#         st.error(f"Erro HTTP ao buscar dados do Supabase: {http_err} - {response.text}")
+#     except requests.exceptions.RequestException as req_err:
+#         st.error(f"Erro de requisição ao buscar dados do Supabase: {req_err}")
+#     except Exception as e:
+#         st.error(f"Erro inesperado ao processar dados do Supabase: {e}")
+#     return []
 
 def exibir_producao(df_original):
     st.subheader("Produção")
@@ -224,13 +260,14 @@ def exibir_producao(df_original):
     if df_filtrado.empty:
         # Mensagem ajustada para refletir possível exclusão de picos
         if remover_picos and not dias_com_pico.empty:
-             st.info(f"Nenhuma atividade encontrada entre {data_inicial.strftime('%d/%m/%Y')} e {data_final.strftime('%d/%m/%Y')} após a remoção dos dias com pico.")
+             st.info(f"Nenhuma atividade encontrada entre {data_inicial.strftime('%d/%m/%Y')} e {data_final.strftime('%d/%m/%Y')} (dados Bitrix) após a remoção dos dias com pico.")
         else:
-             st.info(f"Nenhuma atividade encontrada entre {data_inicial.strftime('%d/%m/%Y')} e {data_final.strftime('%d/%m/%Y')}.")
-        return
+             st.info(f"Nenhuma atividade encontrada entre {data_inicial.strftime('%d/%m/%Y')} e {data_final.strftime('%d/%m/%Y')} (dados Bitrix).")
+        # Não retorna imediatamente, pois podemos ter dados do Supabase
+        # return # Comentado para permitir que a seção do Supabase seja exibida
 
     # --- Exibir Métricas por Data (Cards Categorizados com Estilo) ---
-    st.markdown("#### Atividades no Período")
+    st.markdown("#### Atividades no Período (Dados Bitrix)")
 
     metricas_por_categoria = {'SUCESSO': [], 'EM ANDAMENTO': [], 'FALHA': []}
 
@@ -384,7 +421,71 @@ def exibir_producao(df_original):
                  st.error(f"Ocorreu um erro ao gerar a tabela de responsáveis: {str(e)}")
                  st.dataframe(df_pivot_base) # Mostra dados brutos se pivot falhar
         else:
-             st.info("Nenhuma atividade de responsável encontrada no período selecionado após o processamento.")
+             st.info("Nenhuma atividade de responsável encontrada no período selecionado (dados Bitrix) após o processamento.")
+
+    # --- Análise de Histórico de Movimentações do Supabase ---
+    st.markdown("---") # Divisor visual
+    st.markdown("#### Histórico de Movimentações por Responsável (Dados Supabase)")
+
+    # Os filtros de data_inicial e data_final já existem acima
+    data_inicio_api = data_inicial.strftime('%Y-%m-%d')
+    data_fim_api = data_final.strftime('%Y-%m-%d')
+
+    dados_supabase_raw = fetch_supabase_producao_data(data_inicio_api, data_fim_api)
+
+    if not dados_supabase_raw:
+        st.warning(f"Nenhum histórico de movimentações encontrado no Supabase para o período de {data_inicial.strftime('%d/%m/%Y')} a {data_final.strftime('%d/%m/%Y')}.")
+    else:
+        df_supabase = pd.DataFrame(dados_supabase_raw)
+        
+        # Assegurar que data_criacao é datetime
+        if 'data_criacao' in df_supabase.columns:
+            df_supabase['data_criacao'] = pd.to_datetime(df_supabase['data_criacao'])
+        
+        if df_supabase.empty:
+            st.info("Nenhuma movimentação de responsável encontrada no Supabase para o período selecionado.")
+        else:
+            try:
+                # Colunas esperadas da função: id_movimentacao, movido_por_id, estagio_id, id_card, data_criacao
+                tabela_responsaveis_supabase = pd.pivot_table(
+                    df_supabase,
+                    values='id_card',
+                    index='movido_por_id',
+                    columns='estagio_id',
+                    aggfunc='nunique',
+                    fill_value=0
+                )
+
+                if not tabela_responsaveis_supabase.empty:
+                    tabela_responsaveis_supabase['TOTAL GERAL'] = tabela_responsaveis_supabase.sum(axis=1)
+                    tabela_responsaveis_supabase = tabela_responsaveis_supabase.sort_values('TOTAL GERAL', ascending=False)
+                else:
+                    st.info("A tabela de pivô para o histórico de responsáveis (Supabase) está vazia após o processamento.")
+
+                busca_responsavel_supabase = st.text_input(
+                    "Buscar Responsável no Histórico (Supabase):", 
+                    key="busca_resp_supabase_hist"
+                )
+                
+                tabela_filtrada_supabase = tabela_responsaveis_supabase
+                if busca_responsavel_supabase and not tabela_responsaveis_supabase.empty:
+                    # Assegurar que o índice é string para a busca
+                    idx_str = tabela_responsaveis_supabase.index.astype(str)
+                    tabela_filtrada_supabase = tabela_responsaveis_supabase[
+                        idx_str.str.contains(busca_responsavel_supabase, case=False, na=False)
+                    ]
+                
+                if tabela_filtrada_supabase.empty and busca_responsavel_supabase:
+                    st.warning(f"Nenhum responsável encontrado para '{busca_responsavel_supabase}' no histórico do Supabase.")
+                elif not tabela_filtrada_supabase.empty:
+                    st.dataframe(tabela_filtrada_supabase.style.format("{:,}"), use_container_width=True)
+                    st.caption("A tabela mostra a contagem de cards únicos para os quais cada responsável ('movido_por_id') registrou uma movimentação para um estágio ('estagio_id'), com base no histórico do Supabase. Os valores são os IDs dos estágios.")
+                elif tabela_responsaveis_supabase.empty and not busca_responsavel_supabase: # Se a tabela original já estava vazia e não houve busca
+                    st.info("Nenhuma atividade de responsável para exibir do histórico do Supabase no período selecionado.")
+
+            except Exception as e:
+                 st.error(f"Ocorreu um erro ao gerar a tabela de histórico de responsáveis (Supabase): {str(e)}")
+                 st.dataframe(df_supabase.head()) # Mostra uma amostra dos dados brutos se pivot falhar
 
     # Adicionar aqui a lógica e visualizações de produção
     # st.info("🚧 Seção em construção.") # Remover esta linha

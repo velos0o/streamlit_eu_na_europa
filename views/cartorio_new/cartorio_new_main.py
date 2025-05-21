@@ -7,10 +7,11 @@ from .data_loader import carregar_dados_cartorio
 # Importar funções das novas seções/abas
 from .visao_geral import exibir_visao_geral
 from .acompanhamento import exibir_acompanhamento
-# from .producao import exibir_producao # REMOVIDO
+from .producao import exibir_producao
 from .pendencias import exibir_pendencias
 from .pendencias_adm import exibir_pendencias_adm
 from .higienizacao_desempenho import exibir_higienizacao_desempenho
+from .producao_adm import exibir_producao_adm
 
 # Importar componente TOC - REMOVIDO
 # from components.table_of_contents import render_toc 
@@ -55,8 +56,12 @@ def show_cartorio_new():
         exibir_visao_geral(df_cartorio)
     elif subpagina_selecionada == "Emissões Por Família":
         exibir_acompanhamento(df_cartorio)
+    elif subpagina_selecionada == "Produção":
+        exibir_producao(df_cartorio)
     elif subpagina_selecionada == "Certidões Pendentes por responsável":
         exibir_pendencias(df_cartorio)
+    elif subpagina_selecionada == "Produção ADM":
+        exibir_producao_adm(df_cartorio)
     elif subpagina_selecionada == "Certidões Pendentes Por ADM":
         exibir_pendencias_adm(df_cartorio)
     elif subpagina_selecionada == "Desempenho Conclusão de Pasta":

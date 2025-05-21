@@ -7,122 +7,12 @@ import numpy as np
 # Importar AgGrid
 # from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode, JsCode # Removido AgGrid pois não é usado
 
+# Importar funções do novo utils
+from .utils import simplificar_nome_estagio, categorizar_estagio
+
 # --- Função Auxiliar Copiada de visao_geral.py ---
 # TODO: Considerar mover esta função para um módulo utils compartilhado
-def simplificar_nome_estagio(nome):
-    """ Simplifica o nome do estágio para exibição. """
-    if pd.isna(nome):
-        return "Desconhecido"
-
-    codigo_estagio = str(nome) # Garante que é string
-
-    # Mapeamento Atualizado com base na descrição do usuário e categorias
-    mapeamento = {
-        # SPA - Type ID 1098 STAGES
-        'DT1098_92:NEW': 'AGUARDANDO CERTIDÃO',
-        'DT1098_94:NEW': 'AGUARDANDO CERTIDÃO',
-        'DT1098_92:UC_P6PYHW': 'PESQUISA - BR',
-        'DT1098_94:UC_4YE2PI': 'PESQUISA - BR',
-        'DT1098_92:PREPARATION': 'BUSCA - CRC',
-        'DT1098_94:PREPARATION': 'BUSCA - CRC',
-        'DT1098_92:UC_XBTHZ7': 'DEVOLUTIVA BUSCA - CRC',
-        'DT1098_94:CLIENT': 'DEVOLUTIVA BUSCA - CRC', # Nota: CLIENT em Tatuapé é Devolutiva Busca CRC
-        'DT1098_92:CLIENT': 'APENAS ASS. REQ CLIENTE P/MONTAGEM',
-        'DT1098_94:UC_IQ4WFA': 'APENAS ASS. REQ CLIENTE P/MONTAGEM',
-        'DT1098_92:UC_ZWO7BI': 'MONTAGEM REQUERIMENTO CARTÓRIO',
-        'DT1098_94:UC_UZHXWF': 'MONTAGEM REQUERIMENTO CARTÓRIO',
-        'DT1098_92:UC_83ZGKS': 'SOLICITAR CARTÓRIO DE ORIGEM',
-        'DT1098_94:UC_DH38EI': 'SOLICITAR CARTÓRIO DE ORIGEM',
-        'DT1098_92:UC_6TECYL': 'SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE',
-        'DT1098_94:UC_X9UE60': 'SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE',
-        'DT1098_92:UC_MUJP1P': 'AGUARDANDO CARTÓRIO ORIGEM',
-        'DT1098_94:UC_IXCAA5': 'AGUARDANDO CARTÓRIO ORIGEM',
-        'DT1098_92:UC_EYBGVD': 'DEVOLUÇÃO ADM',
-        'DT1098_94:UC_VS8YKI': 'DEVOLUÇÃO ADM',
-        'DT1098_92:UC_KC335Q': 'DEVOLVIDO REQUERIMENTO',
-        'DT1098_94:UC_M6A09E': 'DEVOLVIDO REQUERIMENTO',
-        'DT1098_92:UC_5LWUTX': 'CERTIDÃO EMITIDA',
-        'DT1098_94:UC_K4JS04': 'CERTIDÃO EMITIDA',
-        'DT1098_92:FAIL': 'SOLICITAÇÃO DUPLICADA',
-        'DT1098_94:FAIL': 'SOLICITAÇÃO DUPLICADA',
-        'DT1098_92:UC_Z24IF7': 'CANCELADO',
-        'DT1098_94:UC_MGTPX0': 'CANCELADO',
-        'DT1098_92:SUCCESS': 'CERTIDÃO ENTREGUE',
-        'DT1098_94:SUCCESS': 'CERTIDÃO ENTREGUE',
-        'DT1098_92:UC_U10R0R': 'CERTIDÃO DISPENSADA', # NOVO
-        'DT1098_94:UC_L3JFKO': 'CERTIDÃO DISPENSADA', # NOVO
-        # Manter mapeamentos genéricos caso algum STAGE_ID venha sem prefixo DT1098_XX:
-        'NEW': 'AGUARDANDO CERTIDÃO',
-        'UC_P6PYHW': 'PESQUISA - BR',
-        'UC_4YE2PI': 'PESQUISA - BR',
-        'PREPARATION': 'BUSCA - CRC',
-        'UC_XBTHZ7': 'DEVOLUTIVA BUSCA - CRC',
-        'UC_IQ4WFA': 'APENAS ASS. REQ CLIENTE P/MONTAGEM',
-        'UC_ZWO7BI': 'MONTAGEM REQUERIMENTO CARTÓRIO',
-        'UC_UZHXWF': 'MONTAGEM REQUERIMENTO CARTÓRIO',
-        'UC_83ZGKS': 'SOLICITAR CARTÓRIO DE ORIGEM',
-        'UC_DH38EI': 'SOLICITAR CARTÓRIO DE ORIGEM',
-        'UC_6TECYL': 'SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE',
-        'UC_X9UE60': 'SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE',
-        'UC_MUJP1P': 'AGUARDANDO CARTÓRIO ORIGEM',
-        'UC_IXCAA5': 'AGUARDANDO CARTÓRIO ORIGEM',
-        'UC_EYBGVD': 'DEVOLUÇÃO ADM',
-        'UC_VS8YKI': 'DEVOLUÇÃO ADM',
-        'UC_KC335Q': 'DEVOLVIDO REQUERIMENTO',
-        'UC_M6A09E': 'DEVOLVIDO REQUERIMENTO',
-        'UC_5LWUTX': 'CERTIDÃO EMITIDA',
-        'UC_K4JS04': 'CERTIDÃO EMITIDA',
-        'FAIL': 'SOLICITAÇÃO DUPLICADA',
-        'UC_Z24IF7': 'CANCELADO',
-        'UC_MGTPX0': 'CANCELADO',
-        'SUCCESS': 'CERTIDÃO ENTREGUE',
-        'UC_U10R0R': 'CERTIDÃO DISPENSADA', # NOVO GENÉRICO
-        'UC_L3JFKO': 'CERTIDÃO DISPENSADA', # NOVO GENÉRICO
-    }
-
-    # Tentar encontrar no mapeamento completo
-    nome_legivel = mapeamento.get(codigo_estagio)
-
-    # Se não encontrou e tem ':', tentar buscar só o código após ':'
-    if nome_legivel is None and ':' in codigo_estagio:
-        apenas_codigo = codigo_estagio.split(':')[-1]
-        nome_legivel = mapeamento.get(apenas_codigo)
-
-    # Se ainda não encontrou, retornar o código original (ou 'Desconhecido')
-    if nome_legivel is None:
-        if ':' in codigo_estagio:
-            # Retorna só o código se não mapeado, para consistência
-            return codigo_estagio.split(':')[-1]
-        # Retorna o próprio código se não tiver ':' e não for mapeado
-        return codigo_estagio if codigo_estagio else "Desconhecido"
-
-    return nome_legivel
-
-# TODO: Mover para utils
-def categorizar_estagio(estagio_legivel):
-    """ Categoriza o estágio simplificado em SUCESSO, EM ANDAMENTO ou FALHA. """
-    # ATUALIZADO com base nos novos nomes de estágio do SPA
-    sucesso = [
-        'CERTIDÃO ENTREGUE',
-        'CERTIDÃO EMITIDA' # Considerado sucesso no contexto de etapas concluídas antes da entrega final
-    ]
-    falha = [
-        'DEVOLUÇÃO ADM',
-        'DEVOLVIDO REQUERIMENTO',
-        'SOLICITAÇÃO DUPLICADA',
-        'CANCELADO',
-        'DEVOLUTIVA BUSCA - CRC', # Se a devolutiva da busca significa que não encontrou, é uma falha de progresso.
-                                 # Se significa que a busca foi devolvida para correção, pode ser 'EM ANDAMENTO'. Precisa confirmar a semântica.
-                                 # Por ora, classificando como FALHA se impede o progresso direto.
-        'CERTIDÃO DISPENSADA', # NOVO - Classificado como FALHA
-    ]
-
-    if estagio_legivel in sucesso:
-        return 'SUCESSO'
-    elif estagio_legivel in falha:
-        return 'FALHA'
-    else:
-        return 'EM ANDAMENTO' if estagio_legivel != "Desconhecido" else "DESCONHECIDO"
+# def simplificar_nome_estagio(nome):
 
 def exibir_pendencias_adm(df_original):
     """

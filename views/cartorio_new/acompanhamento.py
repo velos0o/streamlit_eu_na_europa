@@ -3,7 +3,8 @@ import pandas as pd
 from datetime import datetime, date # Adicionar date
 
 # Reutilizar as funções de visao_geral para consistência
-from .visao_geral import simplificar_nome_estagio, categorizar_estagio
+# from .visao_geral import simplificar_nome_estagio, categorizar_estagio # Comentado
+from .utils import simplificar_nome_estagio, categorizar_estagio # Adicionado
 
 # --- Constantes Chaves Session State ---
 KEY_BUSCA_FAMILIA = "busca_familia_acompanhamento"
