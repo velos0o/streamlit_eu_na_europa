@@ -111,6 +111,8 @@ def load_bitrix_data(url, filters=None, show_logs=False, force_reload=False):
     try:
         if show_logs:
             st.info(f"Tentando acessar: {url}")
+            st.write(f"Filtros para {url}: {filters}") # Log dos filtros
+        
         headers = {"Content-Type": "application/json"}
         
         # Tentar até 3 vezes em caso de falha
@@ -125,75 +127,90 @@ def load_bitrix_data(url, filters=None, show_logs=False, force_reload=False):
                     response = requests.get(url, timeout=30)
                 
                 if response.status_code == 200:
-                    # Tentar interpretar a resposta como JSON
+                    if show_logs:
+                        st.write(f"DEBUG: Status 200 OK para {url}.")
+                        st.write(f"DEBUG: Primeiros 500 chars da resposta bruta (response.text): {response.text[:500]}")
                     try:
                         data = response.json()
+                        if show_logs:
+                            st.write(f"DEBUG: response.json() bem-sucedido. Tipo de 'data': {type(data)}")
+                            if isinstance(data, list) and len(data) > 0:
+                                st.write(f"DEBUG: 'data' é uma lista. Tamanho: {len(data)}. Tipo do primeiro item: {type(data[0])}")
+                                st.write(f"DEBUG: Primeiro item de 'data' (data[0]): {str(data[0])[:500]}") # Mostrar amostra do primeiro item
+                                if len(data) > 1:
+                                    st.write(f"DEBUG: Segundo item de 'data' (data[1]): {str(data[1])[:500]}") # Mostrar amostra do segundo item
+                            elif isinstance(data, dict):
+                                st.write(f"DEBUG: 'data' é um dicionário. Chaves: {list(data.keys())}")
+                                st.write(f"DEBUG: Amostra do dicionário 'data': {str(data)[:1000]}")
+                            else:
+                                st.write(f"DEBUG: 'data' não é lista nem dicionário. Conteúdo (amostra): {str(data)[:500]}")
                         
-                        # Verificar se obtivemos dados
-                        if data:
-                            # Mostrar um exemplo da estrutura dos dados para diagnóstico
-                            if show_logs:
-                                st.write("Estrutura da resposta da API:")
-                            
-                            # Verificar o formato dos dados
+                        df = pd.DataFrame() # Inicializar df como DataFrame vazio
+                        if data: # Se data não for None, [], {}, etc.
                             if isinstance(data, list):
-                                # Se for uma lista, verificar o primeiro item
                                 if len(data) > 0:
                                     first_item = data[0]
-                                    
-                                    # Verificar se o primeiro item parece ser um cabeçalho
-                                    if isinstance(first_item, list):
-                                        if show_logs:
-                                            st.write("Dados em formato tabular com cabeçalhos na primeira linha")
-                                            st.write(f"Cabeçalhos encontrados: {first_item}")
-                                        
-                                        # Usar a primeira linha como cabeçalhos e o resto como dados
+                                    if isinstance(first_item, list): # Cabeçalhos na primeira linha
+                                        if show_logs: st.write("DEBUG: Interpretando como lista de listas (cabeçalhos na primeira linha).")
                                         headers = data[0]
-                                        
-                                        # Criar dicionário para cada linha usando os cabeçalhos
-                                        rows = []
-                                        for row in data[1:]:
-                                            row_dict = {}
-                                            for i, value in enumerate(row):
-                                                if i < len(headers):
-                                                    row_dict[headers[i]] = value
-                                            rows.append(row_dict)
-                                        
-                                        # Criar DataFrame com os dados transformados
-                                        df = pd.DataFrame(rows)
-                                        
-                                    elif isinstance(first_item, dict):
-                                        if show_logs:
-                                            st.write(f"Colunas disponíveis: {list(first_item.keys())}")
-                                            st.write("Exemplo do primeiro registro:")
-                                            st.json(first_item)
+                                        rows_data = data[1:]
+                                        # Garantir que todas as linhas tenham o mesmo número de colunas que os cabeçalhos
+                                        # e preencher com None se faltar, para evitar erros no DataFrame
+                                        processed_rows = []
+                                        for r_idx, row_item in enumerate(rows_data):
+                                            if len(row_item) < len(headers):
+                                                # if show_logs: st.write(f"WARN: Linha {r_idx+1} tem {len(row_item)} colunas, cabeçalho tem {len(headers)}. Preenchendo com None.")
+                                                processed_rows.append(list(row_item) + [None] * (len(headers) - len(row_item)))
+                                            elif len(row_item) > len(headers):
+                                                # if show_logs: st.write(f"WARN: Linha {r_idx+1} tem {len(row_item)} colunas, cabeçalho tem {len(headers)}. Truncando.")
+                                                processed_rows.append(list(row_item)[:len(headers)])
+                                            else:
+                                                processed_rows.append(row_item)
+                                        df = pd.DataFrame(processed_rows, columns=headers)
+                                    elif isinstance(first_item, dict): # Lista de dicionários
+                                        if show_logs: st.write("DEBUG: Interpretando como lista de dicionários.")
                                         df = pd.DataFrame(data)
-                                    else:
-                                        if show_logs:
-                                            st.write(f"Colunas disponíveis: ['Item não é um dicionário']")
-                                            st.write("Exemplo do primeiro registro:")
-                                            st.json(first_item)
-                                        # Tentar criar um DataFrame mesmo assim
-                                        df = pd.DataFrame(data)
-                            else:
-                                if show_logs:
-                                    st.write(f"Tipo de dados recebido: {type(data)}")
-                                    st.write(f"Amostra: {str(data)[:500]}")
-                                df = pd.DataFrame([data])
+                                    else: # Lista de outros tipos (improvável para API tabular)
+                                        if show_logs: st.write("DEBUG: 'data' é uma lista, mas o primeiro item não é lista nem dict. Tentando pd.DataFrame(data).")
+                                        try: df = pd.DataFrame(data)
+                                        except Exception as e_df: 
+                                            if show_logs: st.write(f"DEBUG: Falha ao criar DataFrame de lista de itens não-dict/list: {e_df}")
+                                else: # Lista vazia
+                                    if show_logs: st.write("DEBUG: 'data' é uma lista vazia. Criando DataFrame vazio.")
+                                    # df já é um DataFrame vazio aqui
+                            elif isinstance(data, dict): # Resposta é um único dicionário
+                                # Pode ser um objeto de erro, ou um objeto único de dados
+                                if 'error' in data or 'errors' in data: # Heurística para erro
+                                     if show_logs: st.write(f"DEBUG: 'data' é um dicionário e parece ser um erro: {data}")
+                                     df = pd.DataFrame([data]) # Transforma o erro em um DataFrame de 1 linha
+                                else:
+                                     if show_logs: st.write("DEBUG: Interpretando como dicionário único. Criando DataFrame de 1 linha.")
+                                     df = pd.DataFrame([data])
+                            else: # Nenhum dos formatos esperados
+                                if show_logs: st.write(f"DEBUG: 'data' não é lista nem dicionário. Tentando pd.DataFrame([data]). Tipo: {type(data)}.")
+                                try: df = pd.DataFrame([data]) # Tenta criar um df de 1 linha
+                                except Exception as e_df_single:
+                                    if show_logs: st.write(f"DEBUG: Falha ao criar DataFrame de item único não-dict/list: {e_df_single}")
                             
-                            # Mostrar informações do DataFrame para diagnóstico
+                            if show_logs and not df.empty:
+                                st.write(f"DEBUG: DataFrame criado. Colunas: {df.columns.tolist()}")
+                                st.write(f"DEBUG: Amostra do DataFrame (head(1)):\n{df.head(1)}")
+                            elif show_logs and df.empty:
+                                st.write("DEBUG: DataFrame resultante está vazio (após processamento de 'data').")
+                                
+                            # Log específico para crm_dynamic_items_1098 (repetido para garantir o ponto exato)
+                            if "crm_dynamic_items_1098" in url and show_logs:
+                                st.write(f"DEBUG_CREATE_DF (crm_dynamic_items_1098) Colunas: {df.columns.tolist() if not df.empty else 'Vazio'}")
+
+                            return df # Retorna o DataFrame criado
+                        else: # data é None, ou avalia para False (ex: {}, [])
                             if show_logs:
-                                st.write(f"DataFrame criado com {len(df)} linhas e {len(df.columns)} colunas")
-                                st.write(f"Colunas do DataFrame: {list(df.columns)}")
-                            
-                            return df
-                        else:
-                            if show_logs:
-                                st.warning(f"A API retornou uma lista vazia na tentativa {attempt + 1}")
+                                st.warning(f"DEBUG: A API retornou 'data' vazia ou nula para {url} na tentativa {attempt + 1}. Tipo de data: {type(data)}")
+                            # df já é um DataFrame vazio, pode retornar ele ou continuar o loop
                             if attempt < max_attempts - 1:
-                                time.sleep(2)  # Aguardar antes de tentar novamente
+                                time.sleep(2)
                             else:
-                                return pd.DataFrame()
+                                return pd.DataFrame() # Retorna DF vazio se todas as tentativas resultarem em 'data' vazia
                     except json.JSONDecodeError as je:
                         if show_logs:
                             st.error(f"Erro ao decodificar JSON: {str(je)}")
@@ -220,6 +237,28 @@ def load_bitrix_data(url, filters=None, show_logs=False, force_reload=False):
     except Exception as e:
         if show_logs:
             st.error(f"Erro ao carregar dados do Bitrix24: {str(e)}")
+        return pd.DataFrame()
+
+    # Adicionar o log aqui também, caso o fluxo não entre no try...except de requests.exceptions.RequestException
+    # mas saia do loop de tentativas sem sucesso (embora o return pd.DataFrame() lá devesse cobrir)
+    # Este if é mais para o caso de df ser definido mas vazio por algum motivo inesperado.
+    if "crm_dynamic_items_1098" in url and show_logs and 'df' in locals():
+        if df.empty :
+            st.write(f"DEBUG FINAL (cartorio_new - crm_dynamic_items_1098) df para {url} está vazio antes do retorno final.")
+    
+    # Log genérico para outras tabelas se show_logs estiver ativo
+    elif show_logs and 'df' in locals() and isinstance(df, pd.DataFrame): # Adicionado isinstance check
+        st.write(f"DEBUG (geral) Colunas para {url.split('table=')[-1].split('&')[0] if 'table=' in url else url}:", df.columns.tolist() if not df.empty else "Vazio")
+        if not df.empty:
+            st.write(f"DEBUG (geral) Amostra (head(1)) para {url.split('table=')[-1].split('&')[0] if 'table=' in url else url}:", df.head(1))
+
+    # Se o df existir e foi modificado no loop, ele é retornado. Se não, um DF vazio.
+    if 'df' in locals() and isinstance(df, pd.DataFrame):
+        return df
+    else:
+        # Garante que sempre retorna um DataFrame, mesmo que algo muito errado aconteça
+        # e 'df' não seja definido como DataFrame.
+        print(f"[WARN] load_bitrix_data: 'df' não é um DataFrame ou não foi definido. URL: {url}")
         return pd.DataFrame()
 
 def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=None, debug=False, progress_bar=None, message_container=None, force_reload=False):
@@ -256,41 +295,81 @@ def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=No
     
     try:
         # Preparar os filtros
-        filters = {"dimensionsFilters": [[]]}
-        
-        # Adicionar filtro de IDs se fornecido
-        if deal_ids and len(deal_ids) > 0:
-            filters["dimensionsFilters"][0].append({
-                "fieldName": "ID", 
-                "values": deal_ids, 
-                "type": "INCLUDE", 
-                "operator": "EQUALS"
-            })
+        api_filters = None # Inicializa sem filtro de API
+        local_filter_category_id = None # Para filtro local no Pandas
+
         # Se não tiver IDs específicos, usar categoria
-        elif category_id:
-            filters["dimensionsFilters"][0].append({
-                "fieldName": "CATEGORY_ID", 
-                "values": [category_id], 
-                "type": "INCLUDE", 
-                "operator": "EQUALS"
-            })
+        if not (deal_ids and len(deal_ids) > 0) and category_id:
+            # Para crm_deal (onde category_id pode ser 46, 0, 32 etc.), aplicaremos o filtro localmente por enquanto.
+            # Para outras tabelas ou se soubermos que o filtro de API funciona bem para crm_deal, poderíamos ajustar.
+            if str(category_id) == '46': # Especificamente para Ficha da Família, carregar tudo de crm_deal e filtrar depois
+                if debug: st.write(f"INFO (load_merged_data): Para category_id={category_id} (crm_deal), o filtro de categoria será aplicado localmente após o carregamento.")
+                local_filter_category_id = str(category_id)
+                # api_filters permanece None para carregar todos os deals
+            else: # Para outras category_ids em crm_deal, ou outras tabelas, tentamos o filtro de API
+                api_filters = {"dimensionsFilters": [[]]}
+                api_filters["dimensionsFilters"][0].append({
+                    "fieldName": "CATEGORY_ID", 
+                    "values": [str(category_id)], 
+                    "type": "INCLUDE", 
+                    "operator": "EQUALS"
+                })
         
+        # Adicionar filtro de IDs se fornecido (este deve funcionar na API)
+        if deal_ids and len(deal_ids) > 0:
+            if api_filters is None: api_filters = {"dimensionsFilters": [[]]}
+            # Garantir que não haja múltiplos filtros de ID se um já foi adicionado
+            if not any(f.get("fieldName") == "ID" for f in api_filters["dimensionsFilters"][0]):
+                 api_filters["dimensionsFilters"][0].append({
+                    "fieldName": "ID", 
+                    "values": deal_ids, 
+                    "type": "INCLUDE", 
+                    "operator": "EQUALS"
+                })
+
+        # Filtro de data (mantido como estava, pois parece ser um campo UF_CRM_ específico)
         if date_from and date_to:
-            filters["dimensionsFilters"][0].append({
-                "fieldName": "UF_CRM_1741206763",  # Campo de data
+            if api_filters is None: api_filters = {"dimensionsFilters": [[]]}
+            api_filters["dimensionsFilters"][0].append({
+                "fieldName": "UF_CRM_1741206763",
                 "values": [date_from, date_to],
                 "type": "INCLUDE",
                 "operator": "BETWEEN"
             })
         
-        # Atualizar progresso - 10%
-        if progress_bar:
-            update_progress(progress_bar, 0.1, message_container, "Carregando tabela principal...")
-        
-        # Carregar dados principais
         if debug:
-            st.subheader("Carregando tabela crm_deal")
-        df_deal = load_bitrix_data(BITRIX_CRM_DEAL_URL, filters if filters["dimensionsFilters"][0] else None, show_logs=debug, force_reload=force_reload)
+            st.subheader(f"Carregando tabela crm_deal (Categoria: {category_id})")
+            st.write(f"Filtros de API para crm_deal: {api_filters}")
+            st.write(f"Filtro local de categoria para crm_deal: {local_filter_category_id}")
+
+        df_deal = load_bitrix_data(BITRIX_CRM_DEAL_URL, filters=api_filters, show_logs=debug, force_reload=force_reload)
+        
+        # Aplicar filtro local de CATEGORY_ID se necessário (após o carregamento)
+        if local_filter_category_id and not df_deal.empty and 'CATEGORY_ID' in df_deal.columns:
+            if debug: st.write(f"INFO: Aplicando filtro local para CATEGORY_ID = {local_filter_category_id} em df_deal.")
+            # Certificar que a coluna CATEGORY_ID é string para a comparação, como nos filtros da API
+            df_deal['CATEGORY_ID'] = df_deal['CATEGORY_ID'].astype(str)
+            df_deal = df_deal[df_deal['CATEGORY_ID'] == local_filter_category_id]
+            if debug: st.write(f"INFO: df_deal após filtro local: {len(df_deal)} linhas.")
+        elif local_filter_category_id and ('CATEGORY_ID' not in df_deal.columns and not df_deal.empty):
+            if debug: st.warning(f"WARN: Filtro local de CATEGORY_ID={local_filter_category_id} não aplicado pois a coluna 'CATEGORY_ID' não existe em df_deal.")
+        
+        if category_id == 46 and debug: 
+            st.write("--- DEBUG FICHA FAMÍLIA (category_id 46) --- START --- ")
+            st.write("Conteúdo de df_deal (imediatamente após load_bitrix_data):")
+            st.write("Colunas df_deal:", df_deal.columns.tolist() if not df_deal.empty else "df_deal vazio")
+            if not df_deal.empty:
+                st.write("Tipos de dados df_deal (dtypes):", df_deal.dtypes)
+                st.write("Amostra df_deal (head(3)):")
+                st.dataframe(df_deal.head(3))
+                # Verificar especificamente as colunas UF_CRM_ que esperamos
+                cols_esperadas_ficha = ['ID', 'UF_CRM_1722883482527', 'UF_CRM_1722605592778']
+                for col_chk in cols_esperadas_ficha:
+                    if col_chk not in df_deal.columns:
+                        st.write(f"ALERTA: Coluna esperada '{col_chk}' NÃO ENCONTRADA em df_deal para category_id 46.")
+                    else:
+                        st.write(f"INFO: Coluna esperada '{col_chk}' ENCONTRADA em df_deal.")
+            st.write("--- DEBUG FICHA FAMÍLIA (df_deal) --- END ---")
         
         # Atualizar progresso - 40%
         if progress_bar:
@@ -354,19 +433,24 @@ def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=No
         
         # Carregar dados personalizados com filtro otimizado
         if debug:
-            st.subheader("Carregando tabela crm_deal_uf")
-            st.write("Filtro para crm_deal_uf:", deal_filter)  # Debug adicional
+            st.subheader(f"Carregando tabela crm_deal_uf (Categoria: {category_id})")
+            # st.write("Filtro para crm_deal_uf:", deal_filter) # Já existia
         df_deal_uf = load_bitrix_data(BITRIX_CRM_DEAL_UF_URL, deal_filter, show_logs=debug, force_reload=force_reload)
         
-        # Atualizar progresso - 70%
-        if progress_bar:
-            update_progress(progress_bar, 0.7, message_container, "Processando campos personalizados...")
+        # Logs para df_deal_uf especificamente para category_id 46
+        if category_id == 46 and debug:
+            st.write("Conteúdo de df_deal_uf (antes de verificar se está vazio):")
+            st.write("Colunas df_deal_uf:", df_deal_uf.columns.tolist() if not df_deal_uf.empty else "df_deal_uf vazio")
+            if not df_deal_uf.empty:
+                st.dataframe(df_deal_uf.head(3))
+                cols_ficha_debug = ['UF_CRM_1722883482527', 'UF_CRM_1722605592778', 'DEAL_ID']
+                for col_f_debug in cols_ficha_debug:
+                    if col_f_debug not in df_deal_uf.columns:
+                        st.write(f"DEBUG: Coluna {col_f_debug} AUSENTE em df_deal_uf")
+                    else:
+                        st.write(f"DEBUG: Amostra {col_f_debug} (em df_deal_uf):", df_deal_uf[[col_f_debug, 'DEAL_ID']].head(2) if 'DEAL_ID' in df_deal_uf.columns else df_deal_uf[[col_f_debug]].head(2))
+            st.write("--- FIM DEBUG df_deal_uf ---")
         
-        # Se não conseguimos conectar, tentar com o filtro original
-        if df_deal_uf.empty and debug:
-            st.warning("Falha ao carregar dados com filtro de IDs. Tentando com filtro original...")
-            df_deal_uf = load_bitrix_data(BITRIX_CRM_DEAL_UF_URL, filters if filters["dimensionsFilters"][0] else None, show_logs=debug, force_reload=force_reload)
-            
         # Verificar se temos dados
         if df_deal_uf.empty:
             if debug:
@@ -519,7 +603,7 @@ def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=No
                     df_deal_uf[field] = None
         
         # Realizar a mesclagem
-        merged_df = pd.merge(df_deal, df_deal_uf, left_on="ID", right_on="DEAL_ID", how="left")
+        merged_df = pd.merge(df_deal, df_deal_uf, left_on="ID", right_on="DEAL_ID", how="left", suffixes=('_deal', '_deal_uf')) # Adicionado suffixes para evitar conflitos
         
         if debug:
             st.success(f"Dados mesclados com sucesso! {len(merged_df)} registros gerados.")
@@ -545,6 +629,50 @@ def load_merged_data(category_id=None, date_from=None, date_to=None, deal_ids=No
             update_progress(progress_bar, 1.0, message_container, "Dados carregados com sucesso!")
             time.sleep(0.5)  # Pequena pausa para mostrar a conclusão
         
+        if category_id == 46 and debug:
+            st.write("DEBUG (ficha_familia - category 46) Colunas de df_deal_uf ANTES do merge:", df_deal_uf.columns.tolist() if not df_deal_uf.empty else "df_deal_uf vazio")
+            if not df_deal_uf.empty:
+                cols_ficha_debug = ['UF_CRM_1722883482527', 'UF_CRM_1722605592778', 'DEAL_ID']
+                for col_f_debug in cols_ficha_debug:
+                    if col_f_debug not in df_deal_uf.columns:
+                        st.write(f"DEBUG (ficha_familia - category 46) Coluna {col_f_debug} AUSENTE em df_deal_uf")
+                    else:
+                        st.write(f"DEBUG (ficha_familia - category 46) Amostra {col_f_debug} (primeiras 2):", df_deal_uf[[col_f_debug, 'DEAL_ID']].head(2) if 'DEAL_ID' in df_deal_uf.columns else df_deal_uf[[col_f_debug]].head(2))
+        
+        if category_id == 46 and debug:
+            st.write("DEBUG (ficha_familia - category 46) Colunas de merged_df APÓS o merge:", merged_df.columns.tolist() if not merged_df.empty else "merged_df vazio")
+            if not merged_df.empty:
+                cols_ficha_debug_merged = ['UF_CRM_1722883482527', 'UF_CRM_1722605592778', 'ID']
+                for col_f_debug_m in cols_ficha_debug_merged:
+                    if col_f_debug_m not in merged_df.columns:
+                        st.write(f"DEBUG (ficha_familia - category 46) Coluna {col_f_debug_m} AUSENTE em merged_df")
+                    else:
+                        st.write(f"DEBUG (ficha_familia - category 46) Amostra {col_f_debug_m} (em merged_df):", merged_df[[col_f_debug_m]].head(2))
+            st.write("--- FIM DEBUG merged_df ---")
+            
+        # Adicionar um log final para merged_df especificamente para category_id 46
+        if category_id == 46 and debug:
+            st.write("--- DEBUG FICHA FAMÍLIA (merged_df) --- START ---")
+            st.write("Conteúdo de merged_df (APÓS merge):")
+            st.write("Colunas merged_df:", merged_df.columns.tolist() if not merged_df.empty else "merged_df vazio")
+            if not merged_df.empty:
+                st.dataframe(merged_df.head(3))
+                # Verificar novamente as colunas UF_CRM_ após o merge
+                cols_esperadas_merge = ['UF_CRM_1722883482527', 'UF_CRM_1722605592778']
+                for col_chk_m in cols_esperadas_merge:
+                    # O nome da coluna pode ter mudado por causa dos suffixes no merge,
+                    # se elas também existissem em df_deal_uf. Por isso, checamos o original e com sufixo.
+                    col_original_no_merge = col_chk_m in merged_df.columns
+                    col_com_sufixo_deal_no_merge = f"{col_chk_m}_deal" in merged_df.columns
+                    
+                    if not col_original_no_merge and not col_com_sufixo_deal_no_merge:
+                        st.write(f"ALERTA: Coluna '{col_chk_m}' (ou com sufixo _deal) NÃO ENCONTRADA em merged_df.")
+                    elif col_original_no_merge:
+                        st.write(f"INFO: Coluna '{col_chk_m}' ENCONTRADA em merged_df.")
+                    elif col_com_sufixo_deal_no_merge:
+                         st.write(f"INFO: Coluna '{col_chk_m}_deal' ENCONTRADA em merged_df (veio de df_deal).")
+            st.write("--- DEBUG FICHA FAMÍLIA (merged_df) --- END ---")
+
         return merged_df
         
     except Exception as e:

@@ -51,6 +51,7 @@ views/cartorio_new/chaves/
 **/chaves/
 **/keys/
 **/credentials/
+**/secrets.toml
 
 # Adicionar exceção para o arquivo específico de credenciais
 !views/cartorio_new/chaves/leitura-planilhas-459604-84a6f83793a3.json
