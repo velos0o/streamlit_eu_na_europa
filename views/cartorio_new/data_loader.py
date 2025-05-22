@@ -8,7 +8,7 @@ import functools # Importar functools para lru_cache
 # Carregar variáveis de ambiente
 load_dotenv()
 
-# --- Cache Config --- 
+# --- Cach  e Config --- 
 # Usar st.cache_data para cache gerenciado pelo Streamlit
 # ttl (time-to-live) opcional para expirar o cache (ex: 1 hora = 3600 segundos)
 CACHE_TTL = 3600 # Cache por 1 hora

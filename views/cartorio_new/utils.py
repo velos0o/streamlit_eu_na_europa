@@ -5,9 +5,6 @@ from api.bitrix_connector import get_credentials, load_bitrix_data # IMPORTANTE:
 
 # --- Configurações do Supabase (copiadas de producao.py) ---
 # Idealmente, viriam de st.secrets ou variáveis de ambiente no uso real.
-SUPABASE_URL = "https://mdjrgbclsayzvnniwarj.supabase.co"
-SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kanJnYmNsc2F5enZubml3YXJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4NDAyMjMsImV4cCI6MjA2MzQxNjIyM30.c6WQMKBeupAlDs8MXNge06sdgp7Iw4AuvgpCIUrkukM"
-SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kanJnYmNsc2F5enZubml3YXJqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Nzg0MDIyMywiZXhwIjoyMDYzNDE2MjIzfQ.aotXFfu8t0bXv5NoqCq50qaa0CKH8POAYZETd_W78R8"
 
 def simplificar_nome_estagio(nome):
     """ Simplifica o nome do estágio para exibição. """
@@ -114,18 +111,17 @@ def categorizar_estagio(estagio_legivel):
 def fetch_supabase_producao_data(data_inicio_str, data_fim_str):
     """Busca dados da função RPC get_producao_adm_periodo no Supabase."""
     headers = {
-        "apikey": SUPABASE_ANON_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-        "Content-Type": "application/json",
-        "Prefer": "return=representation"
+        "apikey": st.secrets.supabase.anon_key,
+        "Authorization": f"Bearer {st.secrets.supabase.service_key}",
+        "Content-Type": "application/json"
     }
-    payload = {
+    params = {
         "data_inicio": data_inicio_str,
         "data_fim": data_fim_str
     }
+    rpc_url = f"{st.secrets.supabase.url}/rest/v1/rpc/get_producao_adm_periodo"
     try:
-        rpc_url = f"{SUPABASE_URL}/rest/v1/rpc/get_producao_adm_periodo"
-        response = requests.post(rpc_url, headers=headers, json=payload)
+        response = requests.post(rpc_url, headers=headers, json=params)
         response.raise_for_status()  # Levanta um erro para respostas HTTP 4xx/5xx
         return response.json()
     except requests.exceptions.HTTPError as http_err:

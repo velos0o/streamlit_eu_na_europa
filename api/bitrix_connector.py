@@ -25,26 +25,43 @@ def get_credentials():
     Obtém as credenciais do Bitrix24 de acordo com o ambiente:
     1. Primeiro tenta do Streamlit Secrets
     2. Se não encontrar, tenta das variáveis de ambiente (.env)
-    3. Se não encontrar, usa os valores padrão (que devem ser substituídos em produção)
     """
+    token = None
+    url = None
     try:
-        # Verificar se estamos em ambiente Streamlit Cloud
-        if hasattr(st, 'secrets') and 'BITRIX_TOKEN' in st.secrets:
+        # Verificar se estamos em ambiente Streamlit Cloud e se as chaves existem
+        if hasattr(st, 'secrets') and st.secrets.get('bitrix') and st.secrets.bitrix.get('BITRIX_TOKEN') and st.secrets.bitrix.get('BITRIX_URL'):
+            token = st.secrets.bitrix.BITRIX_TOKEN
+            url = st.secrets.bitrix.BITRIX_URL
+            # st.info("Credenciais do Bitrix carregadas via st.secrets (nível 'bitrix')") # Debug
+        elif hasattr(st, 'secrets') and st.secrets.get('BITRIX_TOKEN') and st.secrets.get('BITRIX_URL'):
+            # Fallback para chaves no nível raiz de st.secrets (menos comum, mas possível)
             token = st.secrets.BITRIX_TOKEN
             url = st.secrets.BITRIX_URL
+            # st.info("Credenciais do Bitrix carregadas via st.secrets (nível raiz)") # Debug
         else:
-            # Usar variáveis de ambiente locais
+            # Tentar variáveis de ambiente locais
             token = os.getenv('BITRIX_TOKEN')
             url = os.getenv('BITRIX_URL')
+            # if token and url:
+                # st.info("Credenciais do Bitrix carregadas via variáveis de ambiente") # Debug
+            # else:
+                # st.info("Nenhuma credencial do Bitrix encontrada em st.secrets ou variáveis de ambiente.") # Debug
+
+
     except Exception as e:
-        # Se ocorrer qualquer erro ao tentar acessar secrets, usar variáveis de ambiente
+        # st.warning(f"Erro ao tentar acessar st.secrets para Bitrix: {e}. Tentando variáveis de ambiente.") # Debug
+        # Em caso de erro com st.secrets (ex: não existe), tentar variáveis de ambiente
         token = os.getenv('BITRIX_TOKEN')
         url = os.getenv('BITRIX_URL')
-    
-    # Retornar valores padrão se não encontrados
+        # if token and url:
+            # st.info("Credenciais do Bitrix carregadas via variáveis de ambiente após exceção com st.secrets.") # Debug
+
     if not token or not url:
-        token = "RuUSETRkbFD3whitfgMbioX8qjLgcdPubr"  # Token padrão - substitua em produção
-        url = "https://eunaeuropacidadania.bitrix24.com.br"  # URL padrão - substitua em produção
+        st.error("CREDENCIAIS DO BITRIX24 NÃO ENCONTRADAS! Verifique o arquivo secrets.toml ou as variáveis de ambiente (BITRIX_TOKEN, BITRIX_URL).")
+        # Poderia levantar uma exceção aqui se preferir interromper a execução:
+        # raise ValueError("Credenciais do Bitrix24 não configuradas.")
+        return None, None
     
     return token, url
 
@@ -52,8 +69,20 @@ def get_credentials():
 BITRIX_TOKEN, BITRIX_URL = get_credentials()
 
 # URLs base para acesso às tabelas do Bitrix24
-BITRIX_CRM_DEAL_URL = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_deal"
-BITRIX_CRM_DEAL_UF_URL = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_deal_uf"
+# Essas URLs serão construídas dinamicamente se BITRIX_TOKEN e BITRIX_URL forem None
+# No entanto, com o st.error acima, o app deve alertar antes disso.
+
+BITRIX_CRM_DEAL_URL = None
+BITRIX_CRM_DEAL_UF_URL = None
+
+if BITRIX_TOKEN and BITRIX_URL:
+    BITRIX_CRM_DEAL_URL = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_deal"
+    BITRIX_CRM_DEAL_UF_URL = f"{BITRIX_URL}/bitrix/tools/biconnector/pbi.php?token={BITRIX_TOKEN}&table=crm_deal_uf"
+else:
+    # Este else pode não ser estritamente necessário se get_credentials() já mostra st.error
+    # e potencialmente interrompe ou retorna None, fazendo com que chamadas subsequentes falhem de qualquer maneira.
+    # Considerar como o resto do código lida com BITRIX_TOKEN/URL sendo None.
+    st.warning("URLs do Bitrix não puderam ser construídas pois as credenciais não foram carregadas.")
 
 # Variável de controle para logs de depuração
 SHOW_DEBUG_INFO = False

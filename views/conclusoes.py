@@ -27,31 +27,6 @@ from animation_utils import update_progress
 # Carregar variáveis de ambiente
 load_dotenv()
 
-# Obter credenciais do ambiente ou Streamlit Secrets
-def get_credentials():
-    try:
-        # Verificar se estamos em ambiente Streamlit Cloud
-        if hasattr(st, 'secrets') and 'BITRIX_REST_TOKEN' in st.secrets:
-            token = st.secrets.BITRIX_REST_TOKEN
-            base_url = st.secrets.BITRIX_REST_URL
-        else:
-            # Usar variáveis de ambiente locais
-            token = os.getenv('BITRIX_REST_TOKEN')
-            base_url = os.getenv('BITRIX_REST_URL')
-    except Exception as e:
-        # Em caso de erro, usar variáveis de ambiente
-        token = os.getenv('BITRIX_REST_TOKEN')
-        base_url = os.getenv('BITRIX_REST_URL')
-    
-    # Valor padrão se não encontrado
-    if not base_url:
-        base_url = "https://eunaeuropacidadania.bitrix24.com.br/rest"
-    
-    return base_url
-
-# URL base do Bitrix24 para API REST
-BITRIX_URL = get_credentials()
-
 def show_conclusoes():
     """
     Exibe a página de conclusões com métricas de produtividade e análises
