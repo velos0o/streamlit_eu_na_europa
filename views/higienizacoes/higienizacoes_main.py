@@ -1,7 +1,7 @@
 import streamlit as st
 # from views.producao import show_producao # REMOVIDO
 # from views.conclusoes import show_conclusoes # REMOVIDO
-from views.higienizacoes.checklist import show_higienizacao_checklist
+from views.higienizacoes.checklist.higienizacao_checklist import show_higienizacao_checklist
 
 def show_higienizacoes():
     """
