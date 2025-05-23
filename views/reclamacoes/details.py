@@ -4,11 +4,7 @@ from .styles import tailwind_container, THEME
 
 def get_status_badge(status):
     """Retorna um badge HTML estilizado para o status."""
-    try:
-        theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
-    except:
-        theme_mode = "light"
-    
+    theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
     theme = THEME[theme_mode]
     
     color_map = {
@@ -23,11 +19,7 @@ def get_status_badge(status):
 
 def display_details_section(df):
     """Exibe a seção de filtros e detalhes das reclamações."""
-    try:
-        theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
-    except:
-        theme_mode = "light"
-    
+    theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
     theme = THEME[theme_mode]
 
     st.markdown('<div class="tw-fade-in" style="animation-delay: 0.2s;">', unsafe_allow_html=True)
@@ -154,14 +146,4 @@ def display_details_section(df):
             else:
                 st.error(f"Reclamação com ID {reclamacao_id} não encontrada.")
     
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def display_reclamacao_details(df, selected_id=None):
-    """Exibe detalhes de uma reclamação específica ou todas elas"""
-    # Determinar o tema com base no session_state (verificação segura)
-    try:
-        theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
-    except:
-        theme_mode = "light"
-    
-    theme = THEME[theme_mode] 
+    st.markdown('</div>', unsafe_allow_html=True) 

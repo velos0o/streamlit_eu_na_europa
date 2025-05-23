@@ -4,11 +4,7 @@ from .styles import THEME
 # Função alternativa usando componentes nativos do Streamlit
 def show_metric_card(col, value, title, change=None, is_positive=True):
     """Exibe um cartão de métrica usando componentes nativos do Streamlit"""
-    try:
-        theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
-    except:
-        theme_mode = "light"
-    
+    theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
     theme = THEME[theme_mode]
     
     # Cria uma div estilizada na coluna
@@ -44,10 +40,7 @@ def show_metric_card(col, value, title, change=None, is_positive=True):
 
 def display_metrics_cards(df):
     """Exibe os cards de métricas principais."""
-    try:
-        theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
-    except:
-        theme_mode = "light"
+    theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
     
     st.markdown('<div class="tw-fade-in">', unsafe_allow_html=True)
     
@@ -98,15 +91,3 @@ def display_metrics_cards(df):
     )
     
     st.markdown('</div>', unsafe_allow_html=True) 
-
-def render_metrics_overview(df_original):
-    """
-    Renderiza uma visão geral com métricas essenciais em cards estilizados.
-    """
-    # Determinar o tema com base no session_state (verificação segura)
-    try:
-        theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
-    except:
-        theme_mode = "light"
-    
-    theme = THEME[theme_mode] 

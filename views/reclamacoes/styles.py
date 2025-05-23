@@ -43,20 +43,16 @@ THEME = {
 # Função para criar containers no estilo Tailwind usando componentes nativos do Streamlit
 def tailwind_container(container_type="default"):
     """
-    Cria um container estilizado inspirado no Tailwind CSS com tema claro/escuro.
+    Cria um container estilizado com Tailwind CSS usando componentes nativos do Streamlit
     
     Args:
-        container_type: tipo do container (default, info, success, warning, error, secondary)
+        container_type: Tipo de container (default, info, success, warning, error)
     
     Returns:
         Um objeto container do Streamlit com estilo do Tailwind
     """
-    # Determinar o tema com base no session_state (verificação segura)
-    try:
-        theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
-    except:
-        theme_mode = "light"  # Fallback para tema claro se session_state não estiver disponível
-    
+    # Determinar o tema com base no session_state
+    theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
     theme = THEME[theme_mode]
     
     # Mapear tipos para cores
@@ -118,12 +114,8 @@ def tailwind_container(container_type="default"):
 # Adicionar CSS global para o tema claro e escuro inspirado no Tailwind
 def apply_tailwind_styles():
     """Aplica estilos globais inspirados no Tailwind CSS para a página."""
-    # Determinar o tema com base no session_state (verificação segura)
-    try:
-        theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
-    except:
-        theme_mode = "light"  # Fallback para tema claro se session_state não estiver disponível
-    
+    # Determinar o tema com base no session_state
+    theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
     theme = THEME[theme_mode]
     
     # Gerar CSS baseado no tema
@@ -456,7 +448,7 @@ def apply_tailwind_styles():
         color: {theme["text"]} !important; 
     }}
     /* Cor do texto dentro do card customizado */
-    .tw-card > div, .tw-card > h3, .tw-card > p, .tw-card > span, .tw-card > li {{
+    .tw-card > div, .tw-card > h3, .tw-card p, .tw-card span, .tw-card li {{
         color: {theme["text"]} !important;
     }}
     .tw-card:hover {{
@@ -702,7 +694,7 @@ def apply_tailwind_styles():
         border: 1px solid {theme.get("border", "#EEEEEE")} !important;
         color: {theme["text"]} !important;
     }}
-    .tw-card > div, .tw-card > h3, .tw-card > p, .tw-card > span, .tw-card > li {{
+    .tw-card > div, .tw-card > h3, .tw-card p, .tw-card span, .tw-card li {{
         color: {theme["text"]} !important;
     }}
     
