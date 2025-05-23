@@ -194,13 +194,72 @@ def exibir_visao_geral(df_original):
     #         total_tatuape = count
 
     st.markdown("#### Métricas por Cartório")
-    col_m1, col_m2, col_m3 = st.columns(3)
-    with col_m1:
-        st.metric("Total Selecionado", f"{total_selecionados:,}")
-    with col_m2:
-        st.metric("Total Casa Verde", f"{total_casa_verde:,}")
-    with col_m3:
-        st.metric("Total Tatuapé", f"{total_tatuape:,}")
+    
+    # Criar métricas customizadas com HTML puro
+    st.markdown(f"""
+    <style>
+    .metrica-custom {{
+        background: #F8F9FA;
+        border: 2px solid #DEE2E6;
+        border-radius: 6px;
+        padding: 16px;
+        text-align: center;
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }}
+    
+    .metrica-custom:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: #ADB5BD;
+    }}
+    
+    .metrica-custom .label {{
+        color: #6C757D;
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+        line-height: 1.2;
+    }}
+    
+    .metrica-custom .valor {{
+        color: #495057;
+        font-weight: 700;
+        font-size: 30px;
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }}
+    
+    .metricas-container {{
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }}
+    </style>
+    
+    <div class="metricas-container">
+        <div class="metrica-custom">
+            <div class="label">Total Selecionado</div>
+            <div class="valor">{total_selecionados:,}</div>
+        </div>
+        <div class="metrica-custom">
+            <div class="label">Total Casa Verde</div>
+            <div class="valor">{total_casa_verde:,}</div>
+        </div>
+        <div class="metrica-custom">
+            <div class="label">Total Tatuapé</div>
+            <div class="valor">{total_tatuape:,}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("---")
     
     # --- Processamento e Categorização (no df FINALMENTE FILTRADO) ---
@@ -277,16 +336,17 @@ def exibir_visao_geral(df_original):
             renderizar_categoria_visao_geral(estagios_falha, "FALHA", "❌", falha_count, falha_perc)
 
     # === SEÇÃO 1: MÉTRICAS PRINCIPAIS ===
-    st.markdown('<div class="metricas-grid metricas-grid--neutral">', unsafe_allow_html=True)
-    
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Total de Solicitações", total_solicitacoes, help="Todas as solicitações de certidões")
-    col2.metric("Famílias Únicas", total_familias, help="Número de famílias que possuem solicitações")
-    col3.metric("Estágios Únicos", total_estagios, help="Número de estágios distintos")
-    col4.metric("Responsáveis", total_responsaveis, help="Número de responsáveis únicos")
-    col5.metric("Pipelines", total_pipelines, help="Pipelines (categorias) distintos")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+    # COMENTADO: Variáveis não definidas - precisa ser implementado no futuro
+    # st.markdown('<div class="metricas-grid metricas-grid--neutral">', unsafe_allow_html=True)
+    # 
+    # col1, col2, col3, col4, col5 = st.columns(5)
+    # col1.metric("Total de Solicitações", total_solicitacoes, help="Todas as solicitações de certidões")
+    # col2.metric("Famílias Únicas", total_familias, help="Número de famílias que possuem solicitações")
+    # col3.metric("Estágios Únicos", total_estagios, help="Número de estágios distintos")
+    # col4.metric("Responsáveis", total_responsaveis, help="Número de responsáveis únicos")
+    # col5.metric("Pipelines", total_pipelines, help="Pipelines (categorias) distintos")
+    # 
+    # st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("---")
     if not estagios_falha.empty:

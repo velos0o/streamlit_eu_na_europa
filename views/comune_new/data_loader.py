@@ -1188,7 +1188,8 @@ def load_comune_data(force_reload: bool = False) -> pd.DataFrame:
 
 # Exemplo de uso (pode ser removido ou comentado)
 if __name__ == '__main__':
-    st.set_page_config(layout="wide")
+    # REMOVIDO: Configuração já feita em main.py para evitar conflito
+    # st.set_page_config(layout="wide")
     st.title("Teste do DataLoader Comune (Novo)")
     
     if st.button("Carregar Dados Comune (Novo) com Coords"):

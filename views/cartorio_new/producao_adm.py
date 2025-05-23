@@ -9,9 +9,6 @@ from .utils import simplificar_nome_estagio, fetch_supabase_producao_data, carre
 
 # Obter o diretório do arquivo atual
 _PRODUCAO_ADM_DIR = os.path.dirname(os.path.abspath(__file__))
-# Construir o caminho para a pasta assets subindo dois níveis (views/cartorio_new -> streamlit_eu_na_europa)
-_ASSETS_DIR = os.path.join(_PRODUCAO_ADM_DIR, '..', '..', 'assets')
-_CSS_PATH = os.path.join(_ASSETS_DIR, 'styles', 'css', 'main.css')
 
 # Lista de IDs dos ADMs relevantes (como strings)
 LISTA_IDS_ADMS_RELEVANTES = [
@@ -36,23 +33,14 @@ def exibir_producao_adm(df_cartorio_original):
     
     # --- Carregar CSS Compilado ---
     try:
-        # Usar o caminho absoluto calculado
-        print(f"[Debug Produção ADM] Tentando carregar CSS de: {_CSS_PATH}")
-        if os.path.exists(_CSS_PATH):
-            with open(_CSS_PATH, 'r', encoding='utf-8') as f:
-                css_content = f.read()
-                print(f"[Debug Produção ADM] CSS carregado com sucesso. Tamanho: {len(css_content)} bytes.")
-                
-                # Injetar o CSS na página
-                st.markdown(f'<style>{css_content}</style>', unsafe_allow_html=True)
-        else:
-            st.warning(f"Arquivo CSS principal não encontrado em: {_CSS_PATH}")
-            print(f"[Debug Produção ADM] Falha ao carregar CSS: Arquivo não existe em {_CSS_PATH}")
+        with open('assets/styles/css/main.css', 'r', encoding='utf-8') as f:
+            css_content = f.read()
+            st.markdown(f'<style>{css_content}</style>', unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("Arquivo CSS principal não encontrado.")
     except Exception as e:
-        st.error(f"Ocorreu um erro inesperado ao carregar o CSS em Produção ADM: {e}")
-        print(f"[Debug Produção ADM] Erro detalhado: {str(e)}")
+        st.error(f"Erro ao carregar o CSS: {e}")
     
-    # Remover CSS inline específico - usar apenas classes SCSS
     st.markdown("---")
 
     # --- Carregar Mapa de Usuários ---
@@ -94,49 +82,74 @@ def exibir_producao_adm(df_cartorio_original):
         return
     
     # --- Filtro de Período para Análise de Resoluções ---
-    st.subheader("🗓️ Filtros para Análise")
-    
-    # Filtro de período
-    col_data1, col_data2 = st.columns(2)
-    with col_data1:
-        data_inicio_analise = st.date_input("Data Inicial", value=datetime.now().date() - pd.Timedelta(days=30), key="data_inicio_resol_adm_geral")
-    with col_data2:
-        data_fim_analise = st.date_input("Data Final", value=datetime.now().date(), key="data_fim_resol_adm_geral")
+    # --- Expander para Filtros ---
+    with st.expander("Filtros", expanded=True):  # Começa expandido
+        # Linha 1: Filtro de Data
+        col_data1, col_data2, col_data3 = st.columns([0.3, 0.35, 0.35])
+        with col_data1:
+            aplicar_filtro_data = st.checkbox("Data Análise", value=False, key="aplicar_filtro_data_producao_adm")
 
-    if data_inicio_analise > data_fim_analise:
-        st.warning("A data inicial da análise não pode ser posterior à data final.")
-        return
-    
-    # Filtro de Consultor (ADM)
-    if mapa_usuarios:
-        # Criar uma lista de nomes baseada nos IDs relevantes
-        nomes_adms_para_filtro = [mapa_usuarios.get(id_adm, mapa_usuarios.get(f"user_{id_adm}", f"ID {id_adm}")) 
-                                 for id_adm in LISTA_IDS_ADMS_RELEVANTES]
-        # Remover duplicatas e ordenar
-        nomes_adms_para_filtro = sorted(list(set(nomes_adms_para_filtro)))
-        # Adicionar opção para selecionar todos
-        nomes_adms_para_filtro = ['Todos os ADMs'] + nomes_adms_para_filtro
+        data_inicio_analise = None
+        data_fim_analise = None
         
-        adm_selecionado = st.selectbox("Filtrar por Consultor (ADM)", 
-                                      options=nomes_adms_para_filtro,
-                                      index=0)
-    else:
-        adm_selecionado = 'Todos os ADMs'
-        st.warning("Mapeamento de usuários não disponível. Mostrando todos os ADMs.")
+        # Campos de data aparecem apenas se o checkbox estiver marcado
+        if aplicar_filtro_data:
+            with col_data2:
+                data_inicio_analise = st.date_input(
+                    "De:",
+                    value=datetime.now().date() - pd.Timedelta(days=30),
+                    key="data_inicio_resol_adm_geral",
+                    label_visibility="collapsed"
+                )
+            with col_data3:
+                data_fim_analise = st.date_input(
+                    "Até:",
+                    value=datetime.now().date(),
+                    key="data_fim_resol_adm_geral",
+                    label_visibility="collapsed"
+                )
+        else:
+            # Usar valores padrão quando filtro de data não está ativado
+            data_inicio_analise = datetime.now().date() - pd.Timedelta(days=30)
+            data_fim_analise = datetime.now().date()
+
+        if data_inicio_analise and data_fim_analise and data_inicio_analise > data_fim_analise:
+            st.error("⚠️ A data inicial não pode ser posterior à data final.")
+            return
+        
+        # Linha 2: Filtros de Categorização
+        col_filtro1, col_filtro2 = st.columns(2)
+        
+        # Filtro de Consultor (ADM)
+        with col_filtro1:
+            if mapa_usuarios:
+                # Criar uma lista de nomes baseada nos IDs relevantes
+                nomes_adms_para_filtro = [mapa_usuarios.get(id_adm, mapa_usuarios.get(f"user_{id_adm}", f"ID {id_adm}")) 
+                                         for id_adm in LISTA_IDS_ADMS_RELEVANTES]
+                # Remover duplicatas e ordenar
+                nomes_adms_para_filtro = sorted(list(set(nomes_adms_para_filtro)))
+                # Adicionar opção para selecionar todos
+                nomes_adms_para_filtro = ['Todos os ADMs'] + nomes_adms_para_filtro
+                
+                adm_selecionado = st.selectbox(
+                    "Filtrar por Consultor (ADM):", 
+                    options=nomes_adms_para_filtro,
+                    index=0
+                )
+            else:
+                adm_selecionado = 'Todos os ADMs'
+                st.warning("⚠️ Mapeamento de usuários não disponível. Mostrando todos os ADMs.")
+        
+        # Filtro de Tipo de Pendência
+        with col_filtro2:
+            tipos_pendencia_para_filtro = ['Todos os Tipos'] + ESTAGIOS_DEVOLUCAO_ADM
+            tipo_pendencia_selecionado = st.selectbox(
+                "Filtrar por Tipo de Pendência:", 
+                options=tipos_pendencia_para_filtro,
+                index=0
+            )
     
-    # Filtro de Tipo de Pendência
-    tipos_pendencia_para_filtro = ['Todos os Tipos'] + ESTAGIOS_DEVOLUCAO_ADM
-    tipo_pendencia_selecionado = st.selectbox("Filtrar por Tipo de Pendência", 
-                                           options=tipos_pendencia_para_filtro,
-                                           index=0)
-    
-    st.info(f"""
-    **Filtros aplicados:**
-    - Período: {data_inicio_analise.strftime('%d/%m/%Y')} a {data_fim_analise.strftime('%d/%m/%Y')}
-    - Consultor: {adm_selecionado}
-    - Tipo de Pendência: {tipo_pendencia_selecionado}
-    """)
-    
+    # --- Aplicar Filtros (Fora do Expander) ---
     st.markdown("---")
 
     # --- Carregar Dados do Supabase para o período selecionado ---
@@ -254,19 +267,77 @@ def exibir_producao_adm(df_cartorio_original):
         total_pendencias_resolvidas = len(df_todas_pendencias_resolvidas)
     
     # 3. Exibir Métricas Resumidas
-    col1, col2, col3 = st.columns(3)
-    
-    st.markdown('<div class="producao-adm producao-adm__metricas">', unsafe_allow_html=True)
-    col1.metric("Total de Pendências Ativas", f"{total_pendencias_ativas}")
-    col2.metric("Total de Pendências Resolvidas", f"{total_pendencias_resolvidas}")
-    
     # Calcular percentual de resolução se existirem pendências
     total_geral = total_pendencias_ativas + total_pendencias_resolvidas
     percentual_resolucao = 0
     if total_geral > 0:
         percentual_resolucao = (total_pendencias_resolvidas / total_geral) * 100
-    col3.metric("Percentual de Resolução", f"{percentual_resolucao:.1f}%")
-    st.markdown('</div>', unsafe_allow_html=True)
+        
+    # Criar métricas customizadas com HTML puro
+    st.markdown(f"""
+    <style>
+    .metrica-custom-adm {{
+        background: #F8F9FA;
+        border: 2px solid #DEE2E6;
+        border-radius: 6px;
+        padding: 16px;
+        text-align: center;
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }}
+    
+    .metrica-custom-adm:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: #ADB5BD;
+    }}
+    
+    .metrica-custom-adm .label {{
+        color: #6C757D;
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+        line-height: 1.2;
+    }}
+    
+    .metrica-custom-adm .valor {{
+        color: #495057;
+        font-weight: 700;
+        font-size: 30px;
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }}
+    
+    .metricas-container-adm {{
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }}
+    </style>
+    
+    <div class="metricas-container-adm">
+        <div class="metrica-custom-adm">
+            <div class="label">Total de Pendências Ativas</div>
+            <div class="valor">{total_pendencias_ativas:,}</div>
+        </div>
+        <div class="metrica-custom-adm">
+            <div class="label">Total de Pendências Resolvidas</div>
+            <div class="valor">{total_pendencias_resolvidas:,}</div>
+        </div>
+        <div class="metrica-custom-adm">
+            <div class="label">Percentual de Resolução</div>
+            <div class="valor">{percentual_resolucao:.1f}%</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
     

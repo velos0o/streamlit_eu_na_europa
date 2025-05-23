@@ -1,6 +1,212 @@
 // assets/styles/scss/components/_acompanhamento.scss
 // Estilos específicos para a página views/cartorio_new/acompanhamento.py
 
+@use 'sass:map';
+@use '../variables' as vars;
+@use '../mixins' as mix;
+
+// === MÉTRICAS DO ACOMPANHAMENTO ===
+.metricas-grid--neutral {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: map.get(vars.$spacing, 3);
+  margin-bottom: map.get(vars.$spacing, 4);
+  
+  // Estilização específica para as métricas do acompanhamento
+  [data-testid="stMetric"] {
+    background: #F8F9FA !important; // Fundo cinza claro
+    border: 2px solid #DEE2E6 !important; // Borda cinza mais escura (quadridinhos)
+    border-radius: map.get(vars.$border-radius, 'md') !important;
+    padding: map.get(vars.$spacing, 4) !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+    min-height: 100px;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    text-align: center !important;
+    
+    // Efeito hover mais suave
+    &:hover {
+      transform: translateY(-2px) !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+      border-color: #ADB5BD !important; // Borda mais escura no hover
+    }
+    
+    // Label da métrica (título)
+    [data-testid="stMetricLabel"] {
+      p {
+        color: #6C757D !important; // Cinza médio
+        font-weight: 600 !important;
+        font-size: 0.875rem !important; // 14px
+        text-transform: uppercase !important;
+        letter-spacing: 0.05em !important;
+        margin-bottom: 0.5rem !important;
+        text-align: center !important;
+      }
+    }
+    
+    // Valor da métrica (número)
+    [data-testid="stMetricValue"] {
+      color: #495057 !important; // Cinza escuro para o valor
+      font-weight: 700 !important;
+      font-size: 1.875rem !important; // 30px
+      text-align: center !important;
+      line-height: 1.2 !important;
+      margin-bottom: 0.25rem !important;
+    }
+    
+    // Delta (se existir)
+    [data-testid="stMetricDelta"] {
+      color: #6C757D !important;
+      font-size: 0.75rem !important;
+      font-weight: 500 !important;
+      text-align: center !important;
+    }
+  }
+  
+  // Responsividade para telas menores
+  @include mix.responsive(sm) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: map.get(vars.$spacing, 2);
+    
+    [data-testid="stMetric"] {
+      padding: map.get(vars.$spacing, 3) !important;
+      min-height: 90px;
+      
+      [data-testid="stMetricValue"] {
+        font-size: 1.5rem !important; // Menor em telas pequenas
+      }
+    }
+  }
+  
+  @include mix.responsive(xs) {
+    grid-template-columns: repeat(2, 1fr);
+    
+    [data-testid="stMetric"] {
+      min-height: 80px;
+      
+      [data-testid="stMetricLabel"] p {
+        font-size: 0.75rem !important;
+      }
+      
+      [data-testid="stMetricValue"] {
+        font-size: 1.25rem !important;
+      }
+    }
+  }
+}
+
+// === TEMA ESCURO ===
+@include mix.dark-mode {
+  .metricas-grid--neutral {
+    [data-testid="stMetric"] {
+      background: #343A40 !important; // Fundo cinza escuro
+      border-color: #495057 !important; // Borda mais clara no dark
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+      
+      &:hover {
+        border-color: #6C757D !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+      }
+      
+      [data-testid="stMetricLabel"] p {
+        color: #ADB5BD !important; // Cinza claro para labels
+      }
+      
+      [data-testid="stMetricValue"] {
+        color: #F8F9FA !important; // Branco para valores
+      }
+      
+      [data-testid="stMetricDelta"] {
+        color: #ADB5BD !important;
+      }
+    }
+  }
+}
+
+// === FILTROS DO ACOMPANHAMENTO ===
+.filtros-container {
+  background: #F8F9FA !important; // Mesmo tom cinza das métricas
+  border: 2px solid #DEE2E6 !important; // Mesma borda das métricas
+  border-radius: map.get(vars.$border-radius, 'lg') !important;
+  padding: map.get(vars.$spacing, 4) !important;
+  margin-bottom: map.get(vars.$spacing, 4) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+  
+  .filtro-section {
+    margin-bottom: map.get(vars.$spacing, 3);
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+  
+  .filtro-label {
+    font-weight: 600 !important;
+    color: #495057 !important; // Mesma cor dos valores das métricas
+    margin-bottom: map.get(vars.$spacing, 2) !important;
+    display: block !important;
+    font-size: 0.875rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.025em !important;
+  }
+  
+  // Botão limpar alinhado com o estilo
+  .espacamento-cartorio--button button {
+    background: #6C757D !important;
+    border: 2px solid #6C757D !important;
+    color: white !important;
+    border-radius: map.get(vars.$border-radius, 'md') !important;
+    padding: 0.5rem 1rem !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+    
+    &:hover {
+      background: #5A6268 !important;
+      border-color: #5A6268 !important;
+      transform: translateY(-1px) !important;
+    }
+  }
+}
+
+// === TEMA ESCURO PARA FILTROS ===
+@include mix.dark-mode {
+  .filtros-container {
+    background: #343A40 !important;
+    border-color: #495057 !important;
+    
+    .filtro-label {
+      color: #F8F9FA !important;
+    }
+    
+    .espacamento-cartorio--button button {
+      background: #ADB5BD !important;
+      border-color: #ADB5BD !important;
+      color: #212529 !important;
+      
+      &:hover {
+        background: #CED4DA !important;
+        border-color: #CED4DA !important;
+      }
+    }
+  }
+}
+
+// === DIVISOR CARTÓRIO ===
+.divisor-cartorio {
+  margin: map.get(vars.$spacing, 4) 0;
+  height: 2px;
+  background: linear-gradient(to right, #DEE2E6, transparent);
+  border-radius: 1px;
+}
+
+@include mix.dark-mode {
+  .divisor-cartorio {
+    background: linear-gradient(to right, #495057, transparent);
+  }
+}
+
 // Exemplo: Estilizar o container das métricas (se você adicionar um container no .py)
 // .acompanhamento-metricas-container {
 //   display: grid;

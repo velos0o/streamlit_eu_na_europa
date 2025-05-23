@@ -634,16 +634,13 @@ def exibir_metricas_macro():
     pass
 
 def show_ficha_familia():
-    # Configurar layout da página para wide
-    # Idealmente, isso deve ser chamado apenas uma vez no script principal (main.py)
-    # Se main.py já chama set_page_config, esta linha pode causar erro ou ser ignorada.
-    # Para efeito de teste local desta página, pode ser útil.
-    try:
-        st.set_page_config(layout="wide")
-    except st.errors.StreamlitAPIException as e:
-        # Isso acontece se set_page_config já foi chamado
-        # st.toast(f"Nota: st.set_page_config(layout=\"wide\") já foi chamado anteriormente. {e}")
-        pass # Ignora o erro se já foi configurado
+    # REMOVIDO: Configuração do layout da página (já feita em main.py)
+    # Comentado para evitar conflito: st.set_page_config() deve ser chamado apenas uma vez
+    # try:
+    #     st.set_page_config(layout="wide")
+    # except st.errors.StreamlitAPIException as e:
+    #     # st.toast(f"Nota: st.set_page_config(layout=\"wide\") já foi chamado anteriormente. {e}")
+    #     pass # Ignora o erro se já foi configurado
 
     st.markdown("<h1 class='page-title initial-page-title'>Ficha da Família</h1>", unsafe_allow_html=True)
     st.markdown("<p class='page-subtitle'>Busque por uma família para ver detalhes ou visualize métricas gerais.</p>", unsafe_allow_html=True)

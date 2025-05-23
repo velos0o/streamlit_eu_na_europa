@@ -5,7 +5,7 @@ st.set_page_config(
     page_title="Dashboard CRM Bitrix24",
     page_icon="assets/LOGO-EU.NA.EUROPA-MAIO.24-COLORIDO-VERTICAL.svg",
     layout="wide",
-    initial_sidebar_state="expanded" if "pagina_atual" not in st.session_state or st.session_state.get("pagina_atual") != "Apresentação Conclusões" else "collapsed"
+    initial_sidebar_state="expanded"  # Removido acesso ao session_state para evitar erro de inicialização
 )
 
 import os

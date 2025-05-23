@@ -63,55 +63,185 @@ def exibir_pesquisa_br(df_cartorio):
     taxa_conclusao = (pesquisas_finalizadas / total_pesquisas * 100) if total_pesquisas > 0 else 0
 
     # --- Exibir Métricas ---
-    col1, col2, col3, col4, col5 = st.columns(5)
+    st.markdown("#### 📊 Métricas Gerais")
     
-    col1.metric("Total Pesquisas", f"{total_pesquisas:,}")
-    col2.metric("Requerentes", f"{total_requerentes:,}")
-    col3.metric("Famílias", f"{total_familias:,}")
-    col4.metric("Finalizadas", f"{pesquisas_finalizadas:,}")
-    col5.metric("Taxa Conclusão", f"{taxa_conclusao:.1f}%")
+    # Criar métricas customizadas com HTML puro
+    st.markdown(f"""
+    <style>
+    .metrica-custom-pesquisa {{
+        background: #F8F9FA;
+        border: 2px solid #DEE2E6;
+        border-radius: 6px;
+        padding: 16px;
+        text-align: center;
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }}
+    
+    .metrica-custom-pesquisa:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: #ADB5BD;
+    }}
+    
+    .metrica-custom-pesquisa .label {{
+        color: #6C757D;
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+        line-height: 1.2;
+    }}
+    
+    .metrica-custom-pesquisa .valor {{
+        color: #495057;
+        font-weight: 700;
+        font-size: 30px;
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }}
+    
+    .metricas-container-pesquisa {{
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }}
+    </style>
+    
+    <div class="metricas-container-pesquisa">
+        <div class="metrica-custom-pesquisa">
+            <div class="label">Total Pesquisas</div>
+            <div class="valor">{total_pesquisas:,}</div>
+        </div>
+        <div class="metrica-custom-pesquisa">
+            <div class="label">Requerentes</div>
+            <div class="valor">{total_requerentes:,}</div>
+        </div>
+        <div class="metrica-custom-pesquisa">
+            <div class="label">Famílias</div>
+            <div class="valor">{total_familias:,}</div>
+        </div>
+        <div class="metrica-custom-pesquisa">
+            <div class="label">Finalizadas</div>
+            <div class="valor">{pesquisas_finalizadas:,}</div>
+        </div>
+        <div class="metrica-custom-pesquisa">
+            <div class="label">Taxa Conclusão</div>
+            <div class="valor">{taxa_conclusao:.1f}%</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
 
     # --- Detalhamento por Estágio ---
-    st.markdown("#### 📊 Andamento por Estágio")
+    st.markdown("#### Andamento por Estágio")
     
     col_est1, col_est2, col_est3, col_est4 = st.columns(4)
     
-    # Cards com classes SCSS (substituindo CSS inline)
+    # Cards com classes SCSS e fundos coloridos (sem emojis)
     col_est1.markdown(f"""
-    <div class="stage-card stage-card--aguardando">
-        <div class="stage-card__icon">🕐</div>
-        <div class="stage-card__title">Aguardando</div>
-        <div class="stage-card__value">{aguardando_pesquisador}</div>
-        <div class="stage-card__subtitle">Aguardando Pesquisador</div>
+    <style>
+    .stage-card-pesquisa {{
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        min-height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.2s ease;
+        border: 2px solid;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }}
+    
+    .stage-card-pesquisa:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }}
+    
+    .stage-card-pesquisa--aguardando {{
+        background: #E3F2FD;
+        border-color: #2196F3;
+        color: #0D47A1;
+    }}
+    
+    .stage-card-pesquisa--andamento {{
+        background: #FFF8E1;
+        border-color: #FF9800;
+        color: #E65100;
+    }}
+    
+    .stage-card-pesquisa--prontas {{
+        background: #E8F5E8;
+        border-color: #4CAF50;
+        color: #1B5E20;
+    }}
+    
+    .stage-card-pesquisa--nao-encontradas {{
+        background: #FFEBEE;
+        border-color: #F44336;
+        color: #B71C1C;
+    }}
+    
+    .stage-card-pesquisa__title {{
+        font-weight: 700;
+        font-size: 16px;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }}
+    
+    .stage-card-pesquisa__value {{
+        font-weight: 900;
+        font-size: 36px;
+        line-height: 1;
+        margin-bottom: 4px;
+    }}
+    
+    .stage-card-pesquisa__subtitle {{
+        font-size: 12px;
+        font-weight: 500;
+        opacity: 0.8;
+    }}
+    </style>
+    
+    <div class="stage-card-pesquisa stage-card-pesquisa--aguardando">
+        <div class="stage-card-pesquisa__title">Aguardando</div>
+        <div class="stage-card-pesquisa__value">{aguardando_pesquisador}</div>
+        <div class="stage-card-pesquisa__subtitle">Aguardando Pesquisador</div>
     </div>
     """, unsafe_allow_html=True)
     
     col_est2.markdown(f"""
-    <div class="stage-card stage-card--andamento">
-        <div class="stage-card__icon">🔄</div>
-        <div class="stage-card__title">Em Andamento</div>
-        <div class="stage-card__value">{pesquisa_andamento}</div>
-        <div class="stage-card__subtitle">Pesquisa em Andamento</div>
+    <div class="stage-card-pesquisa stage-card-pesquisa--andamento">
+        <div class="stage-card-pesquisa__title">Em Andamento</div>
+        <div class="stage-card-pesquisa__value">{pesquisa_andamento}</div>
+        <div class="stage-card-pesquisa__subtitle">Pesquisa em Andamento</div>
     </div>
     """, unsafe_allow_html=True)
     
     col_est3.markdown(f"""
-    <div class="stage-card stage-card--prontas">
-        <div class="stage-card__icon">✅</div>
-        <div class="stage-card__title">Prontas</div>
-        <div class="stage-card__value">{pesquisa_pronta}</div>
-        <div class="stage-card__subtitle">Pronta para Emissão</div>
+    <div class="stage-card-pesquisa stage-card-pesquisa--prontas">
+        <div class="stage-card-pesquisa__title">Prontas</div>
+        <div class="stage-card-pesquisa__value">{pesquisa_pronta}</div>
+        <div class="stage-card-pesquisa__subtitle">Pronta para Emissão</div>
     </div>
     """, unsafe_allow_html=True)
     
     col_est4.markdown(f"""
-    <div class="stage-card stage-card--nao-encontradas">
-        <div class="stage-card__icon">❌</div>
-        <div class="stage-card__title">Não Encontradas</div>
-        <div class="stage-card__value">{pesquisa_nao_encontrada}</div>
-        <div class="stage-card__subtitle">Pesquisa Não Encontrada</div>
+    <div class="stage-card-pesquisa stage-card-pesquisa--nao-encontradas">
+        <div class="stage-card-pesquisa__title">Não Encontradas</div>
+        <div class="stage-card-pesquisa__value">{pesquisa_nao_encontrada}</div>
+        <div class="stage-card-pesquisa__subtitle">Pesquisa Não Encontrada</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -232,6 +362,7 @@ def exibir_pesquisa_br(df_cartorio):
     # Adicionar estatísticas por estágio para cada responsável
     for estagio in ['AGUARDANDO PESQUISADOR', 'PESQUISA EM ANDAMENTO', 'PESQUISA PRONTA PARA EMISSÃO', 'PESQUISA NÃO ENCONTRADA']:
         contagem_estagio = df_pesquisa[df_pesquisa['ESTAGIO_LEGIVEL'] == estagio].groupby('ASSIGNED_BY_NAME').size().reset_index(name=estagio)
+        contagem_estagio = contagem_estagio.rename(columns={'ASSIGNED_BY_NAME': 'Responsável'})
         analise_responsavel = analise_responsavel.merge(contagem_estagio, on='Responsável', how='left')
         analise_responsavel[estagio] = analise_responsavel[estagio].fillna(0).astype(int)
     

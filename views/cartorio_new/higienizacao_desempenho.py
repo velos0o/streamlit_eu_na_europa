@@ -151,24 +151,58 @@ def exibir_higienizacao_desempenho():
     except FileNotFoundError:
         st.warning("Arquivo CSS principal (main.css) não encontrado.")
 
-    # --- Filtros --- 
-    st.markdown('<div class="filtros-container">', unsafe_allow_html=True)
-    st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
-    st.markdown('<label class="filtro-label">Filtros de Data</label>', unsafe_allow_html=True)
-    
-    # --- Filtro de Data (Opcional) ---
-    col_data1, col_data2, col_data_check = st.columns([2,2,1])
-    
-    with col_data1:
-        data_inicio_filtro = st.date_input("Data Início (Opcional)", value=None, key="data_inicio_filtro") # Inicia como None
-    with col_data2:
-        data_fim_filtro = st.date_input("Data Fim (Opcional)", value=None, key="data_fim_filtro") # Inicia como None
-    with col_data_check:
-        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) # Espaçador
-        aplicar_filtro_data = st.checkbox("Aplicar Datas", value=False, help="Marque para filtrar os dados da planilha pelo período selecionado.", key="aplicar_filtro_data")
-    
-    st.markdown('</div>', unsafe_allow_html=True) # Fecha filtro-section
-    st.markdown('</div>', unsafe_allow_html=True) # Fecha filtros-container
+    # --- FILTROS UNIFICADOS ---
+    with st.expander("📊 Filtros", expanded=True):
+        st.markdown('<div class="filtros-container">', unsafe_allow_html=True)
+        
+        # --- SEÇÃO 1: FILTROS DE DATA ---
+        st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+        st.markdown('<label class="filtro-label">Filtros de Data</label>', unsafe_allow_html=True)
+        
+        col_data1, col_data2, col_data_check = st.columns([2,2,1])
+        
+        with col_data1:
+            data_inicio_filtro = st.date_input("Data Início (Opcional)", value=None, key="data_inicio_filtro")
+        with col_data2:
+            data_fim_filtro = st.date_input("Data Fim (Opcional)", value=None, key="data_fim_filtro")
+        with col_data_check:
+            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+            aplicar_filtro_data = st.checkbox("Aplicar Datas", value=False, help="Marque para filtrar os dados da planilha pelo período selecionado.", key="aplicar_filtro_data")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # --- SEÇÃO 2: FILTROS ADICIONAIS ---
+        st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+        st.markdown('<label class="filtro-label">Filtros Adicionais</label>', unsafe_allow_html=True)
+        
+        col_ano, col_resp = st.columns(2)
+        
+        with col_ano:
+            # Placeholder para ano - será preenchido após carregar dados
+            ano_selecionado = st.empty()
+            
+        with col_resp:
+            # Placeholder para responsáveis - será preenchido após carregar dados
+            filtro_responsaveis = st.empty()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # --- SEÇÃO 3: FILTROS POR FAMÍLIA ---
+        st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+        st.markdown('<label class="filtro-label">Filtros por Família</label>', unsafe_allow_html=True)
+        
+        col_id, col_nome = st.columns(2)
+        
+        with col_id:
+            filtro_id_familia = st.text_input("ID da Família (exato)", key="filtro_id_familia_higienizacao")
+            filtro_id_familia = filtro_id_familia.strip()
+            
+        with col_nome:
+            # Placeholder para famílias - será preenchido após carregar dados
+            filtro_nome_familia_selecionado = st.empty()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True) # Fecha filtros-container
 
     # Variáveis para passar para a função de carregamento
     start_date_to_load = None
@@ -178,7 +212,7 @@ def exibir_higienizacao_desempenho():
         if data_inicio_filtro and data_fim_filtro:
             if data_inicio_filtro > data_fim_filtro:
                 st.warning("A data de início não pode ser posterior à data de fim.")
-                return # Ou desabilitar o filtro
+                return
             start_date_to_load = data_inicio_filtro
             end_date_to_load = data_fim_filtro
             st.info(f"Filtro de data aplicado: {start_date_to_load.strftime('%d/%m/%Y')} a {end_date_to_load.strftime('%d/%m/%Y')}")
@@ -230,14 +264,9 @@ def exibir_higienizacao_desempenho():
             df_cartorio = pd.DataFrame() 
             st.warning("Não foi possível carregar os dados de emissões do Bitrix.")
     
-    # --- Filtros Adicionais: Data de Venda e Responsável ---
-    st.markdown('<div class="filtros-container">', unsafe_allow_html=True)
-    st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
-    st.markdown('<label class="filtro-label">Filtros Adicionais</label>', unsafe_allow_html=True)
-    
+    # --- PREENCHER OS FILTROS AGORA QUE OS DADOS FORAM CARREGADOS ---
+
     # --- Filtro de Data de Venda ---
-    col_venda1, col_venda2 = st.columns(2)
-    
     # Obter anos disponíveis a partir das datas de venda
     anos_disponiveis = []
     ano_atual = datetime.now().year
@@ -256,24 +285,15 @@ def exibir_higienizacao_desempenho():
     
     # Adicionar opção para "Todos os anos"
     opcoes_anos = ["Todos os anos"] + [str(ano) for ano in anos_disponiveis]
-    
-    with col_venda1:
-        ano_selecionado = st.selectbox(
+
+    # Preencher o selectbox de ano
+    with ano_selecionado.container():
+        ano_selecionado_valor = st.selectbox(
             "Filtrar por Ano de Venda",
             options=opcoes_anos,
-            index=0
+            index=0,
+            key="ano_venda_select"
         )
-    
-    with col_venda2:
-        st.markdown("<div style='margin-top: 32px;'></div>", unsafe_allow_html=True)
-        mostrar_info_filtro_ano = st.checkbox("Mostrar detalhes do filtro de ano", value=False)
-        
-        if mostrar_info_filtro_ano and ano_selecionado != "Todos os anos":
-            st.info(f"Filtrando vendas do ano: {ano_selecionado}")
-            # Adicionar informações de quantos registros existem neste ano
-            if not df_cartorio.empty and 'DATA_VENDA_FAMILIA' in df_cartorio.columns:
-                count_ano = df_cartorio[df_cartorio['DATA_VENDA_FAMILIA'].dt.year == int(ano_selecionado)].shape[0]
-                st.caption(f"({count_ano} registros encontrados neste ano)")
 
     # --- Filtro de Responsável ---
     # Obter lista de responsáveis únicos
@@ -330,7 +350,7 @@ def exibir_higienizacao_desempenho():
     
     # Criar lista de nomes normalizados (apenas primeiro nome) para o filtro
     responsaveis_unicos = sorted(list(responsaveis_mapeamento.keys()))
-    
+
     # Debug: mostrar o mapeamento de nomes
     print("\n=== DEBUG: Mapeamento de nomes de responsáveis ===")
     for nome_norm, variantes in responsaveis_mapeamento.items():
@@ -340,54 +360,47 @@ def exibir_higienizacao_desempenho():
     # Preparar a mensagem de ajuda com as correções aplicadas
     correcoes_info = ", ".join([f"{k} → {v}" for k, v in correcoes_ortograficas.items() if k != v])
     mensagem_ajuda = f"Selecione o responsável pelo primeiro nome. Variações de sobrenome e algumas correções ortográficas ({correcoes_info}) foram unificadas."
-    
-    # Seleção de responsável usando o nome normalizado
-    filtro_responsaveis = st.multiselect(
-        "Filtrar por Responsável",
-        options=responsaveis_unicos,
-        default=[],
-        placeholder="Selecione um ou mais responsáveis",
-        key="filtro_responsaveis_higienizacao",
-        help=mensagem_ajuda
-    )
 
-    # --- Widgets de Filtro por Família --- 
-    col_filtros1, col_filtros2 = st.columns(2)
-    
-    with col_filtros1:
-        filtro_id_familia = st.text_input("ID da Família (exato)", key="filtro_id_familia_higienizacao")
-        filtro_id_familia = filtro_id_familia.strip() 
+    # Preencher o multiselect de responsáveis
+    with filtro_responsaveis.container():
+        filtro_responsaveis_valor = st.multiselect(
+            "Filtrar por Responsável",
+            options=responsaveis_unicos,
+            default=[],
+            placeholder="Selecione um ou mais responsáveis",
+            key="filtro_responsaveis_higienizacao",
+            help=mensagem_ajuda
+        )
 
-    with col_filtros2:
-        opcoes_familia = ["Todas"] 
-        if not df_conclusao_raw.empty:
-            df_conclusao_raw['nome_familia'] = df_conclusao_raw['nome_familia'].fillna('Sem Nome')
-            df_conclusao_raw['responsavel'] = df_conclusao_raw['responsavel'].fillna('Sem Responsável')
-            df_conclusao_raw['id_familia'] = df_conclusao_raw['id_familia'].astype(str) 
+    # --- Filtro por Família ---
+    opcoes_familia = ["Todas"] 
+    if not df_conclusao_raw.empty:
+        df_conclusao_raw['nome_familia'] = df_conclusao_raw['nome_familia'].fillna('Sem Nome')
+        df_conclusao_raw['responsavel'] = df_conclusao_raw['responsavel'].fillna('Sem Responsável')
+        df_conclusao_raw['id_familia'] = df_conclusao_raw['id_familia'].astype(str) 
 
-            df_conclusao_raw['opcao_selectbox'] = df_conclusao_raw.apply(
-                lambda row: f"{row['nome_familia']} \\\\ {row['responsavel']} \\\\ {row['id_familia']}", axis=1
-            )
-            lista_opcoes = sorted(df_conclusao_raw['opcao_selectbox'].unique().tolist())
-            opcoes_familia.extend(lista_opcoes)
-        
-        filtro_nome_familia_selecionado = st.selectbox(
+        df_conclusao_raw['opcao_selectbox'] = df_conclusao_raw.apply(
+            lambda row: f"{row['nome_familia']} \\\\ {row['responsavel']} \\\\ {row['id_familia']}", axis=1
+        )
+        lista_opcoes = sorted(df_conclusao_raw['opcao_selectbox'].unique().tolist())
+        opcoes_familia.extend(lista_opcoes)
+
+    # Preencher o selectbox de famílias
+    with filtro_nome_familia_selecionado.container():
+        filtro_nome_familia_selecionado_valor = st.selectbox(
             "Nome da Família (\\ Responsável \\ ID)", 
             options=opcoes_familia, 
             key="filtro_nome_familia_higienizacao"
         )
 
-    st.markdown('</div>', unsafe_allow_html=True) # Fecha filtro-section
-    st.markdown('</div>', unsafe_allow_html=True) # Fecha filtros-container
-
     # --- Aplicar Filtros por Família (afeta df_conclusao_raw e df_cartorio) --- 
     id_familia_filtrar = None
-    
+
     if filtro_id_familia:
         id_familia_filtrar = filtro_id_familia
         st.info(f"Filtrando pelo ID da Família: {id_familia_filtrar}")
-    elif filtro_nome_familia_selecionado != "Todas":
-        match = re.search(r'\\\\ ([^\\\\]+)$', filtro_nome_familia_selecionado)
+    elif filtro_nome_familia_selecionado_valor != "Todas":
+        match = re.search(r'\\\\ ([^\\\\]+)$', filtro_nome_familia_selecionado_valor)
         if match:
             id_familia_filtrar = match.group(1).strip()
             st.info(f"Filtrando pela família selecionada (ID: {id_familia_filtrar})")
@@ -402,35 +415,35 @@ def exibir_higienizacao_desempenho():
         if df_conclusao_raw.empty:
              st.warning(f"Nenhum dado de higienização encontrado para a família ID: {id_familia_filtrar} no período selecionado.")
              if 'df_bitrix_agg' in locals(): df_bitrix_agg = pd.DataFrame(columns=df_bitrix_agg.columns if hasattr(df_bitrix_agg, 'columns') else [])
-    
+
     # --- Aplicar Filtro de Data de Venda ---
     if not df_cartorio.empty and 'DATA_VENDA_FAMILIA' in df_cartorio.columns:
-        if ano_selecionado != "Todos os anos":
+        if ano_selecionado_valor != "Todos os anos":
             # Converter para inteiro para comparar com o ano extraído das datas
-            ano_filtro = int(ano_selecionado)
+            ano_filtro = int(ano_selecionado_valor)
             
             # Filtrar df_cartorio apenas pelo ano selecionado
             df_cartorio = df_cartorio[df_cartorio['DATA_VENDA_FAMILIA'].dt.year == ano_filtro].copy()
             
             if df_cartorio.empty:
-                st.warning(f"Nenhum dado encontrado para o ano selecionado: {ano_selecionado}")
+                st.warning(f"Nenhum dado encontrado para o ano selecionado: {ano_selecionado_valor}")
             else:
-                st.success(f"Filtro aplicado: Mostrando dados do ano {ano_selecionado} ({len(df_cartorio)} registros)")
+                st.success(f"Filtro aplicado: Mostrando dados do ano {ano_selecionado_valor} ({len(df_cartorio)} registros)")
         else:
             # Se "Todos os anos" for selecionado, não aplicar filtro de ano
             st.info("Mostrando dados de todos os anos disponíveis")
             
     # --- Aplicar Filtro de Responsável ---
-    if filtro_responsaveis:
+    if filtro_responsaveis_valor:
         # Expandir os nomes normalizados para incluir todas as variações
         nomes_expandidos = []
-        for nome_norm in filtro_responsaveis:
+        for nome_norm in filtro_responsaveis_valor:
             if nome_norm in responsaveis_mapeamento:
                 nomes_expandidos.extend(responsaveis_mapeamento[nome_norm])
         
         # Debug: mostrar os nomes expandidos
         print("\n=== DEBUG: Nomes expandidos para filtro ===")
-        print(f"Nomes normalizados selecionados: {filtro_responsaveis}")
+        print(f"Nomes normalizados selecionados: {filtro_responsaveis_valor}")
         print(f"Nomes expandidos para filtro: {nomes_expandidos}")
         print("=== FIM DEBUG ===\n")
         
@@ -443,7 +456,7 @@ def exibir_higienizacao_desempenho():
             df_cartorio = df_cartorio[df_cartorio['ASSIGNED_BY_NAME'].isin(nomes_expandidos)].copy()
         
         if df_conclusao_raw.empty and df_cartorio.empty:
-            nomes_str = ', '.join(filtro_responsaveis)
+            nomes_str = ', '.join(filtro_responsaveis_valor)
             st.warning(f"Nenhum dado encontrado para o(s) responsável(eis) selecionado(s): {nomes_str}")
 
     # --- MOVER PROCESSAMENTO DE DADOS PARA ANTES DAS FAIXAS ---

@@ -205,25 +205,54 @@ def exibir_producao_time_doutora(df_cartorio_original):
 
     # --- Filtros ---
     st.subheader("🗓️ Filtros para Análise de Produção")
-    col_data1, col_data2 = st.columns(2)
-    with col_data1:
-        # Usar um período maior por padrão para capturar mais dados de teste
-        data_inicio_analise = st.date_input("Data Inicial", value=datetime.now().date() - pd.Timedelta(days=30), key="doutora_data_inicio")
-    with col_data2:
-        data_fim_analise = st.date_input("Data Final", value=datetime.now().date(), key="doutora_data_fim")
 
-    if data_inicio_analise > data_fim_analise:
-        st.warning("A data inicial não pode ser posterior à data final.")
-        return
+    # Usar expander com filtros-container como padrão do projeto
+    with st.expander("Filtros", expanded=True):
+        st.markdown('<div class="filtros-container">', unsafe_allow_html=True)
+        
+        # Layout: Linha 1 (Datas), Linha 2 (Usuário), Linha 3 (Botão)
+        col_data1, col_data2 = st.columns(2)
+        col_usuario = st.columns(1)[0]  # Uma coluna para usuário
+        col_btn, col_empty = st.columns([0.3, 0.7])  # Botão na esquerda e maior
+        
+        with col_data1:
+            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+            st.markdown('<label class="filtro-label">Data Inicial</label>', unsafe_allow_html=True)
+            data_inicio_analise = st.date_input("", value=datetime.now().date() - pd.Timedelta(days=30), key="doutora_data_inicio", label_visibility="collapsed")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        with col_data2:
+            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+            st.markdown('<label class="filtro-label">Data Final</label>', unsafe_allow_html=True)
+            data_fim_analise = st.date_input("", value=datetime.now().date(), key="doutora_data_fim", label_visibility="collapsed")
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    # Filtro por usuário do Time Doutora
-    nomes_time_doutora_para_filtro = sorted([mapa_nomes_usuarios_global.get(id_user, f"ID {id_user}") for id_user in IDS_USUARIOS_TIME_DOUTORA])
-    usuario_selecionado_nome = st.selectbox(
-        "Filtrar por Usuário do Time Doutora",
-        options=['Todos os Usuários'] + nomes_time_doutora_para_filtro,
-        index=0,
-        key="doutora_usuario_select"
-    )
+        if data_inicio_analise > data_fim_analise:
+            st.warning("A data inicial não pode ser posterior à data final.")
+            return
+
+        with col_usuario:
+            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+            st.markdown('<label class="filtro-label">Usuário do Time Doutora</label>', unsafe_allow_html=True)
+            # Filtro por usuário do Time Doutora
+            nomes_time_doutora_para_filtro = sorted([mapa_nomes_usuarios_global.get(id_user, f"ID {id_user}") for id_user in IDS_USUARIOS_TIME_DOUTORA])
+            usuario_selecionado_nome = st.selectbox(
+                "",  # Label vazio pois usamos HTML
+                options=['Todos os Usuários'] + nomes_time_doutora_para_filtro,
+                index=0,
+                key="doutora_usuario_select",
+                label_visibility="collapsed"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col_btn:
+            st.markdown('<div class="espacamento-cartorio espacamento-cartorio--button">', unsafe_allow_html=True)
+            # Função simples para resetar filtros via rerun (pode ser melhorada com session_state)
+            if st.button("Resetar", help="Resetar filtros para valores padrão", use_container_width=True):
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)  # Fecha filtros-container
 
     st.info(f"""
     **Filtros Aplicados:**
@@ -410,14 +439,76 @@ def exibir_producao_time_doutora(df_cartorio_original):
     total_montagens_realizadas = len(df_montagens_concluidas)
     total_solicitacoes_realizadas = len(df_solicitacoes_realizadas)
 
-    # MÉTRICAS SIMPLES E CLARAS
-    col_metric1, col_metric2 = st.columns(2)
-    with col_metric1:
-        st.metric("🎯 Montagens Realizadas", f"{total_montagens_realizadas}", 
-                 help="Montagens concluídas (saiu de MONTAGEM→SOLICITAR ou saiu de DEVOLVIDO→SOLICITAR)")
-    with col_metric2:
-        st.metric("📨 Solicitações Realizadas", f"{total_solicitacoes_realizadas}",
-                 help="Total de solicitações ao cartório (todas as origens)")
+    # Criar métricas customizadas com HTML puro
+    st.markdown(f"""
+    <style>
+    .metrica-custom-doutora {{
+        background: #F8F9FA;
+        border: 2px solid #DEE2E6;
+        border-radius: 6px;
+        padding: 16px;
+        text-align: center;
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }}
+    
+    .metrica-custom-doutora:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: #ADB5BD;
+    }}
+    
+    .metrica-custom-doutora .label {{
+        color: #6C757D;
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+        line-height: 1.2;
+    }}
+    
+    .metrica-custom-doutora .valor {{
+        color: #495057;
+        font-weight: 700;
+        font-size: 30px;
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }}
+    
+    .metrica-custom-doutora .help {{
+        font-size: 10px;
+        color: #6C757D;
+        margin-top: 4px;
+        font-style: italic;
+    }}
+    
+    .metricas-container-doutora {{
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }}
+    </style>
+    
+    <div class="metricas-container-doutora">
+        <div class="metrica-custom-doutora">
+            <div class="label">🎯 Montagens Realizadas</div>
+            <div class="valor">{total_montagens_realizadas:,}</div>
+            <div class="help">Montagens concluídas (saiu de MONTAGEM→SOLICITAR ou saiu de DEVOLVIDO→SOLICITAR)</div>
+        </div>
+        <div class="metrica-custom-doutora">
+            <div class="label">📨 Solicitações Realizadas</div>
+            <div class="valor">{total_solicitacoes_realizadas:,}</div>
+            <div class="help">Total de solicitações ao cartório (todas as origens)</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
 

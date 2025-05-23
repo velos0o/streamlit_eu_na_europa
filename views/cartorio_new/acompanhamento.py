@@ -139,23 +139,17 @@ def exibir_acompanhamento(df_cartorio):
 
     # --- Filtros --- 
     with st.expander("Filtros", expanded=True): 
-        st.markdown('<div class="filtros-container">', unsafe_allow_html=True)
-        
         # Layout: Linha 1 (Família, Data), Linha 2 (Percentual, Responsável), Linha 3 (Botão Limpar)
         col_l1_familia, col_l1_data = st.columns([0.5, 0.5])
         col_l2_perc, col_l2_resp = st.columns([0.5, 0.5])  # Nova linha com colunas para percentual e responsável
         col_l3_empty, col_l3_btn = st.columns([0.8, 0.2])  # Renomear para l3 (linha 3)
         
         with col_l1_familia:
-            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
-            st.markdown('<label class="filtro-label">Buscar Família/Contrato</label>', unsafe_allow_html=True)
             st.text_input(
-                "",  # Label vazio pois usamos HTML
+                "Buscar Família/Contrato:",
                 placeholder="Digite parte do nome...",
-                key=KEY_BUSCA_FAMILIA,
-                label_visibility="collapsed"
+                key=KEY_BUSCA_FAMILIA
             )
-            st.markdown('</div>', unsafe_allow_html=True)
 
             # --- Sugestões para Busca de Família --- 
             sugestoes_familia = []
@@ -176,20 +170,17 @@ def exibir_acompanhamento(df_cartorio):
                     st.caption("Nenhuma família/contrato encontrado.")
 
         with col_l1_data:
-            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
-            st.markdown('<label class="filtro-label">Data de Venda</label>', unsafe_allow_html=True)
+            st.markdown("**Data de Venda**")
             # Usar colunas internas para alinhar De/Até
             date_col1, date_col2 = st.columns(2)
             with date_col1:
-                st.date_input("De", key=KEY_DATA_INICIO, min_value=min_date_default, max_value=max_date_default, label_visibility="collapsed")
+                st.date_input("De:", key=KEY_DATA_INICIO, min_value=min_date_default, max_value=max_date_default, label_visibility="collapsed")
             with date_col2:
-                st.date_input("Até", key=KEY_DATA_FIM, min_value=min_date_default, max_value=max_date_default, label_visibility="collapsed")
+                st.date_input("Até:", key=KEY_DATA_FIM, min_value=min_date_default, max_value=max_date_default, label_visibility="collapsed")
             if st.session_state[KEY_DATA_INICIO] > st.session_state[KEY_DATA_FIM]:
                  st.warning("Data 'De' não pode ser maior que a data 'Até'.")
-            st.markdown('</div>', unsafe_allow_html=True)
 
         with col_l2_perc:
-            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
             opcoes_percentual = [
                 "0% - 9%", 
                 "10% - 30%",
@@ -200,34 +191,27 @@ def exibir_acompanhamento(df_cartorio):
                 "100%",       
             ]
             st.multiselect(
-                "Filtrar por Faixa de % Conclusão",
+                "Filtrar por Faixa de % Conclusão:",
                 options=opcoes_percentual,
                 placeholder="Selecione a(s) faixa(s)", # Placeholder melhorado
                 key=KEY_PERCENTUAL 
             )
-            st.markdown('</div>', unsafe_allow_html=True)
         
         with col_l2_resp:
-            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
             # Obter lista de responsáveis únicos para o filtro
             responsaveis_unicos = sorted(df_agrupado['responsavel'].unique().tolist())
             # Remover valores vazios ou nulos se existirem
             responsaveis_unicos = [resp for resp in responsaveis_unicos if resp and str(resp).strip() != '']
             
             st.multiselect(
-                "Filtrar por Responsável",
+                "Filtrar por Responsável:",
                 options=responsaveis_unicos,
                 placeholder="Selecione um ou mais responsáveis",
                 key=KEY_RESPONSAVEL
             )
-            st.markdown('</div>', unsafe_allow_html=True)
             
         with col_l3_btn:
-            st.markdown('<div class="espacamento-cartorio espacamento-cartorio--button">', unsafe_allow_html=True)
             st.button("Limpar", on_click=clear_filters, help="Limpar todos os filtros")
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-        st.markdown('</div>', unsafe_allow_html=True)  # Fecha filtros-container
             
     # --- Fim Filtros ---
     
@@ -302,22 +286,91 @@ def exibir_acompanhamento(df_cartorio):
     percentual_conclusao_filtrado = (concluidas_filtrado / total_certidoes_filtrado * 100) if total_certidoes_filtrado > 0 else 0
     
     # --- Exibir Métricas Macro DIN MICAS ---
-    st.markdown('<div class="metricas-grid metricas-grid--neutral">', unsafe_allow_html=True)
     
-    col1, col2, col3, col4, col5 = st.columns(5) 
+    # Criar métricas customizadas com HTML puro
+    st.markdown(f"""
+    <style>
+    .metrica-custom-acomp {{
+        background: #F8F9FA;
+        border: 2px solid #DEE2E6;
+        border-radius: 6px;
+        padding: 16px;
+        text-align: center;
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }}
     
-    # Usar st.metric() padrão para manter consistência visual (cinza)
-    col1.metric("Famílias", f"{total_familias_filtrado:,}")
-    col2.metric("Certidões", f"{total_certidoes_filtrado:,}")
-    col3.metric("Requerentes", f"{total_requerentes_filtrado:,}", 
-               help=f"Contagem de IDs únicos ({coluna_id_requerente}) das famílias filtradas.")
-    col4.metric("Concluídas", f"{concluidas_filtrado:,}")
-    col5.metric("% Conclusão", f"{percentual_conclusao_filtrado:.1f}%",
-               help="Percentual calculado sobre as certidões das famílias filtradas.")
+    .metrica-custom-acomp:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: #ADB5BD;
+    }}
     
-    st.markdown('</div>', unsafe_allow_html=True)  # Fecha metricas-grid
-    st.markdown('<div class="divisor-cartorio"></div>', unsafe_allow_html=True) # Divisor com classe SCSS
-
+    .metrica-custom-acomp .label {{
+        color: #6C757D;
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+        line-height: 1.2;
+    }}
+    
+    .metrica-custom-acomp .valor {{
+        color: #495057;
+        font-weight: 700;
+        font-size: 30px;
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }}
+    
+    .metricas-container-acomp {{
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+    }}
+    
+    .metrica-help {{
+        font-size: 10px;
+        color: #6C757D;
+        margin-top: 4px;
+        font-style: italic;
+    }}
+    </style>
+    
+    <div class="metricas-container-acomp">
+        <div class="metrica-custom-acomp">
+            <div class="label">Famílias</div>
+            <div class="valor">{total_familias_filtrado:,}</div>
+        </div>
+        <div class="metrica-custom-acomp">
+            <div class="label">Certidões</div>
+            <div class="valor">{total_certidoes_filtrado:,}</div>
+        </div>
+        <div class="metrica-custom-acomp">
+            <div class="label">Requerentes</div>
+            <div class="valor">{total_requerentes_filtrado:,}</div>
+            <div class="metrica-help">IDs únicos ({coluna_id_requerente})</div>
+        </div>
+        <div class="metrica-custom-acomp">
+            <div class="label">Concluídas</div>
+            <div class="valor">{concluidas_filtrado:,}</div>
+        </div>
+        <div class="metrica-custom-acomp">
+            <div class="label">% Conclusão</div>
+            <div class="valor">{percentual_conclusao_filtrado:.1f}%</div>
+            <div class="metrica-help">Sobre certidões filtradas</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("---")  # Divisor simples do Streamlit
 
     # --- Preparação da Tabela Final ---
     st.markdown("#### Detalhamento por Família")

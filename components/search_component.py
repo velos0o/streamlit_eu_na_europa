@@ -307,6 +307,9 @@ def show_search_box():
     Exibe uma caixa de pesquisa avançada para navegar pelo relatório.
     Inclui informações sobre submódulos específicos nos resultados.
     """
+    # Inicializar o módulo de busca se ainda não foi inicializado
+    init_search_module()
+    
     with st.sidebar:
         st.markdown("### 🔍 Buscar no Relatório")
         query = st.text_input("Digite o que procura", key="search_query", placeholder="Ex: certidões entregues, produtividade...")
@@ -463,14 +466,20 @@ def auto_build_search_index():
 # Adicionar função para inicialização do módulo
 def init_search_module():
     """Inicializa o módulo de busca."""
-    if st.session_state.get('search_index_initialized') != True:
-        # Executar apenas uma vez por sessão
-        st.session_state['search_index_initialized'] = True
-        try:
-            # Atualizar o índice de busca com termos dos arquivos
-            auto_build_search_index()
-        except Exception as e:
-            print(f"Erro ao inicializar módulo de busca: {str(e)}")
+    try:
+        # Verificar se session_state está disponível antes de usar
+        if hasattr(st, 'session_state') and st.session_state.get('search_index_initialized') != True:
+            # Executar apenas uma vez por sessão
+            st.session_state['search_index_initialized'] = True
+            try:
+                # Atualizar o índice de busca com termos dos arquivos
+                auto_build_search_index()
+            except Exception as e:
+                print(f"Erro ao inicializar módulo de busca: {str(e)}")
+    except Exception as e:
+        # Silenciosamente ignora erros de inicialização se session_state não estiver pronto
+        print(f"Módulo de busca será inicializado posteriormente: {str(e)}")
 
+# REMOVIDO: Inicialização automática que causava erro
 # Inicializar o módulo quando importado
-init_search_module() 
+# init_search_module() 
