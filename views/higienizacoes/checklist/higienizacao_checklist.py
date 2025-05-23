@@ -639,4 +639,133 @@ def show_higienizacao_checklist():
         except Exception as e:
             st.error(f"Erro ao gerar arquivo CSV para download: {str(e)}")
     else:
-        st.info("Não há dados para exportar com os filtros atuais.") 
+        st.info("Não há dados para exportar com os filtros atuais.")
+    
+    # Gráfico de Desempenho Diário de Conclusões (posicionado após a tabela)
+    st.subheader("📊 Desempenho Diário de Conclusões")
+    
+    # Verificar se temos dados válidos de data para criar o gráfico
+    if data_valida and not df_filtrado.empty and 'data' in df_filtrado.columns:
+        try:
+            # Definir quais status consideramos como "conclusões"
+            status_conclusao = ["CARDS VALIDADOS", "HIGIENIZAÇÃO COMPLETA", "CARDS CRIADOS BITRIX", "ENVIADO"]
+            
+            # Filtrar apenas registros com status de conclusão
+            df_conclusoes = df_filtrado[df_filtrado["status"].isin(status_conclusao)].copy()
+            
+            if not df_conclusoes.empty:
+                # Converter data para apenas a data (sem hora) para agrupamento diário
+                df_conclusoes['data_apenas'] = df_conclusoes['data'].dt.date
+                
+                # Agrupar por data e status, contando ocorrências
+                df_agrupado = df_conclusoes.groupby(['data_apenas', 'status']).size().reset_index(name='quantidade')
+                
+                # Calcular total por dia para mostrar números no topo das barras
+                totais_por_dia = df_agrupado.groupby('data_apenas')['quantidade'].sum().reset_index()
+                totais_por_dia.columns = ['data_apenas', 'total_dia']
+                
+                # Criar gráfico de barras empilhadas por data e status
+                if not df_agrupado.empty:
+                    fig = px.bar(
+                        df_agrupado, 
+                        x='data_apenas', 
+                        y='quantidade', 
+                        color='status',
+                        title="Conclusões por Dia (Apenas Dias com Produção)",
+                        labels={
+                            'data_apenas': 'Data',
+                            'quantidade': 'Quantidade de Conclusões',
+                            'status': 'Status'
+                        },
+                        color_discrete_map=status_colors,
+                        height=450
+                    )
+                    
+                    # Personalizar layout do gráfico
+                    fig.update_layout(
+                        xaxis_title="",
+                        yaxis_title="Quantidade de Conclusões",
+                        legend_title="Status",
+                        xaxis=dict(
+                            tickangle=45,
+                            tickformat='%d/%m',  # Formato dia/mês
+                            dtick='D1'  # Mostrar todos os dias
+                        ),
+                        showlegend=True,
+                        hovermode='x unified',
+                        bargap=0.1
+                    )
+                    
+                    # Adicionar números no topo das barras empilhadas
+                    for data_dia in totais_por_dia['data_apenas']:
+                        total_dia = totais_por_dia[totais_por_dia['data_apenas'] == data_dia]['total_dia'].iloc[0]
+                        
+                        # Adicionar anotação com o total no topo da barra
+                        fig.add_annotation(
+                            x=data_dia,
+                            y=total_dia + (total_dia * 0.05),  # Posição ligeiramente acima da barra
+                            text=str(total_dia),
+                            showarrow=False,
+                            font=dict(size=16, color="black", family="Arial Black"),
+                            bgcolor="rgba(255,255,255,0.8)",
+                            bordercolor="rgba(0,0,0,0.2)",
+                            borderwidth=1
+                        )
+                    
+                    # Exibir o gráfico
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Adicionar informações adicionais sobre o gráfico
+                    col_info1, col_info2, col_info3 = st.columns(3)
+                    
+                    with col_info1:
+                        total_conclusoes = df_conclusoes.shape[0]
+                        st.metric("Total de Conclusões", total_conclusoes)
+                    
+                    with col_info2:
+                        # Calcular média diária (apenas dias com produção)
+                        dias_com_producao = len(totais_por_dia)
+                        media_diaria = total_conclusoes / dias_com_producao if dias_com_producao > 0 else 0
+                        st.metric("Média Diária", f"{media_diaria:.1f}")
+                    
+                    with col_info3:
+                        # Encontrar o dia com mais conclusões
+                        if not totais_por_dia.empty:
+                            melhor_dia_idx = totais_por_dia['total_dia'].idxmax()
+                            melhor_dia = totais_por_dia.loc[melhor_dia_idx, 'data_apenas']
+                            max_conclusoes = totais_por_dia.loc[melhor_dia_idx, 'total_dia']
+                            st.metric("Melhor Dia", f"{melhor_dia.strftime('%d/%m')}", f"{max_conclusoes} conclusões")
+                        else:
+                            st.metric("Melhor Dia", "N/A")
+                    
+                    # Adicionar informação sobre filtros aplicados
+                    st.caption(f"📈 Exibindo apenas os {dias_com_producao} dias com produção no período filtrado")
+                    
+                else:
+                    st.warning("Não há dados de conclusões agrupados para exibir no gráfico.")
+            else:
+                st.info("Não há registros com status de conclusão no período filtrado.")
+                st.caption(f"Status considerados como conclusão: {', '.join(status_conclusao)}")
+        
+        except Exception as e:
+            st.error(f"Erro ao criar gráfico de desempenho diário: {str(e)}")
+            # Mostrar informação de debug se necessário
+            if st.checkbox("Mostrar detalhes do erro", key="debug_grafico"):
+                st.code(str(e))
+                st.write("Dados disponíveis:")
+                st.write(f"- Dados válidos de data: {data_valida}")
+                st.write(f"- Registros no DataFrame filtrado: {len(df_filtrado)}")
+                if 'data' in df_filtrado.columns:
+                    st.write(f"- Tipo da coluna data: {df_filtrado['data'].dtype}")
+                    st.write(f"- Valores únicos de status: {df_filtrado['status'].unique().tolist()}")
+    
+    else:
+        # Mostrar mensagem explicativa quando não é possível criar o gráfico
+        if not data_valida:
+            st.warning("⚠️ Gráfico de desempenho diário não disponível: dados de data inválidos.")
+        elif df_filtrado.empty:
+            st.warning("⚠️ Gráfico de desempenho diário não disponível: nenhum registro após filtros.")
+        else:
+            st.warning("⚠️ Gráfico de desempenho diário não disponível: coluna 'data' não encontrada.")
+        
+        st.info("💡 **Dica**: Certifique-se de que há dados com datas válidas para visualizar o desempenho diário.") 

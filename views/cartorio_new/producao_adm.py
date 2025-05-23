@@ -465,17 +465,20 @@ def exibir_producao_adm(df_cartorio_original):
         # Agrupar por data para gráfico simplificado com total diário
         df_resol_por_dia = df_para_grafico.groupby('Data Resolução').size().reset_index(name='Resoluções')
         
+        # Converter Data Resolução para string formatada para evitar problemas com o tipo temporal
+        df_resol_por_dia['Data Formatada'] = pd.to_datetime(df_resol_por_dia['Data Resolução']).dt.strftime('%d/%m/%Y')
+        
         # Importar Altair para gráficos
         import altair as alt
         
         # Criar gráfico de barras com linha de tendência
         barras = alt.Chart(df_resol_por_dia).mark_bar(
             color='#4CAF50',
-            size=40  # Barras ainda mais largas
+            size=60  # Barras ainda mais largas
         ).encode(
-            x=alt.X('Data Resolução:T', title='Data', axis=alt.Axis(format='%d/%m/%Y')),
+            x=alt.X('Data Formatada:O', title='Data', sort=alt.SortField('Data Resolução')),
             y=alt.Y('Resoluções:Q', title='Quantidade de Resoluções'),
-            tooltip=['Data Resolução:T', 'Resoluções:Q']
+            tooltip=['Data Formatada:O', 'Resoluções:Q']
         )
         
         # Adicionar números em cima das barras
@@ -483,29 +486,17 @@ def exibir_producao_adm(df_cartorio_original):
             align='center',
             baseline='bottom',
             dy=-5,  # Deslocamento vertical (acima da barra)
-            fontSize=14,
+            fontSize=16,
             fontWeight='bold'
         ).encode(
-            x='Data Resolução:T',
+            x='Data Formatada:O',
             y='Resoluções:Q',
             text='Resoluções:Q'
         )
         
-        # Adicionar linha de tendência
-        linha_tendencia = alt.Chart(df_resol_por_dia).transform_regression(
-            'Data Resolução', 'Resoluções'
-        ).mark_line(
-            color='red', 
-            strokeWidth=3,
-            strokeDash=[5, 5]
-        ).encode(
-            x='Data Resolução:T',
-            y='Resoluções:Q'
-        )
-        
-        # Combinar gráficos (barras + texto + linha de tendência)
-        chart = (barras + texto + linha_tendencia).properties(
-            title='Total de Resoluções Diárias',
+        # Combinar gráficos (apenas barras + texto)
+        chart = (barras + texto).properties(
+            title='Total de Resoluções Diárias (Todos os Dias do Período)',
             height=300
         ).configure_title(
             fontSize=16
