@@ -14,7 +14,11 @@ def hex_to_rgba(h, alpha=0.1):
 
 def display_main_charts(df):
     """Exibe os gráficos principais (status, origem, tendência)."""
-    theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
+    try:
+        theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
+    except:
+        theme_mode = "light"
+    
     theme = THEME[theme_mode]
     
     st.markdown('<div class="tw-fade-in" style="animation-delay: 0.1s;">', unsafe_allow_html=True)
@@ -101,7 +105,11 @@ def display_main_charts(df):
 
 def display_distribution_charts(df):
     """Exibe os gráficos de distribuição (departamento, responsável)."""
-    theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
+    try:
+        theme_mode = "dark" if st.session_state.get("dark_mode", False) else "light"
+    except:
+        theme_mode = "light"
+    
     theme = THEME[theme_mode]
 
     st.markdown('<div class="tw-fade-in" style="animation-delay: 0.15s;">', unsafe_allow_html=True)
