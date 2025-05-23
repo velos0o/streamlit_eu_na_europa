@@ -27,6 +27,66 @@ ESTAGIOS_DEVOLUCAO_ADM = [
     'APENAS ASS. REQ CLIENTE P/MONTAGEM'
 ]
 
+# Mapeamento de estágios para campos de data correspondentes
+MAPEAMENTO_ESTAGIOS_CAMPOS_DATA = {
+    'DEVOLUÇÃO ADM': {
+        'campo_data_entrada': 'UF_CRM_34_DATA_DEVOLUCAO_ADM',
+        'campo_responsavel_entrada': 'UF_CRM_34_RESPONSAVEL_DEVOLUCAO_ADM',
+        'estagios_resolucao': [
+            'UF_CRM_34_DATA_ASSINATURA_REQUERIMENTO',
+            'UF_CRM_34_DATA_MONTAGEM_REQUERIMENTO', 
+            'UF_CRM_34_DATA_CERTIDAO_EMITIDA',
+            'UF_CRM_34_DATA_CERTIDAO_ENTREGUE'
+        ],
+        'responsaveis_resolucao': [
+            'UF_CRM_34_RESPONSAVEL_ASSINATURA_REQUERIMENTO',
+            'UF_CRM_34_RESPONSAVEL_MONTAGEM_REQUERIMENTO',
+            'UF_CRM_34_RESPONSAVEL_CERTIDAO_EMITIDA', 
+            'UF_CRM_34_RESPONSAVEL_DATA_CERTIDAO_ENTREGUE'
+        ]
+    },
+    'DEVOLVIDO REQUERIMENTO': {
+        'campo_data_entrada': 'UF_CRM_34_DATA_DEVOLVIDO_REQUERIMENTO',
+        'campo_responsavel_entrada': None,  # Não tem campo específico
+        'estagios_resolucao': [
+            'UF_CRM_34_DATA_ASSINATURA_REQUERIMENTO',
+            'UF_CRM_34_DATA_MONTAGEM_REQUERIMENTO',
+            'UF_CRM_34_DATA_CERTIDAO_EMITIDA'
+        ],
+        'responsaveis_resolucao': [
+            'UF_CRM_34_RESPONSAVEL_ASSINATURA_REQUERIMENTO',
+            'UF_CRM_34_RESPONSAVEL_MONTAGEM_REQUERIMENTO',
+            'UF_CRM_34_RESPONSAVEL_CERTIDAO_EMITIDA'
+        ]
+    },
+    'DEVOLUTIVA BUSCA - CRC': {
+        'campo_data_entrada': 'UF_CRM_34_DATA_DEVOLUITIVA_BUSCA_CRC',
+        'campo_responsavel_entrada': 'UF_CRM_34_RESPONSAVEL_DEVOLUITIVA_BUSCA_CRC',
+        'estagios_resolucao': [
+            'UF_CRM_34_DATA_MONTAGEM_REQUERIMENTO',
+            'UF_CRM_34_DATA_ASSINATURA_REQUERIMENTO',
+            'UF_CRM_34_DATA_CERTIDAO_EMITIDA'
+        ],
+        'responsaveis_resolucao': [
+            'UF_CRM_34_RESPONSAVEL_MONTAGEM_REQUERIMENTO',
+            'UF_CRM_34_RESPONSAVEL_ASSINATURA_REQUERIMENTO',
+            'UF_CRM_34_RESPONSAVEL_CERTIDAO_EMITIDA'
+        ]
+    },
+    'APENAS ASS. REQ CLIENTE P/MONTAGEM': {
+        'campo_data_entrada': None,  # Não tem campo específico
+        'campo_responsavel_entrada': None,
+        'estagios_resolucao': [
+            'UF_CRM_34_DATA_ASSINATURA_REQUERIMENTO',
+            'UF_CRM_34_DATA_MONTAGEM_REQUERIMENTO'
+        ],
+        'responsaveis_resolucao': [
+            'UF_CRM_34_RESPONSAVEL_ASSINATURA_REQUERIMENTO',
+            'UF_CRM_34_RESPONSAVEL_MONTAGEM_REQUERIMENTO'
+        ]
+    }
+}
+
 def exibir_producao_adm(df_cartorio_original):
     st.markdown('<div class="cartorio-container cartorio-container--info">', unsafe_allow_html=True)
     st.title("Dashboard de Pendências ADM")
@@ -347,10 +407,16 @@ def exibir_producao_adm(df_cartorio_original):
     df_consolidado_adm = pd.DataFrame(index=nomes_adms_relevantes_para_filtro_bitrix if nomes_adms_relevantes_para_filtro_bitrix else list(mapa_usuarios.values()))
     df_consolidado_adm.index.name = 'ADM de Pasta'
     df_consolidado_adm['Pendências Ativas'] = df_consolidado_adm.index.map(contagem_ativas_por_adm).fillna(0).astype(int)
-    df_consolidado_adm['Pendências Resolvidas'] = 0
-    df_consolidado_adm['Tempo Médio de Resolução (dias)'] = 0
     
-    # 5. Calcular resoluções e tempo médio por ADM
+    # Colunas para método Supabase
+    df_consolidado_adm['Resolvidas (Supabase)'] = 0
+    df_consolidado_adm['Tempo Médio Supabase (dias)'] = 0
+    
+    # Colunas para método Bitrix  
+    df_consolidado_adm['Resolvidas (Bitrix)'] = 0
+    df_consolidado_adm['Tempo Médio Bitrix (dias)'] = 0
+    
+    # 5. Calcular resoluções e tempo médio por ADM - MÉTODO SUPABASE
     if not df_todas_pendencias_resolvidas.empty and 'ID Responsável pela Resolução' in df_todas_pendencias_resolvidas.columns:
         # Garantir que temos a coluna de Responsável mapeada para nomes
         if 'Responsável pela Resolução' not in df_todas_pendencias_resolvidas.columns:
@@ -364,86 +430,152 @@ def exibir_producao_adm(df_cartorio_original):
         if not df_resolvidas_adms_relevantes.empty:
             # Contagem de resoluções por ADM
             contagem_resolvidas_por_adm = df_resolvidas_adms_relevantes.groupby('Responsável pela Resolução').size()
-            df_consolidado_adm['Pendências Resolvidas'] = df_consolidado_adm.index.map(contagem_resolvidas_por_adm).fillna(0).astype(int)
+            df_consolidado_adm['Resolvidas (Supabase)'] = df_consolidado_adm.index.map(contagem_resolvidas_por_adm).fillna(0).astype(int)
             
             # Tempo médio de resolução por ADM
             if 'Tempo para Resolução (dias)' in df_resolvidas_adms_relevantes.columns:
                 tempo_medio_por_adm = df_resolvidas_adms_relevantes.groupby('Responsável pela Resolução')['Tempo para Resolução (dias)'].mean()
-                df_consolidado_adm['Tempo Médio de Resolução (dias)'] = df_consolidado_adm.index.map(tempo_medio_por_adm).fillna(0).round(1)
+                df_consolidado_adm['Tempo Médio Supabase (dias)'] = df_consolidado_adm.index.map(tempo_medio_por_adm).fillna(0).round(1)
     
-    # 6. Calcular a Taxa de Conversão (novo)
-    df_consolidado_adm['Total de Pendências'] = df_consolidado_adm['Pendências Ativas'] + df_consolidado_adm['Pendências Resolvidas']
-    df_consolidado_adm['Taxa de Conversão (%)'] = (df_consolidado_adm['Pendências Resolvidas'] / df_consolidado_adm['Total de Pendências'] * 100).round(1)
-    # Substituir NaN (quando Total de Pendências é zero) por 0
-    df_consolidado_adm['Taxa de Conversão (%)'] = df_consolidado_adm['Taxa de Conversão (%)'].fillna(0)
+    # 6. Calcular resoluções e tempo médio por ADM - MÉTODO BITRIX (NOVO)
+    # Primeiro, executar a análise por campos do Bitrix se ainda não foi executada
+    if 'resultados_bitrix' not in locals():
+        resultados_bitrix = analisar_pendencias_por_campos_bitrix(
+            df_bitrix=df,
+            mapa_usuarios=mapa_usuarios,
+            col_adm_pasta_bitrix=col_adm_pasta_bitrix,
+            filtro_adm='Todos os ADMs'  # Para consolidado por ADM, analisar todos
+        )
     
-    # 7. Ordenar e exibir o dataframe consolidado
-    df_consolidado_adm = df_consolidado_adm.sort_values(by=['Pendências Ativas', 'Pendências Resolvidas'], ascending=[False, False])
+    # Consolidar dados do método Bitrix por ADM
+    dados_bitrix_por_adm = {}
     
-    # Reorganizar colunas e remover coluna auxiliar
-    colunas_ordem_para_exibir = [
-        'Pendências Ativas', 
-        'Pendências Resolvidas', 
-        'Taxa de Conversão (%)',
-        'Tempo Médio de Resolução (dias)'
+    for tipo_pendencia, resultado in resultados_bitrix.items():
+        for detalhe in resultado['detalhes_resolvidas']:
+            responsavel = detalhe['Responsavel_Resolucao']
+            if responsavel not in dados_bitrix_por_adm:
+                dados_bitrix_por_adm[responsavel] = {
+                    'total_resolvidas': 0,
+                    'tempos_resolucao': []
+                }
+            
+            dados_bitrix_por_adm[responsavel]['total_resolvidas'] += 1
+            if detalhe['Tempo_Resolucao_Dias'] is not None:
+                dados_bitrix_por_adm[responsavel]['tempos_resolucao'].append(detalhe['Tempo_Resolucao_Dias'])
+    
+    # Aplicar dados do Bitrix ao DataFrame consolidado
+    for adm_nome in df_consolidado_adm.index:
+        if adm_nome in dados_bitrix_por_adm:
+            df_consolidado_adm.loc[adm_nome, 'Resolvidas (Bitrix)'] = dados_bitrix_por_adm[adm_nome]['total_resolvidas']
+            
+            if dados_bitrix_por_adm[adm_nome]['tempos_resolucao']:
+                tempo_medio = np.mean(dados_bitrix_por_adm[adm_nome]['tempos_resolucao'])
+                df_consolidado_adm.loc[adm_nome, 'Tempo Médio Bitrix (dias)'] = round(tempo_medio, 1)
+    
+    # 7. Calcular Taxas de Conversão para ambos os métodos
+    # Taxa Supabase
+    df_consolidado_adm['Total Pendências (Supabase)'] = df_consolidado_adm['Pendências Ativas'] + df_consolidado_adm['Resolvidas (Supabase)']
+    df_consolidado_adm['Taxa Conversão Supabase (%)'] = (df_consolidado_adm['Resolvidas (Supabase)'] / df_consolidado_adm['Total Pendências (Supabase)'] * 100).round(1)
+    df_consolidado_adm['Taxa Conversão Supabase (%)'] = df_consolidado_adm['Taxa Conversão Supabase (%)'].fillna(0)
+    
+    # Taxa Bitrix
+    df_consolidado_adm['Total Pendências (Bitrix)'] = df_consolidado_adm['Pendências Ativas'] + df_consolidado_adm['Resolvidas (Bitrix)']
+    df_consolidado_adm['Taxa Conversão Bitrix (%)'] = (df_consolidado_adm['Resolvidas (Bitrix)'] / df_consolidado_adm['Total Pendências (Bitrix)'] * 100).round(1)
+    df_consolidado_adm['Taxa Conversão Bitrix (%)'] = df_consolidado_adm['Taxa Conversão Bitrix (%)'].fillna(0)
+    
+    # 8. Ordenar e preparar para exibição
+    df_consolidado_adm = df_consolidado_adm.sort_values(by=['Pendências Ativas', 'Resolvidas (Bitrix)'], ascending=[False, False])
+    
+    # Reorganizar colunas para melhor visualização
+    colunas_ordem_final = [
+        'Pendências Ativas',
+        'Resolvidas (Supabase)', 
+        'Resolvidas (Bitrix)',
+        'Taxa Conversão Supabase (%)',
+        'Taxa Conversão Bitrix (%)',
+        'Tempo Médio Supabase (dias)',
+        'Tempo Médio Bitrix (dias)'
     ]
-    df_consolidado_adm = df_consolidado_adm[colunas_ordem_para_exibir]
     
-    df_consolidado_adm = df_consolidado_adm.reset_index()
+    df_consolidado_adm_display = df_consolidado_adm[colunas_ordem_final].copy()
+    df_consolidado_adm_display = df_consolidado_adm_display.reset_index()
     
     # Aplicar filtro de ADM selecionado à tabela se não for "Todos os ADMs"
     if adm_selecionado != 'Todos os ADMs':
-        df_consolidado_adm = df_consolidado_adm[df_consolidado_adm['ADM de Pasta'] == adm_selecionado]
+        df_consolidado_adm_display = df_consolidado_adm_display[df_consolidado_adm_display['ADM de Pasta'] == adm_selecionado]
     
-    # Aplicar formatação para destacar taxas de conversão mais altas
-    def highlight_conversao(s):
-        """Adiciona formatação de cores baseada na taxa de conversão"""
-        # Verificar se a coluna atual é a Taxa de Conversão (%)
-        if s.name != 'Taxa de Conversão (%)':
-            return [''] * len(s)
-        
-        # Converter para números para fazer as comparações
-        try:
-            values = pd.to_numeric(s)
-            is_max = values == values.max()
-            is_high = values >= 75
-            is_medium = (values >= 50) & (values < 75)
-            is_low = (values >= 25) & (values < 50)
-            is_very_low = (values < 25) & (values > 0)
-            is_zero = values == 0
-            
-            return ['background-color: #4CAF50; color: white; font-weight: bold' if v else  # verde (máximo)
-                    'background-color: #8BC34A; color: black' if h else  # verde claro (alto)
-                    'background-color: #FFEB3B; color: black' if m else  # amarelo (médio)
-                    'background-color: #FFC107; color: black' if l else  # laranja (baixo)
-                    'background-color: #FF9800; color: black' if vl else  # laranja forte (muito baixo)
-                    'background-color: #F5F5F5; color: #9E9E9E' if z else ''  # cinza (zero)
-                    for v, h, m, l, vl, z in zip(is_max, is_high, is_medium, is_low, is_very_low, is_zero)]
-        except:
-            # Se houver erro na conversão, retornar sem formatação
-            return [''] * len(s)
+    # Aplicar formatação para destacar diferenças entre métodos
+    def highlight_comparacao_metodos(s):
+        """Adiciona formatação comparando os dois métodos"""
+        if 'Resolvidas (Supabase)' in s.name:
+            return ['background-color: #E3F2FD' for _ in s]  # Azul claro para Supabase
+        elif 'Resolvidas (Bitrix)' in s.name:
+            return ['background-color: #E8F5E8' for _ in s]  # Verde claro para Bitrix
+        elif 'Taxa Conversão Supabase' in s.name:
+            return ['background-color: #E3F2FD' for _ in s]
+        elif 'Taxa Conversão Bitrix' in s.name:
+            return ['background-color: #E8F5E8' for _ in s]
+        elif 'Tempo Médio Supabase' in s.name:
+            return ['background-color: #E3F2FD' for _ in s]
+        elif 'Tempo Médio Bitrix' in s.name:
+            return ['background-color: #E8F5E8' for _ in s]
+        return [''] * len(s)
     
     # Aplicar estilo à tabela
-    styled_df = df_consolidado_adm.style.apply(highlight_conversao)
+    styled_df_consolidado = df_consolidado_adm_display.style.apply(highlight_comparacao_metodos)
     
     # Formatar números decimais
-    styled_df = styled_df.format({
-        'Taxa de Conversão (%)': '{:.1f}%',
-        'Tempo Médio de Resolução (dias)': '{:.1f}'
+    styled_df_consolidado = styled_df_consolidado.format({
+        'Taxa Conversão Supabase (%)': '{:.1f}%',
+        'Taxa Conversão Bitrix (%)': '{:.1f}%',
+        'Tempo Médio Supabase (dias)': '{:.1f}',
+        'Tempo Médio Bitrix (dias)': '{:.1f}'
     })
     
     st.markdown('<div class="producao-adm producao-adm__tabela">', unsafe_allow_html=True)
-    st.dataframe(styled_df, use_container_width=True)
+    st.dataframe(styled_df_consolidado, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
     st.caption("""
-    **Tabela 1: Resumo por ADM**
-    - **Pendências Ativas**: Baseadas no ADM de Pasta
-    - **Pendências Resolvidas**: Baseadas no Responsável pela movimentação
+    **Tabela Comparativa por ADM** - Comparação entre métodos Supabase e Bitrix
+    - **🔵 Colunas Azuis**: Método Supabase (baseado em histórico de movimentações)
+    - **🟢 Colunas Verdes**: Método Bitrix (baseado em campos de data específicos)
+    - **Pendências Ativas**: Baseadas no ADM de Pasta atual
+    - **Resolvidas**: Baseadas no Responsável pela movimentação/resolução
     - **Taxa de Conversão**: (Pendências Resolvidas ÷ Total de Pendências) × 100%
-    - **Tempo Médio**: Tempo médio entre entrada e resolução da pendência (em dias)
     """)
     
+    # Adicionar análise das diferenças entre métodos por ADM
+    if not df_consolidado_adm_display.empty:
+        st.markdown("#### 📊 Comparação de Métodos por ADM")
+        
+        # Calcular estatísticas gerais de diferença
+        df_temp = df_consolidado_adm_display.copy()
+        df_temp['Diferença Resolvidas'] = df_temp['Resolvidas (Bitrix)'] - df_temp['Resolvidas (Supabase)']
+        df_temp['Diferença Taxa (%)'] = df_temp['Taxa Conversão Bitrix (%)'] - df_temp['Taxa Conversão Supabase (%)']
+        
+        # Mostrar estatísticas resumidas
+        total_dif_resolvidas = df_temp['Diferença Resolvidas'].sum()
+        media_dif_taxa = df_temp['Diferença Taxa (%)'].mean()
+        
+        col_stat1, col_stat2 = st.columns(2)
+        with col_stat1:
+            if total_dif_resolvidas > 0:
+                st.success(f"✅ **{total_dif_resolvidas:,}** resoluções a mais identificadas pelo método Bitrix")
+            elif total_dif_resolvidas < 0:
+                st.warning(f"⚠️ **{abs(total_dif_resolvidas):,}** resoluções a mais identificadas pelo método Supabase")
+            else:
+                st.info("📊 Ambos os métodos identificaram o mesmo total de resoluções")
+        
+        with col_stat2:
+            if abs(media_dif_taxa) > 0.1:
+                if media_dif_taxa > 0:
+                    st.success(f"📈 Taxa média **{media_dif_taxa:.1f}%** maior no método Bitrix")
+                else:
+                    st.warning(f"📉 Taxa média **{abs(media_dif_taxa):.1f}%** maior no método Supabase")
+            else:
+                st.info("📊 Taxas médias similares entre os métodos")
+
     # --- EVOLUÇÃO DAS RESOLUÇÕES (GRÁFICO) ---
     st.markdown("---")
     st.markdown("<h3>📈 Evolução das Resoluções</h3>", unsafe_allow_html=True)
@@ -514,15 +646,132 @@ def exibir_producao_adm(df_cartorio_original):
     st.markdown("---")
     st.markdown("<h3>🔍 Detalhes por Tipo de Pendência</h3>", unsafe_allow_html=True)
     
+    # --- NOVA ANÁLISE POR CAMPOS DO BITRIX ---
+    st.markdown("### 📊 Análise por Campos de Data do Bitrix (Método Assertivo)")
+    
+    # Executar a análise por campos do Bitrix (se ainda não foi executada na seção anterior)
+    if 'resultados_bitrix' not in locals():
+        with st.spinner("Analisando pendências usando campos de data do Bitrix..."):
+            resultados_bitrix = analisar_pendencias_por_campos_bitrix(
+                df_bitrix=df,
+                mapa_usuarios=mapa_usuarios,
+                col_adm_pasta_bitrix=col_adm_pasta_bitrix,
+                filtro_adm=adm_selecionado
+            )
+    
+    # Criar tabela consolidada dos resultados do Bitrix
+    dados_comparacao_bitrix = []
+    total_resolvidas_bitrix = 0
+    total_pendencias_bitrix = 0
+    
+    for tipo_pendencia, resultado in resultados_bitrix.items():
+        # Pular se não for o tipo selecionado (quando um tipo específico for selecionado)
+        if tipo_pendencia_selecionado != 'Todos os Tipos' and tipo_pendencia != tipo_pendencia_selecionado:
+            continue
+            
+        dados_comparacao_bitrix.append({
+            'Tipo de Pendência': tipo_pendencia,
+            'Total com Pendência': resultado['total_com_pendencia'],
+            'Total Resolvidas': resultado['total_resolvidas'],
+            'Taxa de Resolução (%)': f"{resultado['taxa_resolucao']:.1f}%"
+        })
+        total_resolvidas_bitrix += resultado['total_resolvidas']
+        total_pendencias_bitrix += resultado['total_com_pendencia']
+    
+    if dados_comparacao_bitrix:
+        df_comparacao_bitrix = pd.DataFrame(dados_comparacao_bitrix)
+        st.markdown("#### Resultados por Campos de Data do Bitrix:")
+        st.dataframe(df_comparacao_bitrix, use_container_width=True)
+        
+        # Métricas totais do método Bitrix
+        taxa_geral_bitrix = (total_resolvidas_bitrix / total_pendencias_bitrix * 100) if total_pendencias_bitrix > 0 else 0
+        
+        col_bit1, col_bit2, col_bit3 = st.columns(3)
+        col_bit1.metric("Total Pendências (Bitrix)", f"{total_pendencias_bitrix:,}")
+        col_bit2.metric("Total Resolvidas (Bitrix)", f"{total_resolvidas_bitrix:,}")
+        col_bit3.metric("Taxa Resolução (Bitrix)", f"{taxa_geral_bitrix:.1f}%")
+        
+        st.caption("""
+        **Método Bitrix**: Baseado nos campos de data específicos de cada etapa.
+        - Mais assertivo pois usa as datas exatas registradas no Bitrix
+        - Não depende do histórico do Supabase
+        - Identifica pendências que foram resolvidas através das datas de etapas posteriores
+        """)
+    
+    # --- COMPARAÇÃO DE MÉTODOS ---
+    st.markdown("---")
+    st.markdown("### ⚖️ Comparação entre Métodos")
+    
+    # Calcular totais do método Supabase para comparação
+    total_resolvidas_supabase = total_pendencias_resolvidas  # Já calculado anteriormente
+    total_pendencias_supabase = total_pendencias_ativas + total_pendencias_resolvidas
+    taxa_geral_supabase = percentual_resolucao  # Já calculado anteriormente
+    
+    # Criar tabela de comparação
+    dados_comparacao_geral = [
+        {
+            'Método': 'Supabase (Histórico)',
+            'Total Pendências': total_pendencias_supabase,
+            'Total Resolvidas': total_resolvidas_supabase,
+            'Taxa de Resolução (%)': f"{taxa_geral_supabase:.1f}%",
+            'Observações': 'Baseado em movimentações históricas'
+        },
+        {
+            'Método': 'Bitrix (Campos de Data)',
+            'Total Pendências': total_pendencias_bitrix,
+            'Total Resolvidas': total_resolvidas_bitrix,
+            'Taxa de Resolução (%)': f"{taxa_geral_bitrix:.1f}%",
+            'Observações': 'Baseado em campos de data específicos'
+        }
+    ]
+    
+    df_comparacao_geral = pd.DataFrame(dados_comparacao_geral)
+    
+    # Aplicar destaque para o método com maior número de resoluções
+    def highlight_melhor_metodo(s):
+        if s.name == 'Total Resolvidas':
+            max_val = s.max()
+            return ['background-color: #4CAF50; color: white; font-weight: bold' if v == max_val else '' for v in s]
+        return [''] * len(s)
+    
+    styled_comparacao = df_comparacao_geral.style.apply(highlight_melhor_metodo)
+    st.dataframe(styled_comparacao, use_container_width=True)
+    
+    # Mostrar diferença entre métodos
+    diferenca_resolvidas = total_resolvidas_bitrix - total_resolvidas_supabase
+    diferenca_taxa = taxa_geral_bitrix - taxa_geral_supabase
+    
+    if diferenca_resolvidas != 0 or abs(diferenca_taxa) > 0.1:
+        st.markdown("#### 📈 Análise das Diferenças:")
+        
+        col_dif1, col_dif2 = st.columns(2)
+        with col_dif1:
+            if diferenca_resolvidas > 0:
+                st.success(f"✅ Método Bitrix identificou **{diferenca_resolvidas:,}** resoluções a mais")
+            elif diferenca_resolvidas < 0:
+                st.warning(f"⚠️ Método Supabase identificou **{abs(diferenca_resolvidas):,}** resoluções a mais")
+            else:
+                st.info("📊 Ambos os métodos identificaram o mesmo número de resoluções")
+        
+        with col_dif2:
+            if abs(diferenca_taxa) > 0.1:
+                if diferenca_taxa > 0:
+                    st.success(f"📊 Taxa de resolução **{diferenca_taxa:.1f}%** maior no método Bitrix")
+                else:
+                    st.warning(f"📊 Taxa de resolução **{abs(diferenca_taxa):.1f}%** maior no método Supabase")
+    
     # 7. Exibir detalhes de cada tipo de pendência em expansores
     st.markdown('<div class="adm-detalhes-pendencia">', unsafe_allow_html=True)
+    
+    # Mostrar detalhes do método Supabase (original)
     if not df_supabase.empty:
+        st.markdown("### 📋 Detalhamento - Método Supabase (Histórico)")
         for tipo_pendencia in ESTAGIOS_DEVOLUCAO_ADM:
             # Pular se não for o tipo selecionado (quando um tipo específico for selecionado)
             if tipo_pendencia_selecionado != 'Todos os Tipos' and tipo_pendencia != tipo_pendencia_selecionado:
                 continue
                 
-            with st.expander(f"Pendências: {tipo_pendencia}", expanded=tipo_pendencia_selecionado != 'Todos os Tipos'):
+            with st.expander(f"Supabase: {tipo_pendencia}", expanded=False):
                 analisar_resolucao_pendencia(
                     df_bitrix_atual=df, 
                     df_supabase_hist=df_supabase, 
@@ -535,8 +784,69 @@ def exibir_producao_adm(df_cartorio_original):
                     renderizar_saida_streamlit=True,
                     filtro_adm=adm_selecionado
                 )
-    else:
-        st.info("Nenhum dado disponível para análise detalhada por tipo de pendência.")
+    
+    # Mostrar detalhes do método Bitrix (novo)
+    st.markdown("### 📋 Detalhamento - Método Bitrix (Campos de Data)")
+    for tipo_pendencia in ESTAGIOS_DEVOLUCAO_ADM:
+        # Pular se não for o tipo selecionado (quando um tipo específico for selecionado)
+        if tipo_pendencia_selecionado != 'Todos os Tipos' and tipo_pendencia != tipo_pendencia_selecionado:
+            continue
+            
+        with st.expander(f"Bitrix: {tipo_pendencia}", expanded=False):
+            if tipo_pendencia in resultados_bitrix:
+                resultado = resultados_bitrix[tipo_pendencia]
+                
+                # Mostrar métricas
+                col_met1, col_met2, col_met3 = st.columns(3)
+                col_met1.metric("Total com Pendência", f"{resultado['total_com_pendencia']:,}")
+                col_met2.metric("Total Resolvidas", f"{resultado['total_resolvidas']:,}")
+                col_met3.metric("Taxa de Resolução", f"{resultado['taxa_resolucao']:.1f}%")
+                
+                # Mostrar detalhes das resolvidas
+                if resultado['detalhes_resolvidas']:
+                    st.markdown("**Detalhes das Pendências Resolvidas:**")
+                    
+                    df_detalhes = pd.DataFrame(resultado['detalhes_resolvidas'])
+                    
+                    # Formatar colunas para exibição
+                    df_detalhes_display = df_detalhes.copy()
+                    
+                    if 'Data_Entrada_Pendencia' in df_detalhes_display.columns:
+                        df_detalhes_display['Data Entrada Pendência'] = pd.to_datetime(df_detalhes_display['Data_Entrada_Pendencia']).dt.strftime('%d/%m/%Y %H:%M')
+                    
+                    if 'Data_Resolucao' in df_detalhes_display.columns:
+                        df_detalhes_display['Data Resolução'] = pd.to_datetime(df_detalhes_display['Data_Resolucao']).dt.strftime('%d/%m/%Y %H:%M')
+                    
+                    if 'Tempo_Resolucao_Dias' in df_detalhes_display.columns:
+                        df_detalhes_display['Tempo Resolução (dias)'] = df_detalhes_display['Tempo_Resolucao_Dias'].round(1)
+                    
+                    # Renomear colunas para exibição
+                    colunas_rename = {
+                        'Responsavel_Resolucao': 'Responsável Resolução',
+                        'ADM_Pasta': 'ADM de Pasta',
+                        'Estagio_Resolucao': 'Estágio de Resolução'
+                    }
+                    df_detalhes_display = df_detalhes_display.rename(columns=colunas_rename)
+                    
+                    # Selecionar colunas para exibição
+                    colunas_exibir = ['ID', 'Responsável Resolução', 'Data Entrada Pendência', 'Data Resolução', 'Tempo Resolução (dias)', 'ADM de Pasta']
+                    colunas_existentes = [col for col in colunas_exibir if col in df_detalhes_display.columns]
+                    
+                    st.dataframe(df_detalhes_display[colunas_existentes], use_container_width=True)
+                    
+                    # Estatísticas de tempo
+                    if 'Tempo_Resolucao_Dias' in df_detalhes.columns and not df_detalhes['Tempo_Resolucao_Dias'].isna().all():
+                        tempos_validos = df_detalhes['Tempo_Resolucao_Dias'].dropna()
+                        if len(tempos_validos) > 0:
+                            col_stat1, col_stat2, col_stat3 = st.columns(3)
+                            col_stat1.metric("Tempo Mínimo", f"{tempos_validos.min():.1f} dias")
+                            col_stat2.metric("Tempo Médio", f"{tempos_validos.mean():.1f} dias")
+                            col_stat3.metric("Tempo Máximo", f"{tempos_validos.max():.1f} dias")
+                else:
+                    st.info("Nenhuma pendência resolvida identificada pelos campos de data.")
+            else:
+                st.info("Não foram encontrados dados para este tipo de pendência.")
+    
     st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)  # Fecha cartorio-container
@@ -708,3 +1018,119 @@ def analisar_resolucao_pendencia(
             st.dataframe(df_pendencias_resolvidas_detalhe, use_container_width=True)
 
     return df_entradas_na_pendencia, df_pendencias_resolvidas_detalhe 
+
+def analisar_pendencias_por_campos_bitrix(df_bitrix, mapa_usuarios, col_adm_pasta_bitrix, filtro_adm='Todos os ADMs'):
+    """
+    Analisa pendências usando os campos de data específicos do Bitrix.
+    Método mais assertivo que complementa a análise do Supabase.
+    """
+    resultados = {}
+    
+    for estagio_pendencia, config in MAPEAMENTO_ESTAGIOS_CAMPOS_DATA.items():
+        resultado_estagio = {
+            'total_com_pendencia': 0,
+            'total_resolvidas': 0,
+            'detalhes_resolvidas': [],
+            'taxa_resolucao': 0
+        }
+        
+        campo_data_entrada = config['campo_data_entrada']
+        campos_data_resolucao = config['estagios_resolucao']
+        campos_responsavel_resolucao = config['responsaveis_resolucao']
+        
+        # Se não tem campo de data de entrada, usar estágio atual
+        if campo_data_entrada and campo_data_entrada in df_bitrix.columns:
+            # Cards que passaram por esta pendência (tem data preenchida)
+            df_com_pendencia = df_bitrix[df_bitrix[campo_data_entrada].notna()].copy()
+        else:
+            # Cards que estão atualmente nesta pendência
+            df_com_pendencia = df_bitrix[df_bitrix['ESTAGIO_ATUAL_LEGIVEL'] == estagio_pendencia].copy()
+        
+        resultado_estagio['total_com_pendencia'] = len(df_com_pendencia)
+        
+        if df_com_pendencia.empty:
+            resultados[estagio_pendencia] = resultado_estagio
+            continue
+        
+        # Verificar resoluções
+        for _, row in df_com_pendencia.iterrows():
+            data_entrada_pendencia = None
+            if campo_data_entrada and campo_data_entrada in row.index:
+                data_entrada_pendencia = row[campo_data_entrada]
+            
+            # Verificar se foi resolvida (tem data posterior em algum estágio de resolução)
+            foi_resolvida = False
+            data_resolucao = None
+            responsavel_resolucao = None
+            estagio_resolucao = None
+            
+            for i, campo_resolucao in enumerate(campos_data_resolucao):
+                if campo_resolucao in row.index and pd.notna(row[campo_resolucao]):
+                    data_campo_resolucao = pd.to_datetime(row[campo_resolucao])
+                    
+                    # Se não temos data de entrada, considera como resolvida
+                    if data_entrada_pendencia is None:
+                        foi_resolvida = True
+                        data_resolucao = data_campo_resolucao
+                        estagio_resolucao = campo_resolucao
+                        
+                        # Buscar responsável correspondente
+                        if i < len(campos_responsavel_resolucao):
+                            campo_resp = campos_responsavel_resolucao[i]
+                            if campo_resp in row.index and pd.notna(row[campo_resp]):
+                                responsavel_resolucao = row[campo_resp]
+                        break
+                    else:
+                        # Verificar se a data de resolução é posterior à entrada
+                        data_entrada_pd = pd.to_datetime(data_entrada_pendencia)
+                        if data_campo_resolucao > data_entrada_pd:
+                            foi_resolvida = True
+                            data_resolucao = data_campo_resolucao
+                            estagio_resolucao = campo_resolucao
+                            
+                            # Buscar responsável correspondente
+                            if i < len(campos_responsavel_resolucao):
+                                campo_resp = campos_responsavel_resolucao[i]
+                                if campo_resp in row.index and pd.notna(row[campo_resp]):
+                                    responsavel_resolucao = row[campo_resp]
+                            break
+            
+            if foi_resolvida:
+                # Mapear responsável para nome
+                nome_responsavel = 'N/A'
+                if responsavel_resolucao:
+                    responsavel_str = str(responsavel_resolucao)
+                    nome_responsavel = mapa_usuarios.get(responsavel_str, 
+                                                       mapa_usuarios.get(f"user_{responsavel_str}", 
+                                                                        responsavel_str))
+                
+                # Aplicar filtro de ADM se especificado
+                if filtro_adm != 'Todos os ADMs' and nome_responsavel != filtro_adm:
+                    continue
+                
+                # Calcular tempo de resolução
+                tempo_resolucao = None
+                if data_entrada_pendencia and data_resolucao:
+                    tempo_resolucao = (data_resolucao - pd.to_datetime(data_entrada_pendencia)).total_seconds() / (24 * 60 * 60)
+                
+                detalhe = {
+                    'ID': row.get('ID', 'N/A'),
+                    'ADM_Pasta': row.get(col_adm_pasta_bitrix, 'N/A'),
+                    'Data_Entrada_Pendencia': data_entrada_pendencia,
+                    'Data_Resolucao': data_resolucao,
+                    'Responsavel_Resolucao': nome_responsavel,
+                    'ID_Responsavel_Resolucao': responsavel_resolucao,
+                    'Estagio_Resolucao': estagio_resolucao,
+                    'Tempo_Resolucao_Dias': tempo_resolucao
+                }
+                resultado_estagio['detalhes_resolvidas'].append(detalhe)
+        
+        resultado_estagio['total_resolvidas'] = len(resultado_estagio['detalhes_resolvidas'])
+        
+        # Calcular taxa de resolução
+        if resultado_estagio['total_com_pendencia'] > 0:
+            resultado_estagio['taxa_resolucao'] = (resultado_estagio['total_resolvidas'] / resultado_estagio['total_com_pendencia']) * 100
+        
+        resultados[estagio_pendencia] = resultado_estagio
+    
+    return resultados 
