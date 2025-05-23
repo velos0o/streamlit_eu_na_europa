@@ -197,6 +197,93 @@ div.stButton > button#btn_sidebar_refresh_all:hover {
     padding: 0 !important;
     margin-bottom: 2px !important;
 }
+
+/* CSS específico para submenu ADM - caixa azul destacada */
+.adm-submenu-container {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(37, 99, 235, 0.04)) !important;
+    border: 1px solid rgba(59, 130, 246, 0.2) !important;
+    border-radius: 8px !important;
+    padding: 8px 12px 8px 12px !important;
+    margin: 6px 0 6px 20px !important;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.adm-submenu-title {
+    color: #374151 !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    margin-bottom: 6px !important;
+    padding-bottom: 4px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.15) !important;
+}
+
+/* CSS para criar container visual dos botões ADM */
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_producao"] {
+    position: relative !important;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(37, 99, 235, 0.04)) !important;
+    border: 1px solid rgba(59, 130, 246, 0.2) !important;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 8px 12px 4px 12px !important;
+    margin: 6px 0 0 20px !important;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_producao"]::before {
+    content: "ADM" !important;
+    display: block !important;
+    color: #374151 !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    margin-bottom: 6px !important;
+    padding-bottom: 4px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    border-bottom: 1px solid rgba(59, 130, 246, 0.15) !important;
+}
+
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_pendencias"] {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(37, 99, 235, 0.04)) !important;
+    border: 1px solid rgba(59, 130, 246, 0.2) !important;
+    border-top: none !important;
+    border-radius: 0 0 8px 8px !important;
+    padding: 4px 12px 8px 12px !important;
+    margin: 0 0 6px 20px !important;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* CSS para botões dentro do container ADM */
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_"] [data-testid="stButton"] {
+    margin: 2px 0 !important;
+}
+
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]) {
+    background: rgba(248, 250, 252, 0.9) !important;
+    border: 1px solid rgba(59, 130, 246, 0.15) !important;
+    border-radius: 6px !important;
+    padding: 6px 12px !important;
+    font-size: 0.875rem !important;
+    color: #4B5563 !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]):hover {
+    background: rgba(59, 130, 246, 0.08) !important;
+    border-color: rgba(59, 130, 246, 0.25) !important;
+    color: #1F2937 !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1) !important;
+}
+
+[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_"] [data-testid="stButton"] button[kind="primary"]:not([data-testid="stIconButton"]) {
+    background: rgba(59, 130, 246, 0.12) !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+    color: #1E40AF !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -258,15 +345,63 @@ def ir_para_emissao_emissoes_por_familia():
     st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'emissoes_por_familia'
 
+def ir_para_emissao_certidoes_pendentes():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Certidões Pendentes por responsável'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'certidoes_pendentes_responsavel'
+
+def ir_para_emissao_desempenho_conclusao():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Desempenho Conclusão de Pasta'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'desempenho_conclusao_pasta'
+
+def ir_para_emissao_adm():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'ADM'
+    st.session_state.adm_submenu_expanded = True
+    st.session_state.adm_subpagina = 'Produção ADM'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'adm'
+
+def ir_para_emissao_producao_time_doutora():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Produção Time Doutora'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'producao_time_doutora'
+
+def ir_para_emissao_pesquisa_br():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Pesquisa BR'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'pesquisa_br'
+
 def ir_para_higienizacao_checklist():
     st.session_state['pagina_atual'] = 'Higienizações'
     st.session_state.higienizacao_subpagina = 'Checklist'
     st.query_params['page'] = 'higienizacoes'
     st.query_params['sub'] = 'checklist'
 
+def ir_para_adm_producao():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'ADM'
+    st.session_state.adm_submenu_expanded = True
+    st.session_state.adm_subpagina = 'Produção ADM'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'adm'
+
+def ir_para_adm_pendencias():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'ADM'
+    st.session_state.adm_submenu_expanded = True
+    st.session_state.adm_subpagina = 'Certidões Pendentes por ADM'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'adm'
+
 # Botões de navegação
 st.sidebar.button(
-    "🏠 Ficha da Família", 
+    "Ficha da Família", 
     key="btn_ficha_familia",
     on_click=ir_para_ficha_familia,
     use_container_width=True,
@@ -318,6 +453,62 @@ if st.session_state.get('emissao_submenu_expanded', False):
             on_click=ir_para_emissao_emissoes_por_familia,
             use_container_width=True,
             type="primary" if st.session_state.get('emissao_subpagina') == "Emissões Por Família" else "secondary"
+        )
+        st.button(
+            "Certidões Pendentes por responsável", 
+            key="subbtn_emissao_certidoes_pendentes",
+            on_click=ir_para_emissao_certidoes_pendentes,
+            use_container_width=True,
+            type="primary" if st.session_state.get('emissao_subpagina') == "Certidões Pendentes por responsável" else "secondary"
+        )
+        st.button(
+            "Desempenho Conclusão de Pasta", 
+            key="subbtn_emissao_desempenho_conclusao",
+            on_click=ir_para_emissao_desempenho_conclusao,
+            use_container_width=True,
+            type="primary" if st.session_state.get('emissao_subpagina') == "Desempenho Conclusão de Pasta" else "secondary"
+        )
+        st.button(
+            "ADM", 
+            key="subbtn_emissao_adm",
+            on_click=ir_para_emissao_adm,
+            use_container_width=True,
+            type="primary" if st.session_state.get('emissao_subpagina') == "ADM" else "secondary"
+        )
+        
+        # Submenu ADM aparece imediatamente após o botão ADM
+        if (st.session_state.get('emissao_subpagina') == "ADM" and 
+            st.session_state.get('adm_submenu_expanded', False)):
+            
+            # Botões ADM com estilo visual unificado via CSS
+            st.button(
+                "Produção ADM", 
+                key="subbtn_adm_producao",
+                on_click=ir_para_adm_producao,
+                use_container_width=True,
+                type="primary" if st.session_state.get('adm_subpagina') == "Produção ADM" else "secondary"
+            )
+            st.button(
+                "Certidões Pendentes por ADM", 
+                key="subbtn_adm_pendencias",
+                on_click=ir_para_adm_pendencias,
+                use_container_width=True,
+                type="primary" if st.session_state.get('adm_subpagina') == "Certidões Pendentes por ADM" else "secondary"
+            )
+        
+        st.button(
+            "Produção Time Doutora", 
+            key="subbtn_emissao_producao_time_doutora",
+            on_click=ir_para_emissao_producao_time_doutora,
+            use_container_width=True,
+            type="primary" if st.session_state.get('emissao_subpagina') == "Produção Time Doutora" else "secondary"
+        )
+        st.button(
+            "Pesquisa BR", 
+            key="subbtn_emissao_pesquisa_br",
+            on_click=ir_para_emissao_pesquisa_br,
+            use_container_width=True,
+            type="primary" if st.session_state.get('emissao_subpagina') == "Pesquisa BR" else "secondary"
         )
 
 # Exibição da página selecionada
