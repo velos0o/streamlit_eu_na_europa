@@ -7,11 +7,14 @@ from .data_loader import carregar_dados_cartorio
 # Importar funções das novas seções/abas
 from .visao_geral import exibir_visao_geral
 from .acompanhamento import exibir_acompanhamento
-from .producao import exibir_producao
+# OCULTO DA VISÃO DO USUÁRIO - PRODUÇÃO
+# from .producao import exibir_producao
 from .pendencias import exibir_pendencias
 from .pendencias_adm import exibir_pendencias_adm
 from .higienizacao_desempenho import exibir_higienizacao_desempenho
 from .producao_adm import exibir_producao_adm
+from .producao_time_doutora import exibir_producao_time_doutora
+from .pesquisa_br import exibir_pesquisa_br
 
 # Importar componente TOC - REMOVIDO
 # from components.table_of_contents import render_toc 
@@ -21,22 +24,16 @@ def show_cartorio_new():
     Função principal para exibir a página refatorada de Emissões Brasileiras.
     Renderiza a subpágina correta com base em st.session_state.emissao_subpagina.
     """
-    # Título com estilo BI (mais profissional e vibrante)
-    st.markdown("""
-    <style>
-    .bi-title {
-        color: #1E40AF; /* Azul mais vibrante */
-        font-size: 2.25rem; /* Tamanho maior */
-        font-weight: 800; /* Extra negrito */
-        margin-bottom: 1.25rem; /* Mais espaçamento inferior */
-        padding-bottom: 0.75rem; /* Mais espaço antes da borda */
-        border-bottom: 4px solid #3B82F6; /* Borda inferior mais grossa e vibrante */
-        text-align: left;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Sutil sombra para profundidade */
-    }
-    </style>
-    <h1 class='bi-title'>EMISSÕES BRASILEIRAS</h1>
-    """, unsafe_allow_html=True)
+    # --- Carregar CSS Compilado ---
+    try:
+        with open('assets/styles/css/main.css', 'r', encoding='utf-8') as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("Arquivo CSS principal (main.css) não encontrado.")
+    # --- Fim Carregar CSS ---
+
+    # Título com classe SCSS (substituindo CSS inline)
+    st.markdown('<h1 class="bi-title">EMISSÕES BRASILEIRAS</h1>', unsafe_allow_html=True)
     
     # --- Carregar Dados ---
     def load_data_cached():
@@ -56,8 +53,6 @@ def show_cartorio_new():
         exibir_visao_geral(df_cartorio)
     elif subpagina_selecionada == "Emissões Por Família":
         exibir_acompanhamento(df_cartorio)
-    elif subpagina_selecionada == "Produção":
-        exibir_producao(df_cartorio)
     elif subpagina_selecionada == "Certidões Pendentes por responsável":
         exibir_pendencias(df_cartorio)
     elif subpagina_selecionada == "Desempenho Conclusão de Pasta":
@@ -72,6 +67,10 @@ def show_cartorio_new():
             exibir_pendencias_adm(df_cartorio)
         else:
             st.warning(f"Subpágina ADM desconhecida: {adm_subpagina}")
+    elif subpagina_selecionada == "Produção Time Doutora":
+        exibir_producao_time_doutora(df_cartorio)
+    elif subpagina_selecionada == "Pesquisa BR":
+        exibir_pesquisa_br(df_cartorio)
     else:
         st.warning(f"Subpágina desconhecida: {subpagina_selecionada}")
 

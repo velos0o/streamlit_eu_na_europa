@@ -1,3 +1,47 @@
+"""
+FICHA DA FAMÍLIA - Relatório Individual de Famílias
+===================================================
+
+ATUALIZAÇÃO DEZEMBRO 2024 - NOVOS PIPELINES 102 E 104:
+- Pipeline 102: Paróquia 
+- Pipeline 104: Pesquisa BR
+
+Alterações realizadas:
+1. Nova função load_cartorio_data_all_pipelines() para carregar dados dos pipelines 92, 94, 102 e 104
+2. Atualização da função simplificar_nome_estagio() em utils.py para incluir mapeamentos dos novos estágios
+3. Atualização do map_stage_to_relatorio com categorias dos novos pipelines
+4. Ampliação do resumo_status_categorias_temp para incluir as novas categorias
+5. Suporte ao novo campo NOME_PIPELINE para identificação do pipeline de origem
+
+Novos Estágios Mapeados:
+Pipeline 102 (Paróquia):
+- DT1098_102:NEW → SOLICITAR PARÓQUIA DE ORIGEM
+- DT1098_102:PREPARATION → AGUARDANDO PARÓQUIA DE ORIGEM  
+- DT1098_102:CLIENT → CERTIDÃO EMITIDA
+- DT1098_102:UC_45SBLC → DEVOLUÇÃO ADM
+- DT1098_102:SUCCESS → CERTIDÃO ENTREGUE
+- DT1098_102:FAIL → CANCELADO
+- DT1098_102:UC_676WIG → CERTIDÃO DISPENSADA
+- DT1098_102:UC_UHPXE8 → CERTIDÃO ENTREGUE
+
+Pipeline 104 (Pesquisa BR):
+- DT1098_104:NEW → AGUARDANDO PESQUISADOR
+- DT1098_104:PREPARATION → PESQUISA EM ANDAMENTO
+- DT1098_104:SUCCESS → PESQUISA PRONTA PARA EMISSÃO
+- DT1098_104:FAIL → PESQUISA NÃO ENCONTRADA
+
+LÓGICA DE PRECEDÊNCIA PIPELINE 104:
+Quando uma pessoa tem "PESQUISA PRONTA PARA EMISSÃO" no pipeline 104 e também possui
+registros nos pipelines superiores (92, 94, 102), o sistema mostra apenas o status 
+dos pipelines superiores, pois após a pesquisa estar pronta, o card é duplicado 
+para os outros pipelines onde o processo continua.
+
+LÓGICA DE "Pasta C/Emissão Concluída":
+Esta é uma MÉTRICA DERIVADA, não um status direto. É calculada quando TODAS as 
+certidões ativas de uma família estão no status "Brasileiras Emitida". 
+Baseada na mesma lógica do higienizacao_desempenho.py.
+"""
+
 import streamlit as st
 # importยอด_เยี่ยม_navigation_utils # Comentado por enquanto
 import pandas as pd # Adicionado para manipulação de dados
@@ -62,6 +106,8 @@ def load_page_specific_css(file_path):
             st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
     except FileNotFoundError:
         st.error(f"Arquivo CSS não encontrado: {file_path}")
+
+# Função removida - agora usamos load_data_all_pipelines() do views.cartorio_new.data_loader
 
 def exibir_ficha_familia(familia_serie, emissoes_df):
     # Iniciar a string HTML com o contêiner principal e adicionar título
@@ -199,30 +245,54 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
     # (Lógica de processamento de emissões, agora incluindo a posição na árvore)
     requerentes_data_list_of_dicts = []
     processamento_emissoes_ok = False
-    # Mapeamento de STAGE_NAME (normalizado para maiúsculas) para Categoria do Relatório
-    # Esta definição é crucial e será usada na nova lógica de resumo.
-    map_stage_to_relatorio = {
-        # Brasileiras Pendências
-        "AGUARDANDO CERTIDÃO": "Brasileiras Pendências",
-        "BUSCA - CRC": "Brasileiras Pendências",
-        "DEVOLUTIVA BUSCA - CRC": "Brasileiras Pendências",
-        "APENAS ASS. REQ CLIENTE P/MONTAGEMA": "Brasileiras Pendências",
-        "MONTAGEM REQUERIMENTO CARTÓRIO": "Brasileiras Pendências",
-        "SOLICITAR CARTÓRIO DE ORIGEM": "Brasileiras Pendências",
-        "SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE": "Brasileiras Pendências",
-        "DEVOLUÇÃO ADM": "Brasileiras Pendências",
-        "DEVOLVIDO REQUERIMENTO": "Brasileiras Pendências",
-        # Brasileiras Pesquisas
-        "PESQUISA - BR": "Brasileiras Pesquisas",
-        # Brasileiras Solicitadas
-        "AGUARDANDO CARTÓRIO ORIGEM": "Brasileiras Solicitadas",
-        # Pasta C/Emissão Concluída
-        "CERTIDÃO EMITIDA": "Pasta C/Emissão Concluída",
-        "CERTIDÃO ENTREGUE": "Pasta C/Emissão Concluída",
-        # Brasileiras Dispensada (Usado para filtrar df_emissoes_ativas, não diretamente no resumo_status_categorias)
-        "SOLICITAÇÃO DUPLICADA": "Brasileiras Dispensada",
-        "CANCELADO": "Brasileiras Dispensada"
-    }
+    
+    # NOVA LÓGICA: Função para determinar categoria baseada em Pipeline + Status
+    # Esta correção resolve o problema de chaves duplicadas no mapeamento anterior
+    def determinar_categoria_por_pipeline_status(category_id, stage_name_legivel):
+            """Determina a categoria do resumo baseada no pipeline (CATEGORY_ID) e status (STAGE_NAME_LEGIVEL)"""
+            category_id_str = str(category_id)
+            status_upper = str(stage_name_legivel).upper() if pd.notna(stage_name_legivel) else ""
+            
+            # Pipeline 92 e 94 (Cartórios Casa Verde e Tatuapé)
+            if category_id_str in ['92', '94']:
+                if status_upper in ["AGUARDANDO CERTIDÃO", "BUSCA - CRC", "DEVOLUTIVA BUSCA - CRC", 
+                                  "APENAS ASS. REQ CLIENTE P/MONTAGEM", "MONTAGEM REQUERIMENTO CARTÓRIO", 
+                                  "SOLICITAR CARTÓRIO DE ORIGEM", "SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE", 
+                                  "DEVOLUÇÃO ADM", "DEVOLVIDO REQUERIMENTO"]:
+                    return "Brasileiras Pendências"
+                elif status_upper == "PESQUISA - BR":
+                    return "Brasileiras Pesquisas"
+                elif status_upper == "AGUARDANDO CARTÓRIO ORIGEM":
+                    return "Brasileiras Solicitadas"
+                elif status_upper in ["CERTIDÃO EMITIDA", "CERTIDÃO ENTREGUE"]:
+                    return "Brasileiras Emitida"  # CORRIGIDO: Era "Pasta C/Emissão Concluída"
+                elif status_upper in ["SOLICITAÇÃO DUPLICADA", "CANCELADO", "CERTIDÃO DISPENSADA"]:
+                    return "Brasileiras Dispensada"  # Não contabilizada no resumo ativo
+                    
+            # Pipeline 102 (Paróquia)
+            elif category_id_str == '102':
+                if status_upper in ["SOLICITAR PARÓQUIA DE ORIGEM", "DEVOLUÇÃO ADM"]:
+                    return "Paróquia Pendências"
+                elif status_upper == "AGUARDANDO PARÓQUIA DE ORIGEM":
+                    return "Paróquia Solicitadas"
+                elif status_upper in ["CERTIDÃO EMITIDA", "CERTIDÃO ENTREGUE"]:
+                    return "Paróquia Emitida"  # CORRIGIDO: Consistente com a lógica
+                elif status_upper in ["SOLICITAÇÃO DUPLICADA", "CANCELADO", "CERTIDÃO DISPENSADA"]:
+                    return "Paróquia Dispensada"  # Não contabilizada no resumo ativo
+                    
+            # Pipeline 104 (Pesquisa BR)
+            elif category_id_str == '104':
+                if status_upper == "AGUARDANDO PESQUISADOR":
+                    return "Pesquisa BR Pendências"
+                elif status_upper == "PESQUISA EM ANDAMENTO":
+                    return "Pesquisa BR Em Andamento"
+                elif status_upper == "PESQUISA PRONTA PARA EMISSÃO":
+                    return "Pesquisa BR Concluída"
+                elif status_upper == "PESQUISA NÃO ENCONTRADA":
+                    return "Pesquisa BR Não Encontrada"
+            
+            # Default para casos não mapeados
+            return "Outros"
 
     if emissoes_df is not None and not emissoes_df.empty:
         col_stage_para_simplificar = None
@@ -282,9 +352,36 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
                         # --- Fim da limpeza ---
 
                         cert_status = {v: 'Dispensado' for k, v in map_tipo_certidao.items() if v}
+                        
+                        # NOVA LÓGICA: Precedência de pipelines
+                        # Se a pessoa tem "PESQUISA PRONTA PARA EMISSÃO" no pipeline 104,
+                        # devemos verificar se ela tem registros nos pipelines superiores (92, 94, 102)
+                        pipeline_104_pronto = False
+                        registros_pipelines_superiores = []
+                        
+                        # Verificar se há registro no pipeline 104 com status "PESQUISA PRONTA PARA EMISSÃO"
                         for _, row in grupo.iterrows():
-                            tipo_l = map_tipo_certidao.get(str(row[cols_req[2]]).upper())
-                            if tipo_l: cert_status[tipo_l] = row[cols_req[3]] if cert_status[tipo_l] == 'Dispensado' or row[cols_req[3]] != 'Dispensado' else cert_status[tipo_l]
+                            if 'CATEGORY_ID' in row and str(row['CATEGORY_ID']) == '104':
+                                if row[cols_req[3]] == 'PESQUISA PRONTA PARA EMISSÃO':
+                                    pipeline_104_pronto = True
+                            elif 'CATEGORY_ID' in row and str(row['CATEGORY_ID']) in ['92', '94', '102']:
+                                registros_pipelines_superiores.append(row)
+                        
+                        # Aplicar lógica de precedência
+                        if pipeline_104_pronto and registros_pipelines_superiores:
+                            # Se tem pipeline 104 pronto E registros nos superiores,
+                            # processar apenas os registros dos pipelines superiores
+                            print(f"[DEBUG PRECEDÊNCIA] ID_REQUERENTE {id_req}: Pipeline 104 pronto, usando status dos pipelines superiores")
+                            for row in registros_pipelines_superiores:
+                                tipo_l = map_tipo_certidao.get(str(row[cols_req[2]]).upper())
+                                if tipo_l: 
+                                    cert_status[tipo_l] = row[cols_req[3]] if cert_status[tipo_l] == 'Dispensado' or row[cols_req[3]] != 'Dispensado' else cert_status[tipo_l]
+                        else:
+                            # Lógica normal: processar todos os registros
+                            for _, row in grupo.iterrows():
+                                tipo_l = map_tipo_certidao.get(str(row[cols_req[2]]).upper())
+                                if tipo_l: 
+                                    cert_status[tipo_l] = row[cols_req[3]] if cert_status[tipo_l] == 'Dispensado' or row[cols_req[3]] != 'Dispensado' else cert_status[tipo_l]
 
                         # Incluir a posição na árvore nos dados a serem exibidos
                         requerentes_data_list_of_dicts.append({
@@ -385,29 +482,90 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
 
         # 2. Reinicializar e popular resumo_status_categorias com base em df_emissoes_ativas
         # Usando o map_stage_to_relatorio definido anteriormente
+        # ATUALIZADO: Incluindo categorias dos novos pipelines 102 e 104
         resumo_status_categorias_temp = { # Renomeado para evitar conflito de escopo se existir antes
+            # Pipelines 92 e 94 (Cartórios)
             'Brasileiras Pendências': 0,
             'Brasileiras Pesquisas': 0,
             'Brasileiras Solicitadas': 0,
-            'Pasta C/Emissão Concluída': 0,
+            'Brasileiras Emitida': 0,  # CORRIGIDO: Status direto de emissão
+            # Pipeline 102 (Paróquia)
+            'Paróquia Pendências': 0,
+            'Paróquia Solicitadas': 0,
+            'Paróquia Emitida': 0,  # CORRIGIDO: Consistente com a lógica
+            # Pipeline 104 (Pesquisa BR)
+            'Pesquisa BR Pendências': 0,
+            'Pesquisa BR Em Andamento': 0,
+            'Pesquisa BR Concluída': 0,
+            'Pesquisa BR Não Encontrada': 0,
             # 'Brasileiras Dispensada': 0, # Não incluímos aqui, pois df_emissoes_ativas já as exclui
+            # 'Paróquia Dispensada': 0, # Não incluímos aqui, pois df_emissoes_ativas já as exclui
             'Outros': 0
         }
 
         if not df_emissoes_ativas.empty:
-            for _idx, certidao_ativa_row in df_emissoes_ativas.iterrows():
-                status_legivel = certidao_ativa_row['STAGE_NAME_LEGIVEL']
-                categoria_para_resumo = 'Outros' # Default
-                if pd.notna(status_legivel) and str(status_legivel).strip() != "":
-                    status_legivel_upper = str(status_legivel).upper()
-                    categoria_para_resumo = map_stage_to_relatorio.get(status_legivel_upper, 'Outros')
+            # NOVA LÓGICA: Aplicar precedência de pipelines também no resumo
+            # Criar DataFrame para processar precedência
+            df_processado = df_emissoes_ativas.copy()
+            
+            # Identificar pessoas que têm "PESQUISA PRONTA PARA EMISSÃO" no pipeline 104
+            # e também têm registros nos pipelines superiores (92, 94, 102)
+            if 'UF_CRM_34_ID_REQUERENTE' in df_processado.columns and 'CATEGORY_ID' in df_processado.columns:
+                # Agrupar por ID_REQUERENTE para aplicar a lógica de precedência
+                requerentes_para_remover_104 = []
                 
-                if categoria_para_resumo in resumo_status_categorias_temp:
-                    resumo_status_categorias_temp[categoria_para_resumo] += 1
-                else:
-                    # Se a categoria do mapa (ex: "Brasileiras Dispensada") não estiver em resumo_status_categorias_temp,
-                    # ela será contada como 'Outros'. Isso é correto, pois estamos contando apenas ativas.
-                    resumo_status_categorias_temp['Outros'] += 1
+                for id_requerente, grupo_req in df_processado.groupby('UF_CRM_34_ID_REQUERENTE'):
+                    # Verificar se tem pipeline 104 com "PESQUISA PRONTA PARA EMISSÃO"
+                    tem_104_pronto = False
+                    tem_pipelines_superiores = False
+                    
+                    for _, row in grupo_req.iterrows():
+                        if str(row['CATEGORY_ID']) == '104' and row['STAGE_NAME_LEGIVEL'] == 'PESQUISA PRONTA PARA EMISSÃO':
+                            tem_104_pronto = True
+                        elif str(row['CATEGORY_ID']) in ['92', '94', '102']:
+                            tem_pipelines_superiores = True
+                    
+                    # Se tem 104 pronto E pipelines superiores, remover registros do 104 do resumo
+                    if tem_104_pronto and tem_pipelines_superiores:
+                        requerentes_para_remover_104.append(id_requerente)
+                        print(f"[DEBUG PRECEDÊNCIA RESUMO] ID_REQUERENTE {id_requerente}: Removendo pipeline 104 do resumo (precedência)")
+                
+                # Remover registros do pipeline 104 para os requerentes identificados
+                if requerentes_para_remover_104:
+                    mask_remover = (df_processado['UF_CRM_34_ID_REQUERENTE'].isin(requerentes_para_remover_104)) & (df_processado['CATEGORY_ID'].astype(str) == '104')
+                    df_processado = df_processado[~mask_remover].copy()
+                    print(f"[DEBUG PRECEDÊNCIA RESUMO] Removidos {mask_remover.sum()} registros do pipeline 104 devido à precedência")
+            
+            # Continuar com a lógica normal de resumo usando df_processado
+            for _idx, certidao_ativa_row in df_processado.iterrows():
+                status_legivel = certidao_ativa_row['STAGE_NAME_LEGIVEL']
+                category_id = certidao_ativa_row.get('CATEGORY_ID', '')
+                
+                # USAR A NOVA FUNÇÃO em vez do mapeamento antigo
+                categoria_para_resumo = determinar_categoria_por_pipeline_status(category_id, status_legivel)
+                
+                # Só contar se não for uma categoria "Dispensada"
+                if not categoria_para_resumo.endswith("Dispensada"):
+                    if categoria_para_resumo in resumo_status_categorias_temp:
+                        resumo_status_categorias_temp[categoria_para_resumo] += 1
+                    else:
+                        # Para categorias não mapeadas, contar como 'Outros'
+                        resumo_status_categorias_temp['Outros'] += 1
+            
+            # Atualizar total com o DataFrame processado
+            total_certidoes_reais_para_exibicao = len(df_processado)
+            
+            # ADICIONAR LÓGICA DE "Pasta C/Emissão Concluída" (métrica derivada)
+            # Calcular se a família tem TODAS as certidões ativas como "Brasileiras Emitida"
+            total_ativas = (resumo_status_categorias_temp['Brasileiras Pendências'] + 
+                           resumo_status_categorias_temp['Brasileiras Pesquisas'] + 
+                           resumo_status_categorias_temp['Brasileiras Solicitadas'] + 
+                           resumo_status_categorias_temp['Brasileiras Emitida'])
+            
+            if total_ativas > 0 and total_ativas == resumo_status_categorias_temp['Brasileiras Emitida']:
+                resumo_status_categorias_temp['Pasta C/Emissão Concluída'] = 1
+            else:
+                resumo_status_categorias_temp['Pasta C/Emissão Concluída'] = 0
         
         # Atribuir o resultado calculado ao nome da variável que o HTML do resumo espera
         resumo_status_categorias = resumo_status_categorias_temp
@@ -656,7 +814,10 @@ def show_ficha_familia():
                             ].iloc[0]
                             
                             # Buscar emissões relacionadas à família selecionada
-                            df_cartorio_completo = carregar_dados_cartorio()
+                            # ATUALIZADO: Usar nova função que carrega todos os pipelines
+                            from views.cartorio_new.data_loader import load_data_all_pipelines
+                            df_cartorio_completo = load_data_all_pipelines()
+                            
                             campo_ligacao_emissoes = 'UF_CRM_34_ID_FAMILIA'
                             
                             if df_cartorio_completo is not None and not df_cartorio_completo.empty and campo_ligacao_emissoes in df_cartorio_completo.columns:
@@ -668,11 +829,11 @@ def show_ficha_familia():
                             print(f"[DEBUG FILTRO EMISSOES] Número de emissões encontradas para a família ID '{id_familia_selecionada}': {len(df_emissoes_filtradas)}")
                             if not df_emissoes_filtradas.empty:
                                 print("[DEBUG FILTRO EMISSOES] Primeiras 5 emissões filtradas (colunas relevantes):")
-                                print(df_emissoes_filtradas[['TITLE', 'UF_CRM_34_ID_REQUERENTE', 'STAGE_ID', 'UF_CRM_34_ID_FAMILIA']].head())
+                                print(df_emissoes_filtradas[['TITLE', 'UF_CRM_34_ID_REQUERENTE', 'STAGE_ID', 'UF_CRM_34_ID_FAMILIA', 'NOME_PIPELINE']].head())
                             else:
-                                print(f"[DEBUG FILTRO EMISSOES] Nenhuma emissão encontrada para o ID de família '{id_familia_selecionada}'. Verifique se este ID existe na coluna 'UF_CRM_34_ID_FAMILIA' do df_cartorio_completo.")
+                                print(f"[DEBUG FILTRO EMISSOES] Nenhuma emissão encontrada para o ID de família '{id_familia_selecionada}'. Verifique se este ID existe na coluna 'UF_CRM_34_ID_FAMILIA'.")
                                 if df_cartorio_completo is not None and not df_cartorio_completo.empty and 'UF_CRM_34_ID_FAMILIA' in df_cartorio_completo.columns:
-                                    print("[DEBUG FILTRO EMISSOES] Alguns IDs de família presentes em df_cartorio_completo['UF_CRM_34_ID_FAMILIA']:")
+                                    print("[DEBUG FILTRO EMISSOES] Alguns IDs de família presentes:")
                                     print(df_cartorio_completo['UF_CRM_34_ID_FAMILIA'].unique()[:20]) # Mostra até 20 IDs únicos
                             
                             st.success(f"Família selecionada: {familia_selecionada_data.get(campo_busca_familia_principal, '')}")

@@ -31,6 +31,7 @@ ESTAGIOS_DEVOLUCAO_ADM = [
 ]
 
 def exibir_producao_adm(df_cartorio_original):
+    st.markdown('<div class="cartorio-container cartorio-container--info">', unsafe_allow_html=True)
     st.title("Dashboard de Pendências ADM")
     
     # --- Carregar CSS Compilado ---
@@ -51,102 +52,7 @@ def exibir_producao_adm(df_cartorio_original):
         st.error(f"Ocorreu um erro inesperado ao carregar o CSS em Produção ADM: {e}")
         print(f"[Debug Produção ADM] Erro detalhado: {str(e)}")
     
-    # Aplicar CSS específico para as tabelas e métricas desta página diretamente
-    css_producao_adm = """
-    /* Estilos para a tabela de resumo por ADM */
-    .adm-resumo-table .stDataFrame {
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      border: 1px solid #E2E8F0;
-    }
-    
-    .adm-resumo-table .stDataFrame thead tr th {
-      background-color: #F1F5F9 !important;
-      color: #1E293B !important;
-      font-weight: 600 !important;
-      text-align: center !important;
-      padding: 8px;
-      border-bottom: 2px solid #CBD5E1;
-    }
-    
-    .adm-resumo-table .stDataFrame tbody tr {
-      transition: background-color 0.15s ease;
-    }
-    
-    .adm-resumo-table .stDataFrame tbody tr:hover {
-      background-color: rgba(37, 99, 235, 0.05);
-    }
-    
-    .adm-resumo-table .stDataFrame tbody tr:nth-child(even) {
-      background-color: #F8FAFC;
-    }
-    
-    .adm-resumo-table .stDataFrame tbody tr td {
-      padding: 8px;
-      border-bottom: 1px solid #E2E8F0;
-    }
-    
-    .adm-resumo-table .stDataFrame tbody tr td:first-child {
-      font-weight: 500;
-      text-align: left;
-    }
-    
-    .adm-resumo-table .stDataFrame tbody tr td:not(:first-child) {
-      text-align: center;
-      font-variant-numeric: tabular-nums;
-    }
-    
-    /* Estilos para as métricas da seção de resumo */
-    .adm-resumo-metricas [data-testid="stHorizontalBlock"] {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-    
-    .adm-resumo-metricas [data-testid="stHorizontalBlock"] > div {
-      background-color: white;
-      border-radius: 8px;
-      padding: 12px;
-      border: 1px solid #E2E8F0;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      transition: transform 0.2s ease;
-    }
-    
-    .adm-resumo-metricas [data-testid="stHorizontalBlock"] > div:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .adm-resumo-metricas [data-testid="stHorizontalBlock"] > div:nth-child(1) [data-testid="stMetricValue"] {
-      color: #334155 !important;
-    }
-    
-    .adm-resumo-metricas [data-testid="stHorizontalBlock"] > div:nth-child(2) [data-testid="stMetricValue"] {
-      color: #2563EB !important;
-    }
-    
-    .adm-resumo-metricas [data-testid="stHorizontalBlock"] > div:nth-child(3) [data-testid="stMetricValue"] {
-      color: #16A34A !important;
-    }
-    
-    .adm-resumo-metricas [data-testid="stMetric"] label[data-testid="stMetricLabel"] p {
-      font-weight: 600 !important;
-      text-align: center !important;
-      font-size: 0.875rem;
-      color: #64748B !important;
-    }
-    
-    .adm-resumo-metricas [data-testid="stMetric"] div[data-testid="stMetricValue"] {
-      font-weight: 700 !important;
-      font-size: 1.25rem !important;
-      text-align: center !important;
-    }
-    """
-    
-    st.markdown(f"<style>{css_producao_adm}</style>", unsafe_allow_html=True)
-    # --- Fim Carregar CSS ---
-    
+    # Remover CSS inline específico - usar apenas classes SCSS
     st.markdown("---")
 
     # --- Carregar Mapa de Usuários ---
@@ -240,18 +146,28 @@ def exibir_producao_adm(df_cartorio_original):
             data_inicio_analise.strftime('%Y-%m-%d'),
             data_fim_analise.strftime('%Y-%m-%d')
         )
-        if dados_supabase_raw:
+        if dados_supabase_raw is not None and not dados_supabase_raw.empty:
             df_supabase = pd.DataFrame(dados_supabase_raw)
             if 'data_criacao' in df_supabase.columns:
                 df_supabase['data_criacao'] = pd.to_datetime(df_supabase['data_criacao'], format='ISO8601', errors='coerce')
-            if 'estagio_id' in df_supabase.columns: 
-                df_supabase['_TEMP_STAGE_NAME'] = df_supabase['estagio_id'].apply(simplificar_nome_estagio)
+            
+            # Verificar se a coluna estagio_id existe ou procurar por alternativas
+            col_estagio = None
+            if 'estagio_id' in df_supabase.columns:
+                col_estagio = 'estagio_id'
+            elif 'stage_id' in df_supabase.columns:
+                col_estagio = 'stage_id'
+            elif 'STAGE_ID' in df_supabase.columns:
+                col_estagio = 'STAGE_ID'
+            
+            if col_estagio:
+                df_supabase['_TEMP_STAGE_NAME'] = df_supabase[col_estagio].apply(simplificar_nome_estagio)
                 df_supabase['STAGE_NAME_PADRONIZADO'] = df_supabase['_TEMP_STAGE_NAME'].apply(
                     lambda x: x.split('/')[-1].strip() if isinstance(x, str) and '/' in x else x
                 )
                 df_supabase.drop(columns=['_TEMP_STAGE_NAME'], inplace=True)
             else:
-                st.warning("Coluna 'estagio_id' não encontrada nos dados do Supabase.")
+                st.warning(f"Coluna de estágio não encontrada nos dados do Supabase. Colunas disponíveis: {df_supabase.columns.tolist()}")
                 df_supabase['STAGE_NAME_PADRONIZADO'] = None
         else:
             st.warning("Nenhum dado de histórico encontrado no Supabase para o período selecionado.")
@@ -340,7 +256,7 @@ def exibir_producao_adm(df_cartorio_original):
     # 3. Exibir Métricas Resumidas
     col1, col2, col3 = st.columns(3)
     
-    st.markdown('<div class="adm-resumo-metricas">', unsafe_allow_html=True)
+    st.markdown('<div class="producao-adm producao-adm__metricas">', unsafe_allow_html=True)
     col1.metric("Total de Pendências Ativas", f"{total_pendencias_ativas}")
     col2.metric("Total de Pendências Resolvidas", f"{total_pendencias_resolvidas}")
     
@@ -445,7 +361,7 @@ def exibir_producao_adm(df_cartorio_original):
         'Tempo Médio de Resolução (dias)': '{:.1f}'
     })
     
-    st.markdown('<div class="adm-resumo-table">', unsafe_allow_html=True)
+    st.markdown('<div class="producao-adm producao-adm__tabela">', unsafe_allow_html=True)
     st.dataframe(styled_df, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -560,6 +476,8 @@ def exibir_producao_adm(df_cartorio_original):
     else:
         st.info("Nenhum dado disponível para análise detalhada por tipo de pendência.")
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)  # Fecha cartorio-container
 
 def analisar_resolucao_pendencia(
     df_bitrix_atual, 

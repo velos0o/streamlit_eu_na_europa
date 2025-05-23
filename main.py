@@ -59,7 +59,9 @@ SUB_ROTAS_EMISSOES = {
     "producao": "Produção",
     "adm": "ADM",  # Novo submenu para ADM
     "certidoes_pendentes_responsavel": "Certidões Pendentes por responsável",
-    "desempenho_conclusao_pasta": "Desempenho Conclusão de Pasta"
+    "desempenho_conclusao_pasta": "Desempenho Conclusão de Pasta",
+    "producao_time_doutora": "Produção Time Doutora", # NOVA SUB-ROTA
+    "pesquisa_br": "Pesquisa BR"  # NOVA SUB-ROTA para Pipeline 104
 }
 
 # Novo mapeamento de sub-rotas para o submenu ADM
@@ -320,11 +322,12 @@ def ir_para_emissao_emissoes_por_familia():
     st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'emissoes_por_familia'
 
-def ir_para_emissao_producao():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras' 
-    st.session_state.emissao_subpagina = 'Produção'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'producao'
+# OCULTO DA VISÃO DO USUÁRIO - PRODUÇÃO
+# def ir_para_emissao_producao():
+#     st.session_state['pagina_atual'] = 'Emissões Brasileiras' 
+#     st.session_state.emissao_subpagina = 'Produção'
+#     st.query_params['page'] = 'cartorio_new'
+#     st.query_params['sub'] = 'producao'
 
 def ir_para_emissao_certidoes_pendentes_responsavel():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
@@ -337,6 +340,20 @@ def ir_para_emissao_desempenho_conclusao_pasta():
     st.session_state.emissao_subpagina = 'Desempenho Conclusão de Pasta'
     st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'desempenho_conclusao_pasta'
+
+# --- MOVIDA E CORRIGIDA A FUNÇÃO DE NAVEGAÇÃO PARA PRODUÇÃO TIME DOUTORA ---
+def ir_para_emissao_producao_time_doutora():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras' 
+    st.session_state.emissao_subpagina = 'Produção Time Doutora'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'producao_time_doutora'
+# --- FIM FUNÇÃO MOVIDA ---
+
+def ir_para_emissao_pesquisa_br():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras' 
+    st.session_state.emissao_subpagina = 'Pesquisa BR'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'pesquisa_br'
 
 def ir_para_emissao_adm():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
@@ -530,10 +547,11 @@ if st.session_state.get('emissao_submenu_expanded', False):
                     on_click=ir_para_emissao_emissoes_por_familia,
                     use_container_width=True,
                     type="primary" if st.session_state.get('emissao_subpagina') == "Emissões Por Família" else "secondary")
-        st.button("Produção", key="subbtn_emissao_producao",
-                    on_click=ir_para_emissao_producao,
-                    use_container_width=True,
-                    type="primary" if st.session_state.get('emissao_subpagina') == "Produção" else "secondary")
+        # OCULTO DA VISÃO DO USUÁRIO - BOTÃO PRODUÇÃO
+        # st.button("Produção", key="subbtn_emissao_producao",
+        #             on_click=ir_para_emissao_producao,
+        #             use_container_width=True,
+        #             type="primary" if st.session_state.get('emissao_subpagina') == "Produção" else "secondary")
         # Botão para o submenu ADM
         st.button("ADM", key="subbtn_emissao_adm",
                     on_click=ir_para_emissao_adm,
@@ -605,6 +623,18 @@ if st.session_state.get('emissao_submenu_expanded', False):
                     on_click=ir_para_emissao_desempenho_conclusao_pasta,
                     use_container_width=True,
                     type="primary" if st.session_state.get('emissao_subpagina') == "Desempenho Conclusão de Pasta" else "secondary")
+        # --- ADICIONAR BOTÃO PARA PRODUÇÃO TIME DOUTORA ---
+        st.button("Produção Time Doutora", key="subbtn_emissao_producao_time_doutora",
+                    on_click=ir_para_emissao_producao_time_doutora,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Produção Time Doutora" else "secondary")
+        
+        # --- ADICIONAR BOTÃO PARA PESQUISA BR ---
+        st.button("🔍 Pesquisa BR", key="subbtn_emissao_pesquisa_br",
+                    on_click=ir_para_emissao_pesquisa_br,
+                    use_container_width=True,
+                    type="primary" if st.session_state.get('emissao_subpagina') == "Pesquisa BR" else "secondary",
+                    help="Relatório do Pipeline 104 - Pesquisa BR")
 
 # st.sidebar.button("Extrações", key="btn_extracoes", 
 #             on_click=ir_para_extracoes,

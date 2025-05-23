@@ -1,0 +1,420 @@
+// assets/styles/scss/components/_cartorio_dashboards.scss
+// Estilos para dashboards específicos do cartório
+
+@use 'sass:map';
+@use '../variables' as vars;
+@use '../mixins' as mix;
+
+// === DASHBOARD PESQUISA BR ===
+.pesquisa-br {
+  &__stage-card {
+    padding: map.get(vars.$spacing, 4);
+    border-radius: map.get(vars.$border-radius, 'lg');
+    text-align: center;
+    margin-bottom: map.get(vars.$spacing, 3);
+    box-shadow: map.get(vars.$shadows, 'sm');
+    transition: vars.$transition-base;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: map.get(vars.$shadows, 'md');
+    }
+
+    h3 {
+      margin: 0;
+      margin-bottom: map.get(vars.$spacing, 1);
+      font-size: map.get(vars.$font-sizes, 'lg');
+    }
+
+    p {
+      font-size: map.get(vars.$font-sizes, 'xl');
+      font-weight: bold;
+      margin: map.get(vars.$spacing, 1) 0;
+    }
+
+    small {
+      font-size: map.get(vars.$font-sizes, 'sm');
+    }
+
+    // Variantes por status
+    &--aguardando {
+      background-color: #FFE082;
+      
+      h3, p {
+        color: #F57F17;
+      }
+      
+      small {
+        color: #795548;
+      }
+    }
+
+    &--andamento {
+      background-color: #90CAF9;
+      
+      h3, p {
+        color: #1976D2;
+      }
+      
+      small {
+        color: #424242;
+      }
+    }
+
+    &--prontas {
+      background-color: #A5D6A7;
+      
+      h3, p {
+        color: #388E3C;
+      }
+      
+      small {
+        color: #1B5E20;
+      }
+    }
+
+    &--nao-encontradas {
+      background-color: #FFCDD2;
+      
+      h3, p {
+        color: #D32F2F;
+      }
+      
+      small {
+        color: #B71C1C;
+      }
+    }
+  }
+
+  &__detalhes-table {
+    .stDataFrame {
+      tbody tr {
+        &:nth-child(even) {
+          background-color: vars.$gray-50;
+        }
+
+        &:hover {
+          background-color: rgba(vars.$primary, 0.05);
+        }
+      }
+    }
+  }
+}
+
+// === DASHBOARD PRODUÇÃO ADM ===
+.producao-adm {
+  &__resumo-table {
+    .stDataFrame {
+      border-radius: map.get(vars.$border-radius, 'md');
+      overflow: hidden;
+      box-shadow: map.get(vars.$shadows, 'sm');
+      border: 1px solid vars.$gray-200;
+
+      thead tr th {
+        background-color: vars.$gray-100 !important;
+        color: vars.$gray-800 !important;
+        font-weight: 600 !important;
+        text-align: center !important;
+        padding: map.get(vars.$spacing, 2);
+        border-bottom: 2px solid vars.$gray-300;
+      }
+
+      tbody tr {
+        transition: background-color 0.15s ease;
+
+        &:hover {
+          background-color: rgba(vars.$primary, 0.05);
+        }
+
+        &:nth-child(even) {
+          background-color: vars.$gray-50;
+        }
+
+        td {
+          padding: map.get(vars.$spacing, 2);
+          border-bottom: 1px solid vars.$gray-200;
+
+          &:first-child {
+            font-weight: 500;
+            text-align: left;
+          }
+
+          &:not(:first-child) {
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+          }
+        }
+
+        &:last-child {
+          background-color: vars.$gray-100;
+          font-weight: 600;
+
+          td {
+            border-top: 2px solid vars.$gray-300;
+          }
+        }
+      }
+    }
+  }
+
+  &__metricas {
+    [data-testid="stHorizontalBlock"] {
+      display: flex;
+      gap: map.get(vars.$spacing, 2);
+      margin-bottom: map.get(vars.$spacing, 4);
+
+      & > div {
+        background-color: white;
+        border-radius: map.get(vars.$border-radius, 'md');
+        padding: map.get(vars.$spacing, 3);
+        border: 1px solid vars.$gray-200;
+        box-shadow: map.get(vars.$shadows, 'sm');
+        transition: transform 0.2s ease;
+
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: map.get(vars.$shadows, 'md');
+        }
+
+        &:nth-child(1) [data-testid="stMetricValue"] {
+          color: vars.$gray-700 !important;
+        }
+
+        &:nth-child(2) [data-testid="stMetricValue"] {
+          color: vars.$primary !important;
+        }
+
+        &:nth-child(3) [data-testid="stMetricValue"] {
+          color: vars.$success !important;
+        }
+      }
+    }
+
+    [data-testid="stMetric"] {
+      label[data-testid="stMetricLabel"] p {
+        font-weight: 600 !important;
+        text-align: center !important;
+        font-size: map.get(vars.$font-sizes, 'sm');
+        color: vars.$gray-600 !important;
+      }
+
+      div[data-testid="stMetricValue"] {
+        font-weight: 700 !important;
+        font-size: map.get(vars.$font-sizes, 'xl') !important;
+        text-align: center !important;
+      }
+    }
+  }
+
+  &__evolucao-grafico {
+    margin-top: map.get(vars.$spacing, 4);
+    margin-bottom: map.get(vars.$spacing, 5);
+
+    .stChart {
+      background-color: white;
+      border-radius: map.get(vars.$border-radius, 'md');
+      padding: map.get(vars.$spacing, 3);
+      box-shadow: map.get(vars.$shadows, 'sm');
+      border: 1px solid vars.$gray-200;
+    }
+  }
+
+  &__detalhes-pendencia {
+    margin-top: map.get(vars.$spacing, 4);
+
+    [data-testid="stExpander"] {
+      background-color: white;
+      border-radius: map.get(vars.$border-radius, 'md');
+      margin-bottom: map.get(vars.$spacing, 3);
+      box-shadow: map.get(vars.$shadows, 'sm');
+      border: 1px solid vars.$gray-200;
+      overflow: hidden;
+
+      [data-testid="stExpanderToggleIcon"] + div p {
+        font-weight: 600;
+        color: vars.$gray-700;
+      }
+    }
+
+    [data-testid="stHorizontalBlock"] {
+      display: flex;
+      gap: map.get(vars.$spacing, 2);
+
+      & > div {
+        background-color: vars.$gray-50;
+        border-radius: map.get(vars.$border-radius, 'md');
+        padding: map.get(vars.$spacing, 2);
+      }
+    }
+
+    .stDataFrame {
+      margin-top: map.get(vars.$spacing, 3);
+      border-radius: map.get(vars.$border-radius, 'md');
+      overflow: hidden;
+
+      thead tr th {
+        background-color: vars.$gray-100 !important;
+      }
+    }
+  }
+}
+
+// === DASHBOARD PRODUÇÃO TIME DOUTORA ===
+.producao-doutora {
+  &__table {
+    .stDataFrame {
+      border-radius: map.get(vars.$border-radius, 'lg');
+      overflow: hidden;
+      box-shadow: map.get(vars.$shadows, 'sm');
+      border: 1px solid #E2E8F0;
+
+      thead tr th {
+        background-color: #F0F9FF !important;
+        color: #0C4A6E !important;
+        font-weight: 600 !important;
+        text-align: center !important;
+      }
+    }
+  }
+
+  &__metricas {
+    [data-testid="stMetricValue"] {
+      color: #0E7490 !important;
+    }
+  }
+
+  &__cards-container {
+    display: grid;
+    gap: map.get(vars.$spacing, 3);
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    margin-bottom: map.get(vars.$spacing, 4);
+  }
+
+  &__card {
+    @include mix.card-base;
+    @include mix.hover-shadow;
+    padding: map.get(vars.$spacing, 4);
+    text-align: center;
+    border-left: 4px solid vars.$primary;
+
+    &__title {
+      font-size: map.get(vars.$font-sizes, 'lg');
+      font-weight: 600;
+      color: vars.$primary;
+      margin-bottom: map.get(vars.$spacing, 2);
+    }
+
+    &__value {
+      font-size: map.get(vars.$font-sizes, '2xl');
+      font-weight: 800;
+      color: vars.$gray-800;
+      margin-bottom: map.get(vars.$spacing, 1);
+    }
+
+    &__subtitle {
+      font-size: map.get(vars.$font-sizes, 'sm');
+      color: vars.$gray-600;
+    }
+  }
+}
+
+// === TEMA ESCURO ===
+@include mix.dark-mode {
+  .pesquisa-br {
+    &__stage-card {
+      // Manter cores específicas dos cards de pesquisa em tema escuro
+      // pois são funcionais e identificam status
+    }
+  }
+
+  .producao-adm {
+    &__resumo-table {
+      .stDataFrame {
+        border-color: vars.$gray-700;
+
+        thead tr th {
+          background-color: vars.$gray-800 !important;
+          color: white !important;
+          border-bottom-color: vars.$gray-600;
+        }
+
+        tbody tr {
+          &:nth-child(even) {
+            background-color: rgba(vars.$gray-700, 0.3);
+          }
+
+          &:hover {
+            background-color: rgba(vars.$primary, 0.2);
+          }
+
+          td {
+            border-bottom-color: vars.$gray-700;
+          }
+
+          &:last-child {
+            background-color: vars.$gray-800;
+
+            td {
+              border-top-color: vars.$gray-600;
+            }
+          }
+        }
+      }
+    }
+
+    &__metricas {
+      [data-testid="stHorizontalBlock"] > div {
+        background-color: vars.$gray-800;
+        border-color: vars.$gray-700;
+      }
+    }
+
+    &__evolucao-grafico {
+      .stChart {
+        background-color: vars.$gray-800;
+        border-color: vars.$gray-700;
+      }
+    }
+
+    &__detalhes-pendencia {
+      [data-testid="stExpander"] {
+        background-color: vars.$gray-800;
+        border-color: vars.$gray-700;
+      }
+
+      [data-testid="stHorizontalBlock"] > div {
+        background-color: vars.$gray-900;
+      }
+    }
+  }
+
+  .producao-doutora {
+    &__table {
+      .stDataFrame {
+        border-color: vars.$gray-700;
+
+        thead tr th {
+          background-color: vars.$gray-800 !important;
+          color: white !important;
+        }
+      }
+    }
+
+    &__card {
+      background-color: vars.$gray-800;
+      border-color: vars.$gray-700;
+
+      &__title {
+        color: vars.$primary-light;
+      }
+
+      &__value {
+        color: vars.$gray-100;
+      }
+
+      &__subtitle {
+        color: vars.$gray-300;
+      }
+    }
+  }
+} 

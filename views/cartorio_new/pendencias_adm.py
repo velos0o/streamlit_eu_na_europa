@@ -14,19 +14,27 @@ from .utils import simplificar_nome_estagio, categorizar_estagio
 # TODO: Considerar mover esta função para um módulo utils compartilhado
 # def simplificar_nome_estagio(nome):
 
-def exibir_pendencias_adm(df_original):
+def exibir_pendencias_adm(df_cartorio_original):
     """
     Exibe uma tabela dinâmica mostrando a contagem de processos por ADM de Pasta e estágio,
     com filtro por nome e estilização SCSS.
     Coluna 'DEVOLUÇÃO ADM' destacada.
     """
-    st.markdown("#### Pendências por ADM de Pasta e Estágio")
+    # --- Carregar CSS Compilado ---
+    try:
+        with open('assets/styles/css/main.css', 'r', encoding='utf-8') as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("Arquivo CSS principal (main.css) não encontrado.")
+    
+    st.markdown('<div class="cartorio-container cartorio-container--info">', unsafe_allow_html=True)
+    st.title("Pendências ADM")
 
-    if df_original is None or df_original.empty:
+    if df_cartorio_original is None or df_cartorio_original.empty:
         st.warning("Não há dados disponíveis para exibir as pendências.")
         return
 
-    df = df_original.copy()
+    df = df_cartorio_original.copy()
 
     # --- Definição das Colunas ---
     coluna_data_criacao = 'CREATED_TIME' # Coluna para o filtro de data
@@ -115,8 +123,8 @@ def exibir_pendencias_adm(df_original):
         # --- Sugestões para Busca de Família ---
         # sugestoes_familia = [] # Removido, não usado diretamente depois
         termo_digitado_familia = termo_busca_familia_widget.strip()
-        if termo_digitado_familia and filtro_familia_habilitado and coluna_nome_familia in df_original.columns:
-            nomes_unicos_familia_sugestao = df_original[coluna_nome_familia].fillna('Desconhecido').astype(str).unique()
+        if termo_digitado_familia and filtro_familia_habilitado and coluna_nome_familia in df_cartorio_original.columns:
+            nomes_unicos_familia_sugestao = df_cartorio_original[coluna_nome_familia].fillna('Desconhecido').astype(str).unique()
             sugestoes_familia_list = [
                 nome for nome in nomes_unicos_familia_sugestao
                 if termo_digitado_familia.lower() in nome.lower()
@@ -414,6 +422,8 @@ def exibir_pendencias_adm(df_original):
                mime='text/csv',
                key='download-detalhes-devolucao-adm-csv'
             )
+
+    st.markdown('</div>', unsafe_allow_html=True)  # Fecha cartorio-container
 
 def extrair_nome_responsavel(resp):
     """ Extrai o nome do responsável de diferentes formatos possíveis. """

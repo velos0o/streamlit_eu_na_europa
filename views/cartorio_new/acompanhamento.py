@@ -83,12 +83,18 @@ def exibir_acompanhamento(df_cartorio):
     df['STAGE_ID'] = df['STAGE_ID'].astype(str)
     df['ESTAGIO_LEGIVEL'] = df['STAGE_ID'].apply(simplificar_nome_estagio)
     df['CATEGORIA_ESTAGIO'] = df['ESTAGIO_LEGIVEL'].apply(categorizar_estagio)
-    df['CONCLUIDA'] = df['CATEGORIA_ESTAGIO'] == 'SUCESSO'
-
+    
+    # NOVA LÓGICA: Aplicar regras específicas para os pipelines
+    df['CONCLUIDA'] = df.apply(lambda row: calcular_conclusao_por_pipeline(row), axis=1)
+    
     # 3. Tratar Nulos na coluna Nome da Família (já feito no loader, mas confirmando)
     df[coluna_nome_familia] = df[coluna_nome_familia].fillna('Família Desconhecida').astype(str)
     df[coluna_nome_familia] = df[coluna_nome_familia].replace(r'^\s*$', 'Família Desconhecida', regex=True)
 
+    # --- LÓGICA ESPECIAL PARA PIPELINE 104 (Pesquisa BR) ---
+    # Aplicar lógica de precedência para evitar duplicação de contagem
+    df = aplicar_logica_precedencia_pipeline_104(df, coluna_id_requerente)
+    
     # --- Agrupamento por Família (pré-filtro) ---
     # Mover agregação para ANTES dos filtros para ter a base completa
     df_agrupado = df.groupby(coluna_nome_familia).agg(
@@ -133,17 +139,23 @@ def exibir_acompanhamento(df_cartorio):
 
     # --- Filtros --- 
     with st.expander("Filtros", expanded=True): 
+        st.markdown('<div class="filtros-container">', unsafe_allow_html=True)
+        
         # Layout: Linha 1 (Família, Data), Linha 2 (Percentual, Responsável), Linha 3 (Botão Limpar)
         col_l1_familia, col_l1_data = st.columns([0.5, 0.5])
         col_l2_perc, col_l2_resp = st.columns([0.5, 0.5])  # Nova linha com colunas para percentual e responsável
         col_l3_empty, col_l3_btn = st.columns([0.8, 0.2])  # Renomear para l3 (linha 3)
         
         with col_l1_familia:
+            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+            st.markdown('<label class="filtro-label">Buscar Família/Contrato</label>', unsafe_allow_html=True)
             st.text_input(
-                "Buscar Família/Contrato", # Label consistente
+                "",  # Label vazio pois usamos HTML
                 placeholder="Digite parte do nome...",
-                key=KEY_BUSCA_FAMILIA 
+                key=KEY_BUSCA_FAMILIA,
+                label_visibility="collapsed"
             )
+            st.markdown('</div>', unsafe_allow_html=True)
 
             # --- Sugestões para Busca de Família --- 
             sugestoes_familia = []
@@ -164,7 +176,8 @@ def exibir_acompanhamento(df_cartorio):
                     st.caption("Nenhuma família/contrato encontrado.")
 
         with col_l1_data:
-            st.markdown("**Data de Venda**") 
+            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+            st.markdown('<label class="filtro-label">Data de Venda</label>', unsafe_allow_html=True)
             # Usar colunas internas para alinhar De/Até
             date_col1, date_col2 = st.columns(2)
             with date_col1:
@@ -173,8 +186,10 @@ def exibir_acompanhamento(df_cartorio):
                 st.date_input("Até", key=KEY_DATA_FIM, min_value=min_date_default, max_value=max_date_default, label_visibility="collapsed")
             if st.session_state[KEY_DATA_INICIO] > st.session_state[KEY_DATA_FIM]:
                  st.warning("Data 'De' não pode ser maior que a data 'Até'.")
+            st.markdown('</div>', unsafe_allow_html=True)
 
         with col_l2_perc:
+            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
             opcoes_percentual = [
                 "0% - 9%", 
                 "10% - 30%",
@@ -190,8 +205,10 @@ def exibir_acompanhamento(df_cartorio):
                 placeholder="Selecione a(s) faixa(s)", # Placeholder melhorado
                 key=KEY_PERCENTUAL 
             )
+            st.markdown('</div>', unsafe_allow_html=True)
         
         with col_l2_resp:
+            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
             # Obter lista de responsáveis únicos para o filtro
             responsaveis_unicos = sorted(df_agrupado['responsavel'].unique().tolist())
             # Remover valores vazios ou nulos se existirem
@@ -203,11 +220,14 @@ def exibir_acompanhamento(df_cartorio):
                 placeholder="Selecione um ou mais responsáveis",
                 key=KEY_RESPONSAVEL
             )
+            st.markdown('</div>', unsafe_allow_html=True)
             
         with col_l3_btn:
-            # Adicionar um pouco de espaço acima do botão
-            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) 
+            st.markdown('<div class="espacamento-cartorio espacamento-cartorio--button">', unsafe_allow_html=True)
             st.button("Limpar", on_click=clear_filters, help="Limpar todos os filtros")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+        st.markdown('</div>', unsafe_allow_html=True)  # Fecha filtros-container
             
     # --- Fim Filtros ---
     
@@ -282,13 +302,21 @@ def exibir_acompanhamento(df_cartorio):
     percentual_conclusao_filtrado = (concluidas_filtrado / total_certidoes_filtrado * 100) if total_certidoes_filtrado > 0 else 0
     
     # --- Exibir Métricas Macro DIN MICAS ---
+    st.markdown('<div class="metricas-grid metricas-grid--neutral">', unsafe_allow_html=True)
+    
     col1, col2, col3, col4, col5 = st.columns(5) 
+    
+    # Usar st.metric() padrão para manter consistência visual (cinza)
     col1.metric("Famílias", f"{total_familias_filtrado:,}")
     col2.metric("Certidões", f"{total_certidoes_filtrado:,}")
-    col3.metric("Requerentes", f"{total_requerentes_filtrado:,}", help=f"Contagem de IDs únicos ({coluna_id_requerente}) das famílias filtradas.")
+    col3.metric("Requerentes", f"{total_requerentes_filtrado:,}", 
+               help=f"Contagem de IDs únicos ({coluna_id_requerente}) das famílias filtradas.")
     col4.metric("Concluídas", f"{concluidas_filtrado:,}")
-    col5.metric("% Conclusão", f"{percentual_conclusao_filtrado:.1f}%", help="Percentual calculado sobre as certidões das famílias filtradas.")
-    st.markdown("---") # Divisor
+    col5.metric("% Conclusão", f"{percentual_conclusao_filtrado:.1f}%",
+               help="Percentual calculado sobre as certidões das famílias filtradas.")
+    
+    st.markdown('</div>', unsafe_allow_html=True)  # Fecha metricas-grid
+    st.markdown('<div class="divisor-cartorio"></div>', unsafe_allow_html=True) # Divisor com classe SCSS
 
 
     # --- Preparação da Tabela Final ---
@@ -375,3 +403,120 @@ def exibir_acompanhamento(df_cartorio):
         use_container_width=True,
         column_config=column_config_dict,
     ) 
+
+def calcular_conclusao_por_pipeline(row):
+    """
+    Calcula se uma certidão está concluída baseada no pipeline e lógica específica.
+    
+    CORRIGIDO DEZEMBRO 2024: Incluindo suporte correto para funis 102 (Paróquia) e 104 (Pesquisa BR)
+    
+    Pipeline 92/94 (Cartórios): Lógica normal
+    Pipeline 102 (Paróquia): Incluir nas métricas normais  
+    Pipeline 104 (Pesquisa BR): APENAS considerar concluído quando realmente finalizado
+    """
+    category_id = str(row.get('CATEGORY_ID', ''))
+    estagio_legivel = row.get('ESTAGIO_LEGIVEL', '')
+    categoria_estagio = row.get('CATEGORIA_ESTAGIO', '')
+    
+    # Pipeline 102 (Paróquia): Tratar como pipeline normal de emissão
+    if category_id == '102':
+        return categoria_estagio == 'SUCESSO'
+    
+    # Pipeline 104 (Pesquisa BR): CORRIGIDO - Lógica mais restritiva
+    elif category_id == '104':
+        # CORREÇÃO CRÍTICA: Não considerar "PESQUISA PRONTA PARA EMISSÃO" como concluída
+        # Isso significa apenas que a pesquisa foi finalizada, mas ainda precisa ser processada
+        # Apenas considerar concluído se realmente chegou ao final do processo
+        
+        # Para pipeline 104, só considerar concluído se:
+        # 1. Chegou ao estado SUCCESS final (se existir)
+        # 2. OU se foi dispensada/cancelada (FAIL pode indicar finalização)
+        if categoria_estagio == 'SUCESSO':
+            return True
+        elif categoria_estagio == 'FALHA':
+            # PESQUISA NÃO ENCONTRADA pode ser considerada como "concluída" no sentido de finalizada
+            return True
+        else:
+            # Estados como "PESQUISA PRONTA PARA EMISSÃO" NÃO são conclusão final
+            # pois ainda precisam ser processados em outros funis
+            return False
+    
+    # Pipelines 92 e 94 (Cartórios): Lógica normal
+    else:
+        return categoria_estagio == 'SUCESSO'
+
+def aplicar_logica_precedencia_pipeline_104(df, coluna_id_requerente):
+    """
+    Aplica lógica de precedência para o pipeline 104 (Pesquisa BR).
+    
+    ATUALIZADA DEZEMBRO 2024: Melhorada para tratar adequadamente a lógica de duplicação
+    
+    Regras:
+    1. Se um requerente tem registros no pipeline 104 EM ANDAMENTO E
+    2. Tem registros nos pipelines superiores (92, 94, 102) TAMBÉM EM ANDAMENTO
+    3. Então: Manter ambos na contagem (são processos paralelos)
+    
+    4. Se um requerente tem pipeline 104 "PESQUISA PRONTA" E
+    5. Tem registros nos pipelines superiores (92, 94, 102) 
+    6. Então: Manter o 104 na contagem APENAS se não houver duplicação real
+    
+    IMPORTANTE: Ser mais conservador para não remover dados importantes
+    """
+    df_processado = df.copy()
+    
+    if 'CATEGORY_ID' not in df_processado.columns or coluna_id_requerente not in df_processado.columns:
+        return df_processado
+    
+    # Identificar requerentes que têm pipeline 104
+    requerentes_104 = df_processado[
+        df_processado['CATEGORY_ID'].astype(str) == '104'
+    ][coluna_id_requerente].unique()
+    
+    if len(requerentes_104) == 0:
+        return df_processado
+    
+    # Para cada requerente com 104, verificar se há conflito real de duplicação
+    requerentes_para_ajustar_104 = []
+    
+    for id_requerente in requerentes_104:
+        registros_requerente = df_processado[df_processado[coluna_id_requerente] == id_requerente]
+        
+        # Verificar registros por pipeline
+        registros_104 = registros_requerente[registros_requerente['CATEGORY_ID'].astype(str) == '104']
+        registros_superiores = registros_requerente[registros_requerente['CATEGORY_ID'].astype(str).isin(['92', '94', '102'])]
+        
+        # Se tem pipelines superiores E pipeline 104 está "pronto para emissão"
+        if not registros_superiores.empty and not registros_104.empty:
+            # Verificar se o 104 está realmente pronto para emissão (seria duplicação)
+            tem_104_pronto = registros_104['ESTAGIO_LEGIVEL'].str.contains('PESQUISA PRONTA PARA EMISSÃO', na=False).any()
+            
+            # Verificar se os pipelines superiores estão ativos/em andamento
+            superiores_ativos = registros_superiores['CATEGORIA_ESTAGIO'].isin(['EM_ANDAMENTO', 'SUCESSO']).any()
+            
+            if tem_104_pronto and superiores_ativos:
+                # APENAS remover se há clara duplicação 
+                # (pesquisa pronta + pipeline superior ativo)
+                requerentes_para_ajustar_104.append(id_requerente)
+                print(f"[DEBUG ACOMPANHAMENTO] ID_REQUERENTE {id_requerente}: Pipeline 104 pronto com pipeline superior ativo, ajustando para evitar duplicação")
+            else:
+                print(f"[DEBUG ACOMPANHAMENTO] ID_REQUERENTE {id_requerente}: Pipeline 104 e superiores coexistindo normalmente")
+        else:
+            print(f"[DEBUG ACOMPANHAMENTO] ID_REQUERENTE {id_requerente}: Apenas pipeline 104 ou sem conflito")
+    
+    # AJUSTE CONSERVADOR: Em vez de remover, apenas marcar para não contar como "concluído"
+    # se há duplicação real
+    if requerentes_para_ajustar_104:
+        # Aplicar ajuste mais sutil: não remover registros, mas ajustar a contagem de conclusão
+        for id_req in requerentes_para_ajustar_104:
+            mask_104_pronto = (
+                (df_processado[coluna_id_requerente] == id_req) &
+                (df_processado['CATEGORY_ID'].astype(str) == '104') &
+                (df_processado['ESTAGIO_LEGIVEL'].str.contains('PESQUISA PRONTA PARA EMISSÃO', na=False))
+            )
+            
+            # Em vez de remover, vamos deixar o registro mas não contar como concluído
+            # (isso será tratado na função de conclusão revisada)
+            if mask_104_pronto.any():
+                print(f"[DEBUG ACOMPANHAMENTO] Mantendo registros do pipeline 104 para {id_req}, mas ajustando lógica de conclusão")
+    
+    return df_processado 

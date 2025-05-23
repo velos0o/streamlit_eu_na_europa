@@ -19,7 +19,15 @@ def exibir_pendencias(df_original):
     Exibe uma tabela dinâmica mostrando a contagem de processos por responsável e estágio,
     com filtro por nome e estilização SCSS.
     """
-    st.markdown("#### Pendências por Responsável e Estágio")
+    # --- Carregar CSS Compilado ---
+    try:
+        with open('assets/styles/css/main.css', 'r', encoding='utf-8') as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("Arquivo CSS principal (main.css) não encontrado.")
+    
+    st.markdown('<div class="cartorio-container cartorio-container--warning">', unsafe_allow_html=True)
+    st.title("Análise de Pendências")
 
     if df_original is None or df_original.empty:
         st.warning("Não há dados disponíveis para exibir as pendências.")
@@ -395,6 +403,13 @@ def exibir_pendencias(df_original):
        mime='text/csv',
        key='download-pendencias-csv'
     ) 
+
+    st.success(f"Filtro aplicado: Mostrando {len(tabela_filtrada)} registros de pendências.")
+    
+    # Exibir a tabela
+    st.dataframe(tabela_filtrada, use_container_width=True, height=400)
+
+    st.markdown('</div>', unsafe_allow_html=True)  # Fecha cartorio-container
 
 def extrair_nome_responsavel(resp):
     """ Extrai o nome do responsável de diferentes formatos possíveis ou retorna 'SEM_RESPONSAVEL'. """

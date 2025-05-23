@@ -1,0 +1,414 @@
+// assets/styles/scss/components/_cartorio_new_base.scss
+// Estilos base para o módulo cartorio_new
+
+@use 'sass:map';
+@use '../variables' as vars;
+@use '../mixins' as mix;
+
+// === TÍTULOS E HEADERS ===
+.bi-title {
+  color: vars.$primary-dark;
+  font-size: map.get(vars.$font-sizes, '3xl');
+  font-weight: 800;
+  margin-bottom: map.get(vars.$spacing, 5);
+  padding-bottom: map.get(vars.$spacing, 3);
+  border-bottom: 4px solid vars.$primary-light;
+  text-align: left;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: vars.$transition-base;
+}
+
+.section-title-cartorio {
+  color: vars.$primary;
+  font-size: map.get(vars.$font-sizes, 'xl');
+  font-weight: 700;
+  margin-top: map.get(vars.$spacing, 4);
+  margin-bottom: map.get(vars.$spacing, 3);
+  padding-bottom: map.get(vars.$spacing, 1);
+  border-bottom: 2px solid vars.$primary-light;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+// === LAYOUT CONTAINERS ===
+.cartorio-container {
+  @include mix.card-base;
+  margin-bottom: map.get(vars.$spacing, 4);
+  
+  &--bordered {
+    border-left: 4px solid vars.$primary;
+  }
+  
+  &--info {
+    background-color: rgba(vars.$primary, 0.05);
+    border-left-color: vars.$primary;
+  }
+  
+  &--success {
+    background-color: rgba(vars.$success, 0.05);
+    border-left-color: vars.$success;
+    
+    // Variante abóbora/laranja para métricas de totais
+    &-total {
+      background: linear-gradient(135deg, #ffab7a 0%, #ff9966 100%); // Laranja mais suave e levado
+      border: 2px solid #ff8855; // Laranja mais claro
+      border-left: 6px solid #ff8855;
+      color: white;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 15px rgba(255, 136, 85, 0.3); // Sombra mais suave
+      text-align: left; // Alinhamento à esquerda
+      
+      .section-title-cartorio {
+        color: white;
+        border-bottom-color: rgba(255, 255, 255, 0.3);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        font-weight: 800;
+        text-align: left; // Título à esquerda
+      }
+      
+      .metrica-card {
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        backdrop-filter: blur(10px);
+        text-align: left; // Card à esquerda
+        
+        &__value {
+          color: white;
+          font-weight: 900;
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          font-size: 3rem; // Maior para destaque
+          text-align: left; // Valor à esquerda
+        }
+        
+        &__label {
+          color: rgba(255, 255, 255, 0.9);
+          font-weight: 700;
+          text-align: left; // Label à esquerda
+        }
+      }
+      
+      &:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(255, 136, 85, 0.4); // Sombra hover mais suave
+      }
+    }
+  }
+  
+  &--warning {
+    background-color: rgba(vars.$warning, 0.05);
+    border-left-color: vars.$warning;
+  }
+  
+  &--danger {
+    background-color: rgba(vars.$danger, 0.05);
+    border-left-color: vars.$danger;
+  }
+}
+
+// === FILTROS E FORMULÁRIOS ===
+.filtros-container {
+  @include mix.card-base;
+  padding: map.get(vars.$spacing, 4);
+  margin-bottom: map.get(vars.$spacing, 5);
+  border: 1px solid vars.$gray-400; // Cinza mais escuro para não brigar
+  background: vars.$gray-100; // Fundo cinza mais escuro
+  
+  .filtro-section {
+    margin-bottom: map.get(vars.$spacing, 3);
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+  
+  .filtro-label {
+    font-weight: 600;
+    color: vars.$gray-800; // Texto mais escuro para contraste
+    margin-bottom: map.get(vars.$spacing, 2);
+    display: block;
+  }
+}
+
+// === MÉTRICAS E ESTATÍSTICAS ===
+.metricas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: map.get(vars.$spacing, 3);
+  margin-bottom: map.get(vars.$spacing, 4);
+  
+  // Variante para st.metric() padrão (mantém cinza)
+  &--neutral {
+    margin-bottom: map.get(vars.$spacing, 4);
+    
+    // Garantir que as st.metric() mantenham estilo padrão (cinza)
+    [data-testid="stMetric"] {
+      background: var(--card-bg);
+      padding: map.get(vars.$spacing, 3);
+      border-radius: map.get(vars.$border-radius, md);
+      border: 1px solid var(--card-border);
+      transition: vars.$transition-base;
+      
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      
+      [data-testid="stMetricValue"] {
+        color: vars.$gray-700 !important; // Manter cinza
+        font-weight: 600 !important;
+      }
+      
+      [data-testid="stMetricLabel"] {
+        color: vars.$gray-600 !important; // Manter cinza
+        font-weight: 500 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+        font-size: 0.875rem !important;
+      }
+    }
+    
+    @include mix.dark-mode {
+      [data-testid="stMetric"] {
+        background: var(--card-bg-dark);
+        border-color: var(--card-border-dark);
+        
+        [data-testid="stMetricValue"] {
+          color: vars.$gray-200 !important;
+        }
+        
+        [data-testid="stMetricLabel"] {
+          color: vars.$gray-400 !important;
+        }
+      }
+    }
+  }
+}
+
+.metrica-card {
+  @include mix.card-base;
+  position: relative;
+  text-align: center;
+  padding: map.get(vars.$spacing, 4);
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: vars.$transition-base;
+  
+  // Cores neutras por padrão (cinza como st.metric)
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  
+  &:hover {
+    @include mix.hover-shadow;
+    transform: translateY(-2px);
+  }
+
+  &__value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: map.get(vars.$spacing, 1);
+    // Cor neutra (cinza) por padrão
+    color: vars.$gray-700;
+  }
+
+  &__label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    margin-bottom: map.get(vars.$spacing, 2);
+    // Cor neutra (cinza) por padrão  
+    color: vars.$gray-600;
+  }
+
+  &__subtitle {
+    font-size: 0.75rem;
+    color: vars.$gray-500;
+  }
+
+  &__help {
+    font-size: 0.75rem;
+    color: vars.$gray-500;
+    margin-top: map.get(vars.$spacing, 1);
+    font-style: italic;
+  }
+
+  // === SISTEMA DE CORES: GANHO/ANDAMENTO/PERCA ===
+  
+  // Ganho = Verde
+  &--ganho, &--success {
+    border-left: 4px solid vars.$success;
+    
+    .metrica-card__value {
+      color: vars.$success;
+    }
+    
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: vars.$success;
+    }
+  }
+
+  // Em Andamento = Amarelo
+  &--andamento, &--warning {
+    border-left: 4px solid vars.$warning;
+    
+    .metrica-card__value {
+      color: vars.$warning;
+    }
+    
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: vars.$warning;
+    }
+  }
+
+  // Perca = Vermelho
+  &--perca, &--danger {
+    border-left: 4px solid vars.$danger;
+    
+    .metrica-card__value {
+      color: vars.$danger;
+    }
+    
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: vars.$danger;
+    }
+  }
+
+  // Métricas especiais
+  &--percentage {
+    .metrica-card__value::after {
+      content: '%';
+      font-size: 0.8em;
+      opacity: 0.7;
+    }
+  }
+
+  &--large {
+    .metrica-card__value {
+      font-size: 2.5rem;
+    }
+  }
+
+  // === TEMA ESCURO ===
+  @include mix.dark-mode {
+    background: var(--card-bg-dark);
+    border-color: var(--card-border-dark);
+    
+    .metrica-card__value {
+      color: vars.$gray-200;
+    }
+    
+    .metrica-card__label {
+      color: vars.$gray-400;
+    }
+    
+    .metrica-card__subtitle,
+    .metrica-card__help {
+      color: vars.$gray-400;
+    }
+  }
+}
+
+// === RESPONSIVIDADE E UTILITÁRIOS ===
+.divisor-cartorio {
+  margin: map.get(vars.$spacing, 4) 0;
+  height: 1px;
+  background: linear-gradient(to right, vars.$gray-300, transparent);
+}
+
+.espacamento-cartorio {
+  &--sm { margin-bottom: map.get(vars.$spacing, 2); }
+  &--md { margin-bottom: map.get(vars.$spacing, 4); }
+  &--lg { margin-bottom: map.get(vars.$spacing, 6); }
+  &--xl { margin-bottom: map.get(vars.$spacing, 8); }
+}
+
+// === TEMA ESCURO ===
+@include mix.dark-mode {
+  .bi-title {
+    color: vars.$primary-light;
+    border-bottom-color: vars.$primary;
+  }
+  
+  .section-title-cartorio {
+    color: vars.$primary-light;
+    border-bottom-color: vars.$primary;
+  }
+  
+  .cartorio-container {
+    background-color: vars.$gray-800;
+    border-color: vars.$gray-700;
+    
+    &--info {
+      background-color: rgba(vars.$primary-light, 0.1);
+    }
+    
+    &--success {
+      background-color: rgba(vars.$success-light, 0.1);
+    }
+    
+    &--warning {
+      background-color: rgba(vars.$warning-light, 0.1);
+    }
+    
+    &--danger {
+      background-color: rgba(vars.$danger-light, 0.1);
+    }
+  }
+  
+  .filtros-container {
+    background-color: vars.$gray-900; // Mais escuro no dark mode
+    border-color: vars.$gray-600; // Borda mais contrastante
+    
+    .filtro-label {
+      color: vars.$gray-200; // Texto mais claro para contraste
+    }
+  }
+  
+  .metrica-card {
+    background-color: vars.$gray-800;
+    border-color: vars.$gray-700;
+    
+    &__value {
+      color: vars.$primary-light;
+    }
+    
+    &__label {
+      color: vars.$gray-300;
+    }
+    
+    &__subtitle {
+      color: vars.$gray-400;
+    }
+    
+    &--success .metrica-card__value {
+      color: vars.$success-light;
+    }
+    
+    &--warning .metrica-card__value {
+      color: vars.$warning-light;
+    }
+    
+    &--danger .metrica-card__value {
+      color: vars.$danger-light;
+    }
+  }
+} 

@@ -18,30 +18,15 @@ def exibir_visao_geral(df_original):
     Exibe a seção Visão Geral com filtro de cartório, filtro de data, métricas e estágios categorizados.
     Utiliza CSS INJETADO para estilização específica das métricas.
     """
-    # --- CSS Injetado para Métricas ---
-    # REMOVER TODO ESTE BLOCO st.markdown("""...""", unsafe_allow_html=True)
-    # st.markdown(""" ... """, unsafe_allow_html=True)
-    # --- Fim CSS Injetado ---
-
-    # Carregar CSS compilado externo (MANTER OU AJUSTAR ESTA PARTE)
+    # --- Carregar CSS Compilado ---
     try:
-        # Usar o caminho absoluto calculado
-        print(f"[Debug Visão Geral] Tentando carregar CSS de: {_CSS_PATH}")
-        if os.path.exists(_CSS_PATH):
-            with open(_CSS_PATH, 'r', encoding='utf-8') as f:
-                st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-                print("[Debug Visão Geral] CSS carregado com sucesso.")
-        else:
-             st.warning(f"Arquivo CSS principal não encontrado em: {_CSS_PATH}")
-             print(f"[Debug Visão Geral] Falha ao carregar CSS: Arquivo não existe em {_CSS_PATH}")
+        with open('assets/styles/css/main.css', 'r', encoding='utf-8') as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
     except FileNotFoundError:
-        # Esta exceção pode não ser mais necessária com a verificação os.path.exists
-        st.warning(f"Erro ao tentar abrir o arquivo CSS principal (main.css) em {_CSS_PATH}.")
-    except Exception as e:
-        st.error(f"Ocorreu um erro inesperado ao carregar o CSS: {e}")
-
-    # Título já está em cartorio_new_main.py, podemos remover ou manter se fizer sentido aqui
-    # st.markdown('<div class="section-title fade-in">Visão Geral dos Estágios</div>', unsafe_allow_html=True)
+        st.warning("Arquivo CSS principal (main.css) não encontrado.")
+    
+    st.markdown('<div class="cartorio-container cartorio-container--bordered">', unsafe_allow_html=True)
+    st.title("Visão Geral - Emissões Brasileiras")
 
     if df_original.empty:
         st.warning("Não há dados disponíveis para exibir a visão geral dos estágios.")
@@ -290,6 +275,24 @@ def exibir_visao_geral(df_original):
             renderizar_categoria_visao_geral(estagios_andamento, "EM ANDAMENTO", "⏳", andamento_count, andamento_perc)
         with col3:
             renderizar_categoria_visao_geral(estagios_falha, "FALHA", "❌", falha_count, falha_perc)
+
+    # === SEÇÃO 1: MÉTRICAS PRINCIPAIS ===
+    st.markdown('<div class="metricas-grid metricas-grid--neutral">', unsafe_allow_html=True)
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Total de Solicitações", total_solicitacoes, help="Todas as solicitações de certidões")
+    col2.metric("Famílias Únicas", total_familias, help="Número de famílias que possuem solicitações")
+    col3.metric("Estágios Únicos", total_estagios, help="Número de estágios distintos")
+    col4.metric("Responsáveis", total_responsaveis, help="Número de responsáveis únicos")
+    col5.metric("Pipelines", total_pipelines, help="Pipelines (categorias) distintos")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+    if not estagios_falha.empty:
+        renderizar_categoria_visao_geral(estagios_falha, "FALHA", "❌", falha_count, falha_perc)
+        
+    st.markdown('</div>', unsafe_allow_html=True)  # Fecha cartorio-container
 
 def renderizar_categoria_visao_geral(df_categoria, titulo, icone, total_count, total_perc):
     """Renderiza uma seção de categoria com seu total e estágios."""

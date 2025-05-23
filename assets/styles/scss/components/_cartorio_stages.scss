@@ -1,0 +1,337 @@
+// assets/styles/scss/components/_cartorio_stages.scss
+// Estilos para cards de estágio do cartório
+
+@use 'sass:map';
+@use '../variables' as vars;
+@use '../mixins' as mix;
+
+// === CARDS DE ESTÁGIO ===
+.stage-card {
+  @include mix.card-base;
+  @include mix.hover-shadow;
+  text-align: center;
+  padding: map.get(vars.$spacing, 4);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  transition: vars.$transition-base;
+  border-radius: map.get(vars.$border-radius, lg);
+  
+  // Cor neutra por padrão (cinza claro)
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  &__icon {
+    font-size: 2rem;
+    margin-bottom: map.get(vars.$spacing, 2);
+  }
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: map.get(vars.$spacing, 2);
+    color: vars.$gray-700;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  &__value {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: map.get(vars.$spacing, 1);
+    color: vars.$gray-700;
+  }
+
+  &__subtitle {
+    font-size: 0.75rem;
+    color: vars.$gray-500;
+    font-weight: 500;
+  }
+
+  // === SISTEMA DE CORES: GANHO/ANDAMENTO/PERCA ===
+  
+  // Ganho = Verde (sucesso, prontas, emitidas)
+  &--ganho, &--sucesso, &--prontas, &--emitidas {
+    background: rgba(34, 197, 94, 0.08); // Verde muito claro
+    border-color: vars.$success;
+    
+    .stage-card__icon {
+      color: vars.$success;
+    }
+    
+    .stage-card__title {
+      color: vars.$success;
+    }
+    
+    .stage-card__value {
+      color: vars.$success;
+    }
+  }
+
+  // Em Andamento = Amarelo (aguardando, pesquisa, processando)
+  &--andamento, &--aguardando, &--pesquisa, &--processando {
+    background: rgba(245, 158, 11, 0.08); // Amarelo muito claro
+    border-color: vars.$warning;
+    
+    .stage-card__icon {
+      color: vars.$warning;
+    }
+    
+    .stage-card__title {
+      color: vars.$warning;
+    }
+    
+    .stage-card__value {
+      color: vars.$warning;
+    }
+  }
+
+  // Perca = Vermelho (falha, não encontradas, canceladas)
+  &--perca, &--falha, &--nao-encontradas, &--canceladas {
+    background: rgba(239, 68, 68, 0.08); // Vermelho muito claro
+    border-color: vars.$danger;
+    
+    .stage-card__icon {
+      color: vars.$danger;
+    }
+    
+    .stage-card__title {
+      color: vars.$danger;
+    }
+    
+    .stage-card__value {
+      color: vars.$danger;
+    }
+  }
+
+  // === TEMA ESCURO ===
+  @include mix.dark-mode {
+    background: var(--card-bg-dark);
+    border-color: var(--card-border-dark);
+    
+    .stage-card__title {
+      color: vars.$gray-200;
+    }
+    
+    .stage-card__value {
+      color: vars.$gray-200;
+    }
+    
+    .stage-card__subtitle {
+      color: vars.$gray-400;
+    }
+    
+    // Ajustar cores no tema escuro
+    &--ganho, &--sucesso, &--prontas, &--emitidas {
+      background: rgba(34, 197, 94, 0.15);
+      
+      .stage-card__icon,
+      .stage-card__title,
+      .stage-card__value {
+        color: #4ade80; // Verde mais claro no dark
+      }
+    }
+    
+    &--andamento, &--aguardando, &--pesquisa, &--processando {
+      background: rgba(245, 158, 11, 0.15);
+      
+      .stage-card__icon,
+      .stage-card__title,
+      .stage-card__value {
+        color: #fbbf24; // Amarelo mais claro no dark
+      }
+    }
+    
+    &--perca, &--falha, &--nao-encontradas, &--canceladas {
+      background: rgba(239, 68, 68, 0.15);
+      
+      .stage-card__icon,
+      .stage-card__title,
+      .stage-card__value {
+        color: #f87171; // Vermelho mais claro no dark
+      }
+    }
+  }
+}
+
+// === CATEGORIAS DE ESTÁGIO ===
+.category-header {
+  @include mix.flex-between;
+  margin: map.get(vars.$spacing, 4) 0 map.get(vars.$spacing, 3);
+  padding: map.get(vars.$spacing, 2) map.get(vars.$spacing, 3);
+  background: vars.$gray-100;
+  border-radius: map.get(vars.$border-radius, 'md');
+  border-left: 4px solid vars.$gray-400;
+  box-shadow: map.get(vars.$shadows, 'sm');
+
+  .category-title {
+    margin: 0;
+    font-size: map.get(vars.$font-sizes, 'lg');
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: vars.$gray-700;
+  }
+}
+
+// === LAYOUT ESPECÍFICO PARA COLUNAS DE CATEGORIA ===
+.stHorizontalBlock > .stColumn:has(.category-title) {
+  border-radius: map.get(vars.$border-radius, 'lg');
+  padding: map.get(vars.$spacing, 4) map.get(vars.$spacing, 2);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  // Estilo específico por categoria
+  &:nth-child(1) { // Sucesso
+    border: 2px solid vars.$success;
+    background-color: rgba(vars.$success, 0.08);
+    
+    .category-title {
+      color: vars.$success;
+    }
+  }
+
+  &:nth-child(2) { // Em Andamento
+    border: 2px dashed vars.$warning;
+    background-color: rgba(vars.$warning, 0.08);
+    
+    .category-title {
+      color: vars.$warning;
+    }
+  }
+
+  &:nth-child(3) { // Falha
+    border: 2px solid vars.$danger;
+    background-color: rgba(vars.$danger, 0.07);
+    
+    .category-title {
+      color: vars.$danger;
+    }
+  }
+}
+
+// === GRID PARA CARDS ===
+.cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: map.get(vars.$spacing, 2);
+}
+
+// === MÉTRICAS DE ESTÁGIO ===
+.stage-metrics-container {
+  background: vars.$gray-50;
+  border-radius: map.get(vars.$border-radius, 'lg');
+  padding: map.get(vars.$spacing, 4);
+  margin-bottom: map.get(vars.$spacing, 5);
+  
+  .stage-metrics-grid {
+    display: grid;
+    gap: map.get(vars.$spacing, 3);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+  
+  .stage-metric-item {
+    text-align: center;
+    padding: map.get(vars.$spacing, 3);
+    background: white;
+    border-radius: map.get(vars.$border-radius, 'md');
+    box-shadow: map.get(vars.$shadows, 'sm');
+    
+    &__value {
+      font-size: map.get(vars.$font-sizes, '2xl');
+      font-weight: 700;
+      margin-bottom: map.get(vars.$spacing, 1);
+    }
+    
+    &__label {
+      font-size: map.get(vars.$font-sizes, 'sm');
+      font-weight: 600;
+      color: vars.$gray-600;
+    }
+  }
+}
+
+// === TEMA ESCURO ===
+@include mix.dark-mode {
+  .stage-card {
+    background-color: vars.$gray-800;
+    border-color: vars.$gray-700;
+    
+    &__title {
+      color: vars.$gray-200;
+    }
+    
+    &__value {
+      color: vars.$gray-100;
+    }
+    
+    &__subtitle {
+      color: vars.$gray-300;
+    }
+    
+    &--ganho, &--sucesso, &--prontas, &--emitidas {
+      background-color: rgba(34, 197, 94, 0.2);
+      
+      .stage-card__icon,
+      .stage-card__title,
+      .stage-card__value {
+        color: #4ade80;
+      }
+    }
+    
+    &--andamento, &--aguardando, &--pesquisa, &--processando {
+      background-color: rgba(245, 158, 11, 0.2);
+      
+      .stage-card__icon,
+      .stage-card__title,
+      .stage-card__value {
+        color: #fbbf24;
+      }
+    }
+    
+    &--perca, &--falha, &--nao-encontradas, &--canceladas {
+      background-color: rgba(239, 68, 68, 0.2);
+      
+      .stage-card__icon,
+      .stage-card__title,
+      .stage-card__value {
+        color: #f87171;
+      }
+    }
+  }
+  
+  .category-header {
+    background: vars.$gray-900;
+    border-left-color: vars.$gray-600;
+    
+    .category-title {
+      color: vars.$gray-200;
+    }
+  }
+  
+  .stage-metrics-container {
+    background: vars.$gray-900;
+    
+    .stage-metric-item {
+      background: vars.$gray-800;
+      border: 1px solid vars.$gray-700;
+      
+      &__value {
+        color: vars.$gray-100;
+      }
+      
+      &__label {
+        color: vars.$gray-300;
+      }
+    }
+  }
+} 

@@ -6,6 +6,91 @@ from datetime import datetime, timedelta, date
 import re # Para extrair ID da opção do selectbox
 import numpy as np # Para operações numéricas
 
+def aplicar_logica_precedencia_pipeline_104_higienizacao(df):
+    """
+    Aplica lógica de precedência específica para higienização no pipeline 104.
+    
+    CORRIGIDA DEZEMBRO 2024: Melhorada para tratar adequadamente a lógica de duplicação
+    
+    Regras especiais para higienização:
+    1. Se pipeline 104 tem registros EM ANDAMENTO E existe pipeline superior (92, 94, 102):
+       - Manter ambos (são processos paralelos)
+    2. Se pipeline 104 tem "PESQUISA PRONTA PARA EMISSÃO" E existe pipeline superior ATIVO:
+       - Ajustar para evitar duplicação nas métricas de "Pasta C/Emissão Concluída"
+    3. Se pipeline 104 é o ÚNICO para a família: manter na contagem sempre
+    
+    IMPORTANTE: Ser mais conservador para não remover dados importantes
+    """
+    if 'CATEGORY_ID' not in df.columns or 'UF_CRM_34_ID_FAMILIA' not in df.columns:
+        return df
+    
+    df_processado = df.copy()
+    
+    # Identificar famílias que têm pipeline 104
+    familias_104 = df_processado[
+        df_processado['CATEGORY_ID'].astype(str) == '104'
+    ]['UF_CRM_34_ID_FAMILIA'].unique()
+    
+    if len(familias_104) == 0:
+        return df_processado
+    
+    # Para cada família com 104, verificar se há conflito real de duplicação
+    familias_para_ajustar_104 = []
+    
+    for id_familia in familias_104:
+        registros_familia = df_processado[df_processado['UF_CRM_34_ID_FAMILIA'] == id_familia]
+        
+        # Verificar registros por pipeline
+        registros_104 = registros_familia[registros_familia['CATEGORY_ID'].astype(str) == '104']
+        registros_superiores = registros_familia[registros_familia['CATEGORY_ID'].astype(str).isin(['92', '94', '102'])]
+        
+        # Se tem pipelines superiores E pipeline 104
+        if not registros_superiores.empty and not registros_104.empty:
+            # Verificar se há 104 "pronto para emissão" 
+            tem_104_pronto = registros_104['STAGE_ID'].str.contains('SUCCESS', na=False).any()
+            
+            # Verificar se os pipelines superiores estão ativos
+            superiores_com_sucesso = registros_superiores['STAGE_ID'].str.contains('SUCCESS', na=False).any()
+            
+            if tem_104_pronto and superiores_com_sucesso:
+                # Se há clara duplicação (ambos prontos/concluídos)
+                familias_para_ajustar_104.append(id_familia)
+                print(f"[DEBUG HIGIENIZAÇÃO] FAMÍLIA {id_familia}: Pipeline 104 pronto com pipeline superior concluído, ajustando para evitar duplicação")
+            else:
+                print(f"[DEBUG HIGIENIZAÇÃO] FAMÍLIA {id_familia}: Pipeline 104 e superiores coexistindo normalmente")
+        else:
+            print(f"[DEBUG HIGIENIZAÇÃO] FAMÍLIA {id_familia}: Apenas pipeline 104 ou sem conflito, mantendo na contagem")
+    
+    # AJUSTE CONSERVADOR: Em vez de remover completamente, apenas ajustar a contagem
+    # quando há duplicação clara
+    if familias_para_ajustar_104:
+        # Para higienização, vamos manter uma abordagem mais conservadora
+        # Removendo apenas quando há duplicação muito clara
+        familias_para_remover_realmente = []
+        
+        for id_familia in familias_para_ajustar_104:
+            registros_familia = df_processado[df_processado['UF_CRM_34_ID_FAMILIA'] == id_familia]
+            registros_104 = registros_familia[registros_familia['CATEGORY_ID'].astype(str) == '104']
+            registros_superiores = registros_familia[registros_familia['CATEGORY_ID'].astype(str).isin(['92', '94', '102'])]
+            
+            # Verificar se há duplicação MUITO clara (ambos concluídos)
+            tem_104_success = registros_104['STAGE_ID'].str.contains('SUCCESS', na=False).any()
+            tem_superiores_success = registros_superiores['STAGE_ID'].str.contains('SUCCESS', na=False).any()
+            
+            if tem_104_success and tem_superiores_success:
+                # Só remover quando ambos estão "SUCCESS" (duplicação clara)
+                familias_para_remover_realmente.append(id_familia)
+        
+        if familias_para_remover_realmente:
+            mask_remover = (
+                df_processado['UF_CRM_34_ID_FAMILIA'].isin(familias_para_remover_realmente) &
+                (df_processado['CATEGORY_ID'].astype(str) == '104')
+            )
+            df_processado = df_processado[~mask_remover].copy()
+            print(f"[DEBUG HIGIENIZAÇÃO] Removidos {mask_remover.sum()} registros do pipeline 104 devido à duplicação clara")
+    
+    return df_processado
+
 # Função auxiliar para garantir tipos numéricos corretos para exibição
 def ensure_numeric_display(df):
     # Lista de colunas que devem ser inteiras
@@ -59,8 +144,17 @@ def exibir_higienizacao_desempenho():
 
     st.subheader("Desempenho da Higienização por Mesa")
 
+    # --- Carregar CSS Compilado ---
+    try:
+        with open('assets/styles/css/main.css', 'r', encoding='utf-8') as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.warning("Arquivo CSS principal (main.css) não encontrado.")
+
     # --- Filtros --- 
-    st.markdown("**Filtros:**")
+    st.markdown('<div class="filtros-container">', unsafe_allow_html=True)
+    st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+    st.markdown('<label class="filtro-label">Filtros de Data</label>', unsafe_allow_html=True)
     
     # --- Filtro de Data (Opcional) ---
     col_data1, col_data2, col_data_check = st.columns([2,2,1])
@@ -72,6 +166,9 @@ def exibir_higienizacao_desempenho():
     with col_data_check:
         st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) # Espaçador
         aplicar_filtro_data = st.checkbox("Aplicar Datas", value=False, help="Marque para filtrar os dados da planilha pelo período selecionado.", key="aplicar_filtro_data")
+    
+    st.markdown('</div>', unsafe_allow_html=True) # Fecha filtro-section
+    st.markdown('</div>', unsafe_allow_html=True) # Fecha filtros-container
 
     # Variáveis para passar para a função de carregamento
     start_date_to_load = None
@@ -134,7 +231,9 @@ def exibir_higienizacao_desempenho():
             st.warning("Não foi possível carregar os dados de emissões do Bitrix.")
     
     # --- Filtros Adicionais: Data de Venda e Responsável ---
-    st.markdown("**Filtros Adicionais:**")
+    st.markdown('<div class="filtros-container">', unsafe_allow_html=True)
+    st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+    st.markdown('<label class="filtro-label">Filtros Adicionais</label>', unsafe_allow_html=True)
     
     # --- Filtro de Data de Venda ---
     col_venda1, col_venda2 = st.columns(2)
@@ -278,6 +377,9 @@ def exibir_higienizacao_desempenho():
             key="filtro_nome_familia_higienizacao"
         )
 
+    st.markdown('</div>', unsafe_allow_html=True) # Fecha filtro-section
+    st.markdown('</div>', unsafe_allow_html=True) # Fecha filtros-container
+
     # --- Aplicar Filtros por Família (afeta df_conclusao_raw e df_cartorio) --- 
     id_familia_filtrar = None
     
@@ -346,30 +448,78 @@ def exibir_higienizacao_desempenho():
 
     # --- MOVER PROCESSAMENTO DE DADOS PARA ANTES DAS FAIXAS ---
 
+    # --- APLICAR LÓGICA ESPECIAL PARA PIPELINE 104 (PESQUISA BR) ---
+    # Aplicar lógica de precedência antes de calcular métricas
+    if not df_cartorio.empty and 'CATEGORY_ID' in df_cartorio.columns:
+        df_cartorio = aplicar_logica_precedencia_pipeline_104_higienizacao(df_cartorio)
+
     # --- Mapeamento de Estágios Bitrix ---
+    # ATUALIZADO: Incluindo os novos funis 102 (Paróquia) e 104 (Pesquisa BR)
     mapeamento_stages = {
-        'DT1098_92:NEW': 'Brasileiras Pendências', 'DT1098_92:UC_P6PYHW': 'Brasileiras Pesquisas',
-        'DT1098_92:PREPARATION': 'Brasileiras Pendências', 'DT1098_92:UC_XBTHZ7': 'Brasileiras Pendências',
-        'DT1098_92:CLIENT': 'Brasileiras Pendências', 'DT1098_92:UC_ZWO7BI': 'Brasileiras Pendências',
-        'DT1098_92:UC_83ZGKS': 'Brasileiras Pendências', 'DT1098_92:UC_6TECYL': 'Brasileiras Pendências',
-        'DT1098_92:UC_MUJP1P': 'Brasileiras Solicitadas', 'DT1098_92:UC_EYBGVD': 'Brasileiras Pendências',
-        'DT1098_92:UC_KC335Q': 'Brasileiras Pendências', 'DT1098_92:UC_5LWUTX': 'Brasileiras Emitida',
-        'DT1098_92:FAIL': 'Brasileiras Dispensada', 'DT1098_92:UC_Z24IF7': 'Brasileiras Dispensada',
-        'DT1098_92:UC_U10R0R': 'Brasileiras Dispensada', 'DT1098_92:SUCCESS': 'Brasileiras Emitida',
-        'DT1098_94:NEW': 'Brasileiras Pendências', 'DT1098_94:UC_4YE2PI': 'Brasileiras Pesquisas',
-        'DT1098_94:PREPARATION': 'Brasileiras Pendências', 'DT1098_94:CLIENT': 'Brasileiras Pendências',
-        'DT1098_94:UC_IQ4WFA': 'Brasileiras Pendências', 'DT1098_94:UC_UZHXWF': 'Brasileiras Pendências',
-        'DT1098_94:UC_DH38EI': 'Brasileiras Pendências', 'DT1098_94:UC_X9UE60': 'Brasileiras Pendências',
-        'DT1098_94:UC_IXCAA5': 'Brasileiras Solicitadas', 'DT1098_94:UC_VS8YKI': 'Brasileiras Pendências',
-        'DT1098_94:UC_M6A09E': 'Brasileiras Pendências', 'DT1098_94:UC_K4JS04': 'Brasileiras Emitida',
-        'DT1098_94:FAIL': 'Brasileiras Dispensada', 'DT1098_94:UC_MGTPX0': 'Brasileiras Dispensada',
-        'DT1098_94:UC_L3JFKO': 'Brasileiras Dispensada', 'DT1098_94:SUCCESS': 'Brasileiras Emitida'
+        # === Pipeline 92 ===
+        'DT1098_92:NEW': 'Brasileiras Pendências', 
+        'DT1098_92:UC_P6PYHW': 'Brasileiras Pesquisas',
+        'DT1098_92:PREPARATION': 'Brasileiras Pendências', 
+        'DT1098_92:UC_XBTHZ7': 'Brasileiras Pendências',
+        'DT1098_92:CLIENT': 'Brasileiras Pendências', 
+        'DT1098_92:UC_ZWO7BI': 'Brasileiras Pendências',
+        'DT1098_92:UC_83ZGKS': 'Brasileiras Pendências', 
+        'DT1098_92:UC_6TECYL': 'Brasileiras Pendências',
+        'DT1098_92:UC_MUJP1P': 'Brasileiras Solicitadas', 
+        'DT1098_92:UC_EYBGVD': 'Brasileiras Pendências',
+        'DT1098_92:UC_KC335Q': 'Brasileiras Pendências', 
+        'DT1098_92:UC_5LWUTX': 'Brasileiras Emitida',
+        'DT1098_92:FAIL': 'Brasileiras Dispensada', 
+        'DT1098_92:UC_Z24IF7': 'Brasileiras Dispensada',
+        'DT1098_92:UC_U10R0R': 'Brasileiras Dispensada', 
+        'DT1098_92:SUCCESS': 'Brasileiras Emitida',
+        
+        # === Pipeline 94 ===
+        'DT1098_94:NEW': 'Brasileiras Pendências', 
+        'DT1098_94:UC_4YE2PI': 'Brasileiras Pesquisas',
+        'DT1098_94:PREPARATION': 'Brasileiras Pendências', 
+        'DT1098_94:CLIENT': 'Brasileiras Pendências',
+        'DT1098_94:UC_IQ4WFA': 'Brasileiras Pendências', 
+        'DT1098_94:UC_UZHXWF': 'Brasileiras Pendências',
+        'DT1098_94:UC_DH38EI': 'Brasileiras Pendências', 
+        'DT1098_94:UC_X9UE60': 'Brasileiras Pendências',
+        'DT1098_94:UC_IXCAA5': 'Brasileiras Solicitadas', 
+        'DT1098_94:UC_VS8YKI': 'Brasileiras Pendências',
+        'DT1098_94:UC_M6A09E': 'Brasileiras Pendências', 
+        'DT1098_94:UC_K4JS04': 'Brasileiras Emitida',
+        'DT1098_94:FAIL': 'Brasileiras Dispensada', 
+        'DT1098_94:UC_MGTPX0': 'Brasileiras Dispensada',
+        'DT1098_94:UC_L3JFKO': 'Brasileiras Dispensada', 
+        'DT1098_94:SUCCESS': 'Brasileiras Emitida',
+        
+        # === Pipeline 102 (Paróquia) ===
+        'DT1098_102:NEW': 'Brasileiras Pendências',
+        'DT1098_102:PREPARATION': 'Brasileiras Pendências',
+        'DT1098_102:CLIENT': 'Brasileiras Emitida',
+        'DT1098_102:UC_45SBLC': 'Brasileiras Pendências',  # Devolução ADM como pendência
+        'DT1098_102:SUCCESS': 'Brasileiras Emitida',  # Certidão Entregue
+        'DT1098_102:FAIL': 'Brasileiras Dispensada',  # Cancelado
+        'DT1098_102:UC_676WIG': 'Brasileiras Dispensada',  # Certidão Dispensada
+        'DT1098_102:UC_UHPXE8': 'Brasileiras Emitida',  # Certidão Entregue
+        
+        # === Pipeline 104 (Pesquisa BR) - LÓGICA ESPECIAL ===
+        # IMPORTANTE: Pipeline 104 será tratado de forma especial na função aplicar_logica_precedencia_pipeline_104
+        'DT1098_104:NEW': 'Brasileiras Pesquisas',  # Aguardando Pesquisador
+        'DT1098_104:PREPARATION': 'Brasileiras Pesquisas',  # Pesquisa em Andamento
+        'DT1098_104:SUCCESS': 'Brasileiras Pesquisas',  # Pesquisa Pronta - consideramos como pesquisa finalizada
+        'DT1098_104:FAIL': 'Brasileiras Dispensada',  # Pesquisa Não Encontrada
     }
     col_id_familia_bitrix = 'UF_CRM_34_ID_FAMILIA'
     df_bitrix_agg = pd.DataFrame() # Inicializar df_bitrix_agg
 
     if not df_cartorio.empty and 'STAGE_ID' in df_cartorio.columns and col_id_familia_bitrix in df_cartorio.columns:
         df_cartorio['CATEGORIA_EMISSAO'] = df_cartorio['STAGE_ID'].map(mapeamento_stages).fillna('Categoria Desconhecida')
+        
+        # NOVO: Adicionar coluna de conclusão corrigida para cada registro
+        df_cartorio['CONCLUIDA_CORRIGIDA'] = df_cartorio.apply(
+            lambda row: calcular_conclusao_corrigida_por_pipeline(row), axis=1
+        )
+        
         df_bitrix_agg = pd.crosstab(df_cartorio[col_id_familia_bitrix], df_cartorio['CATEGORIA_EMISSAO'])
         
         categorias_bitrix_contagem = [
@@ -389,21 +539,44 @@ def exibir_higienizacao_desempenho():
 
         df_bitrix_agg = df_bitrix_agg.reindex(columns=categorias_bitrix_contagem, fill_value=0)
         
-        df_bitrix_agg['TOTAL_ATIVAS'] = df_bitrix_agg['Brasileiras Pendências'] + \
-                                        df_bitrix_agg['Brasileiras Pesquisas'] + \
-                                        df_bitrix_agg['Brasileiras Solicitadas'] + \
-                                        df_bitrix_agg['Brasileiras Emitida']
+        # CORRIGIDO: Calcular "Pasta C/Emissão Concluída" usando a lógica corrigida
+        # Primeiro, agrupar por família e verificar se TODAS as certidões estão realmente concluídas
+        conclusao_por_familia = df_cartorio.groupby(col_id_familia_bitrix).agg({
+            'CONCLUIDA_CORRIGIDA': ['count', 'sum']
+        })
+        conclusao_por_familia.columns = ['total_certidoes', 'total_concluidas']
+        conclusao_por_familia = conclusao_por_familia.reset_index()
         
-        df_bitrix_agg['Pasta C/Emissão Concluída'] = np.where(
-            (df_bitrix_agg['TOTAL_ATIVAS'] > 0) & (df_bitrix_agg['TOTAL_ATIVAS'] == df_bitrix_agg['Brasileiras Emitida']), 1, 0
+        # Uma família está "C/Emissão Concluída" apenas se TODAS as certidões estão concluídas
+        # E se há pelo menos uma certidão (evitar divisão por zero)
+        conclusao_por_familia['familia_concluida'] = (
+            (conclusao_por_familia['total_certidoes'] > 0) &
+            (conclusao_por_familia['total_concluidas'] == conclusao_por_familia['total_certidoes'])
+        ).astype(int)
+        
+        # Merge com df_bitrix_agg para adicionar a coluna corrigida
+        df_bitrix_agg = pd.merge(
+            df_bitrix_agg.reset_index(),
+            conclusao_por_familia[[col_id_familia_bitrix, 'familia_concluida']],
+            on=col_id_familia_bitrix,
+            how='left'
         )
-        df_bitrix_agg = df_bitrix_agg.drop(columns=['TOTAL_ATIVAS'])
-        df_bitrix_agg = df_bitrix_agg.reset_index()
         
+        # Renomear e garantir que existe
+        df_bitrix_agg['Pasta C/Emissão Concluída'] = df_bitrix_agg['familia_concluida'].fillna(0).astype(int)
+        df_bitrix_agg = df_bitrix_agg.drop(columns=['familia_concluida'], errors='ignore')
+        
+        print(f"[DEBUG HIGIENIZAÇÃO] Cálculo corrigido: {df_bitrix_agg['Pasta C/Emissão Concluída'].sum()} famílias com emissão concluída")
+        
+    else:
+        df_bitrix_agg = pd.DataFrame()
+
+    # Garantir que todas as colunas necessárias existam
     novas_colunas_bitrix = [
         'Brasileiras Pendências', 'Brasileiras Pesquisas', 'Brasileiras Solicitadas',
         'Brasileiras Emitida', 'Pasta C/Emissão Concluída', 'Brasileiras Dispensada'
     ]
+    
     if df_bitrix_agg.empty: # Se df_bitrix_agg não foi populado (ex: df_cartorio vazio)
         colunas_esperadas_bitrix_vazio = [col_id_familia_bitrix] + novas_colunas_bitrix
         df_bitrix_agg = pd.DataFrame(columns=colunas_esperadas_bitrix_vazio)
@@ -647,16 +820,32 @@ def exibir_higienizacao_desempenho():
         df_final['Pasta C/Emissão Concluída'] = pd.to_numeric(df_final['Pasta C/Emissão Concluída'], errors='coerce').fillna(0).astype(int)
         total_mesas_1_8 = df_final[df_final['MESA'].isin(mesas_1_8_list)]['Pasta C/Emissão Concluída'].sum()
 
-        # Estilos para a faixa de totais
-        faixa_style = "background-color: #FFA726; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
-        titulo_style = "color: white; margin: 0; font-size: 1.1em; font-weight: bold;"
-        contagem_style = "color: white; font-size: 2em; font-weight: bolder; margin: 8px 0 0 0;"
-
-        # Exibir faixa com total das MESAS 1-8
+        # Exibir card de totais com design mais profissional e harmônico
         st.markdown(f"""
-        <div style="{faixa_style}">
-            <h4 style="{titulo_style}">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (MESAS 1-8)</h4>
-            <p style="{contagem_style}">{int(total_mesas_1_8)} PASTAS</p>
+        <div style="
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        ">
+            <div style="
+                color: #495057;
+                font-size: 14px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 8px;
+                text-align: center;
+            ">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (MESAS 1-8)</div>
+            <div style="
+                color: #212529;
+                font-size: 28px;
+                font-weight: 700;
+                text-align: center;
+                margin: 0;
+            ">{int(total_mesas_1_8)} PASTAS</div>
         </div>
         """, unsafe_allow_html=True)
         st.markdown("---")
@@ -760,11 +949,32 @@ def exibir_higienizacao_desempenho():
         # Calcular total de Pasta C/Emissão Concluída para CABINES
         total_cabines = df_cabines_final['Pasta C/Emissão Concluída'].sum()
 
-        # Exibir faixa com total das CABINES
+        # Exibir card de CABINES com design mais profissional e harmônico
         st.markdown(f"""
-        <div style="{faixa_style}">
-            <h4 style="{titulo_style}">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (CABINES)</h4>
-            <p style="{contagem_style}">{int(total_cabines)} PASTAS</p>
+        <div style="
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        ">
+            <div style="
+                color: #495057;
+                font-size: 14px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 8px;
+                text-align: center;
+            ">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (CABINES)</div>
+            <div style="
+                color: #212529;
+                font-size: 28px;
+                font-weight: 700;
+                text-align: center;
+                margin: 0;
+            ">{int(total_cabines)} PASTAS</div>
         </div>
         """, unsafe_allow_html=True)
         st.markdown("---")
@@ -816,11 +1026,32 @@ def exibir_higienizacao_desempenho():
         # Calcular total de Pasta C/Emissão Concluída para CARRÃO
         total_carrao = df_carrao_final['Pasta C/Emissão Concluída'].sum()
 
-        # Exibir faixa com total do CARRÃO
+        # Exibir card de CARRÃO com design mais profissional e harmônico
         st.markdown(f"""
-        <div style="{faixa_style}">
-            <h4 style="{titulo_style}">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (CARRÃO)</h4>
-            <p style="{contagem_style}">{int(total_carrao)} PASTAS</p>
+        <div style="
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        ">
+            <div style="
+                color: #495057;
+                font-size: 14px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 8px;
+                text-align: center;
+            ">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (CARRÃO)</div>
+            <div style="
+                color: #212529;
+                font-size: 28px;
+                font-weight: 700;
+                text-align: center;
+                margin: 0;
+            ">{int(total_carrao)} PASTAS</div>
         </div>
         """, unsafe_allow_html=True)
         st.markdown("---")
@@ -856,3 +1087,40 @@ def exibir_higienizacao_desempenho():
         )
     else:
         st.info("Não há dados de CARRÃO na planilha para exibir detalhes.") 
+
+    st.markdown("---")
+
+def calcular_conclusao_corrigida_por_pipeline(row):
+    """
+    Calcula se uma certidão está concluída usando a lógica corrigida para pipeline 104.
+    
+    CORRIGIDO DEZEMBRO 2024: Mesma lógica aplicada no acompanhamento.py
+    
+    Pipeline 102 (Paróquia): Lógica normal
+    Pipeline 104 (Pesquisa BR): APENAS SUCCESS ou FAIL são considerados finalizados
+    Outros pipelines: Lógica normal baseada em mapeamento
+    """
+    category_id = str(row.get('CATEGORY_ID', ''))
+    stage_id = str(row.get('STAGE_ID', ''))
+    categoria_emissao = row.get('CATEGORIA_EMISSAO', '')
+    
+    # Pipeline 102 (Paróquia): Tratar como pipeline normal
+    if category_id == '102':
+        return categoria_emissao == 'Brasileiras Emitida'
+    
+    # Pipeline 104 (Pesquisa BR): CORRIGIDO - Lógica mais restritiva
+    elif category_id == '104':
+        # CORREÇÃO CRÍTICA: Apenas considerar realmente finalizado
+        if 'SUCCESS' in stage_id:
+            # Se chegou ao SUCCESS final (se existir mapeamento específico)
+            return True
+        elif 'FAIL' in stage_id:
+            # Se foi dispensada/cancelada (processo finalizado)
+            return True
+        else:
+            # Qualquer outro estado (incluindo "PRONTA PARA EMISSÃO") NÃO é conclusão final
+            return False
+    
+    # Pipelines 92 e 94 (Cartórios): Lógica normal baseada no mapeamento
+    else:
+        return categoria_emissao == 'Brasileiras Emitida' 

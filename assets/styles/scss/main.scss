@@ -10,6 +10,11 @@
 @use 'components/higienizacoes';
 @use 'components/producao_adm';
 
+// === CARTORIO NEW MODULE ===
+@use 'components/cartorio_new_base';
+@use 'components/cartorio_stages';
+@use 'components/cartorio_dashboards';
+
 // 2. Importando variáveis e mixins
 @use 'variables' as vars;
 @use 'mixins' as mix;
