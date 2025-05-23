@@ -414,8 +414,8 @@ def exibir_producao_time_doutora(df_cartorio_original):
     else:
         df_montagens_concluidas = pd.DataFrame().copy()
 
-    # 2.1. NOVA MÉTRICA: Total de solicitações realizadas (independente da origem)
-    df_solicitacoes_realizadas = df_movimentacoes_time_doutora[
+    # 2.1. RENOMEADA: Total de solicitações realizadas (independente da origem) -> PRODUÇÃO
+    df_producao_realizadas = df_movimentacoes_time_doutora[
         df_movimentacoes_time_doutora[col_stage_atual].isin([
             "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM",
             "EMISSÕES TATUAPÉ/SOLICITAR CARTÓRIO DE ORIGEM",
@@ -424,6 +424,21 @@ def exibir_producao_time_doutora(df_cartorio_original):
         ])
     ].copy()
     
+    # 2.2. NOVA MÉTRICA: Solicitação Cartório (SOLICITAR CARTÓRIO → AGUARDANDO CARTÓRIO)
+    # ATENÇÃO: Esta métrica NÃO usa filtro do time doutora, pois quem faz essa movimentação é outro setor
+    df_solicitacao_cartorio = df_movimentacoes[  # <- Usar df_movimentacoes (TODOS os dados) em vez de df_movimentacoes_time_doutora
+        (df_movimentacoes[col_stage_anterior].isin([
+            "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM",
+            "EMISSÕES TATUAPÉ/SOLICITAR CARTÓRIO DE ORIGEM",
+            "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE", 
+            "EMISSÕES TATUAPÉ/SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE"
+        ])) &
+        (df_movimentacoes[col_stage_atual].isin([
+            "EMISSÕES CASA VERDE/AGUARDANDO CARTÓRIO ORIGEM",
+            "EMISSÕES TATUAPÉ/AGUARDANDO CARTÓRIO ORIGEM"
+        ]))
+    ].copy()
+
     # 3. Categorizar TODAS as movimentações do time em Ganhos e Perdas
     df_ganhos = df_movimentacoes_time_doutora[
         df_movimentacoes_time_doutora[col_stage_atual].isin(STAGES_GANHO_NOMES)
@@ -437,7 +452,8 @@ def exibir_producao_time_doutora(df_cartorio_original):
     st.subheader("📊 Produção - Time Doutora")
 
     total_montagens_realizadas = len(df_montagens_concluidas)
-    total_solicitacoes_realizadas = len(df_solicitacoes_realizadas)
+    total_producao_realizadas = len(df_producao_realizadas)
+    total_solicitacao_cartorio = len(df_solicitacao_cartorio)
 
     # Criar métricas customizadas com HTML puro
     st.markdown(f"""
@@ -490,7 +506,7 @@ def exibir_producao_time_doutora(df_cartorio_original):
     
     .metricas-container-doutora {{
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: 12px;
         margin-bottom: 16px;
     }}
@@ -503,9 +519,14 @@ def exibir_producao_time_doutora(df_cartorio_original):
             <div class="help">Montagens concluídas (saiu de MONTAGEM→SOLICITAR ou saiu de DEVOLVIDO→SOLICITAR)</div>
         </div>
         <div class="metrica-custom-doutora">
-            <div class="label">📨 Solicitações Realizadas</div>
-            <div class="valor">{total_solicitacoes_realizadas:,}</div>
-            <div class="help">Total de solicitações ao cartório (todas as origens)</div>
+            <div class="label">📊 Produção</div>
+            <div class="valor">{total_producao_realizadas:,}</div>
+            <div class="help">Total de produção ao cartório (todas as origens)</div>
+        </div>
+        <div class="metrica-custom-doutora">
+            <div class="label">📨 Solicitação Cartório</div>
+            <div class="valor">{total_solicitacao_cartorio:,}</div>
+            <div class="help">Conversão de solicitações (saiu de SOLICITAR→AGUARDANDO) - TODOS os setores</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -513,7 +534,7 @@ def exibir_producao_time_doutora(df_cartorio_original):
     st.markdown("---")
 
     # TABELAS PRINCIPAIS - SIMPLES E CLARAS
-    col_tab1, col_tab2 = st.columns(2)
+    col_tab1, col_tab2, col_tab3 = st.columns(3)
     
     with col_tab1:
         st.markdown("### 🎯 Quem Realizou Montagens")
@@ -525,13 +546,26 @@ def exibir_producao_time_doutora(df_cartorio_original):
             st.info("Nenhuma montagem encontrada.")
     
     with col_tab2:
-        st.markdown("### 📨 Quem Realizou Solicitações")
-        if not df_solicitacoes_realizadas.empty:
-            df_solicitacoes_simples = df_solicitacoes_realizadas.groupby('movido_por_nome').size().reset_index(name='Solicitações')
-            df_solicitacoes_simples = df_solicitacoes_simples.sort_values('Solicitações', ascending=False)
-            st.dataframe(df_solicitacoes_simples, use_container_width=True, hide_index=True)
+        st.markdown("### 📊 Quem Realizou Produção")
+        if not df_producao_realizadas.empty:
+            df_producao_simples = df_producao_realizadas.groupby('movido_por_nome').size().reset_index(name='Produção')
+            df_producao_simples = df_producao_simples.sort_values('Produção', ascending=False)
+            st.dataframe(df_producao_simples, use_container_width=True, hide_index=True)
         else:
-            st.info("Nenhuma solicitação encontrada.")
+            st.info("Nenhuma produção encontrada.")
+    
+    with col_tab3:
+        st.markdown("### 📨 Quem Realizou Solicitação Cartório")
+        if not df_solicitacao_cartorio.empty:
+            # Mapear nomes dos usuários (incluindo outros setores, não só time doutora)
+            df_solicitacao_cartorio['movido_por_nome'] = df_solicitacao_cartorio['movido_por_id'].astype(str).map(mapa_nomes_usuarios_global).fillna(df_solicitacao_cartorio['movido_por_id'])
+            
+            df_solicitacao_simples = df_solicitacao_cartorio.groupby('movido_por_nome').size().reset_index(name='Solicitações')
+            df_solicitacao_simples = df_solicitacao_simples.sort_values('Solicitações', ascending=False)
+            st.dataframe(df_solicitacao_simples, use_container_width=True, hide_index=True)
+            st.caption("💡 Inclui usuários de todos os setores (não apenas Time Doutora)")
+        else:
+            st.info("Nenhuma solicitação cartório encontrada.")
 
     # TABELA DE DETALHES - REGISTRO DO BANCO
     st.markdown("---")
@@ -566,18 +600,18 @@ def exibir_producao_time_doutora(df_cartorio_original):
         else:
             st.info("Nenhuma montagem encontrada.")
             
-        st.markdown("### 📨 Solicitações Realizadas - Registros do Banco") 
-        if not df_solicitacoes_realizadas.empty:
+        st.markdown("### 📨 Produção Realizadas - Registros do Banco") 
+        if not df_producao_realizadas.empty:
             # Preparar dados simples e claros
-            df_detalhes_solicitacoes = df_solicitacoes_realizadas.copy()
-            df_detalhes_solicitacoes['Data/Hora'] = pd.to_datetime(df_detalhes_solicitacoes['data_criacao']).dt.strftime('%d/%m/%Y %H:%M')
+            df_detalhes_producao = df_producao_realizadas.copy()
+            df_detalhes_producao['Data/Hora'] = pd.to_datetime(df_detalhes_producao['data_criacao']).dt.strftime('%d/%m/%Y %H:%M')
             
             # Tabela limpa
-            df_detalhes_sol_display = df_detalhes_solicitacoes[[
+            df_detalhes_prod_display = df_detalhes_producao[[
                 'id_card', 'Data/Hora', 'movido_por_nome', col_stage_anterior, col_stage_atual
             ]].copy()
             
-            df_detalhes_sol_display.rename(columns={
+            df_detalhes_prod_display.rename(columns={
                 'id_card': 'ID Card',
                 'movido_por_nome': 'Quem Movimentou',
                 col_stage_anterior: 'Etapa Anterior',
@@ -585,23 +619,56 @@ def exibir_producao_time_doutora(df_cartorio_original):
             }, inplace=True)
             
             # Filtro simples
-            usuarios_solicitacao = ['Todos'] + sorted(df_detalhes_sol_display['Quem Movimentou'].unique().tolist())
-            usuario_filtro_solicitacao = st.selectbox("Filtrar solicitações por usuário:", usuarios_solicitacao, key="filtro_solicitacao_user")
+            usuarios_producao = ['Todos'] + sorted(df_detalhes_prod_display['Quem Movimentou'].unique().tolist())
+            usuario_filtro_producao = st.selectbox("Filtrar produção por usuário:", usuarios_producao, key="filtro_producao_user")
             
-            if usuario_filtro_solicitacao != 'Todos':
-                df_detalhes_sol_display = df_detalhes_sol_display[df_detalhes_sol_display['Quem Movimentou'] == usuario_filtro_solicitacao]
+            if usuario_filtro_producao != 'Todos':
+                df_detalhes_prod_display = df_detalhes_prod_display[df_detalhes_prod_display['Quem Movimentou'] == usuario_filtro_producao]
             
-            st.dataframe(df_detalhes_sol_display.sort_values('Data/Hora', ascending=False), use_container_width=True, hide_index=True)
-            st.caption(f"💡 {len(df_detalhes_sol_display)} registros de solicitações realizadas")
+            st.dataframe(df_detalhes_prod_display.sort_values('Data/Hora', ascending=False), use_container_width=True, hide_index=True)
+            st.caption(f"💡 {len(df_detalhes_prod_display)} registros de produção realizadas")
         else:
-            st.info("Nenhuma solicitação encontrada.")
+            st.info("Nenhuma produção encontrada.")
+
+        st.markdown("### 📨 Solicitação Cartório - Registros do Banco") 
+        if not df_solicitacao_cartorio.empty:
+            # Preparar dados simples e claros
+            df_detalhes_solicitacao_cartorio = df_solicitacao_cartorio.copy()
+            # Garantir que o mapeamento de nomes esteja aplicado
+            df_detalhes_solicitacao_cartorio['movido_por_nome'] = df_detalhes_solicitacao_cartorio['movido_por_id'].astype(str).map(mapa_nomes_usuarios_global).fillna(df_detalhes_solicitacao_cartorio['movido_por_id'])
+            df_detalhes_solicitacao_cartorio['Data/Hora'] = pd.to_datetime(df_detalhes_solicitacao_cartorio['data_criacao']).dt.strftime('%d/%m/%Y %H:%M')
+            
+            # Tabela limpa
+            df_detalhes_solic_display = df_detalhes_solicitacao_cartorio[[
+                'id_card', 'Data/Hora', 'movido_por_nome', col_stage_anterior, col_stage_atual
+            ]].copy()
+            
+            df_detalhes_solic_display.rename(columns={
+                'id_card': 'ID Card',
+                'movido_por_nome': 'Quem Movimentou',
+                col_stage_anterior: 'Etapa Anterior',
+                col_stage_atual: 'Etapa Atual'
+            }, inplace=True)
+            
+            # Filtro simples
+            usuarios_solicitacao_cartorio = ['Todos'] + sorted(df_detalhes_solic_display['Quem Movimentou'].unique().tolist())
+            usuario_filtro_solicitacao_cartorio = st.selectbox("Filtrar solicitações cartório por usuário:", usuarios_solicitacao_cartorio, key="filtro_solicitacao_cartorio_user")
+            
+            if usuario_filtro_solicitacao_cartorio != 'Todos':
+                df_detalhes_solic_display = df_detalhes_solic_display[df_detalhes_solic_display['Quem Movimentou'] == usuario_filtro_solicitacao_cartorio]
+            
+            st.dataframe(df_detalhes_solic_display.sort_values('Data/Hora', ascending=False), use_container_width=True, hide_index=True)
+            st.caption(f"💡 {len(df_detalhes_solic_display)} registros de solicitações cartório realizadas (todos os setores)")
+        else:
+            st.info("Nenhuma solicitação cartório encontrada.")
 
     # RESUMO FINAL
     st.markdown("---")
     st.info(f"""
     💡 **Resumo:**
-    - **Montagens Realizadas:** {total_montagens_realizadas} (saíram de MONTAGEM→SOLICITAR ou saíram de DEVOLVIDO→SOLICITAR)
-    - **Solicitações Realizadas:** {total_solicitacoes_realizadas} (todas as solicitações ao cartório)
+    - **Montagens Realizadas:** {total_montagens_realizadas} (Time Doutora: saíram de MONTAGEM→SOLICITAR ou saíram de DEVOLVIDO→SOLICITAR)
+    - **Produção:** {total_producao_realizadas} (Time Doutora: todas as solicitações ao cartório)
+    - **Solicitação Cartório:** {total_solicitacao_cartorio} (Todos os setores: conversão saíram de SOLICITAR→AGUARDANDO)
     - **Período:** {data_inicio_analise.strftime('%d/%m/%Y')} a {data_fim_analise.strftime('%d/%m/%Y')}
     """)
     
@@ -613,11 +680,11 @@ if __name__ == '__main__':
     
     # Simular df_cartorio_original_bitrix se necessário para carregar usuários
     mock_df_usuarios = pd.DataFrame({
-        'ID': ["178", "260", "262", "270", "286", "612", "630", "632", "652", "999"],
+        'ID': ["178", "260", "262", "270", "286", "612", "630", "632", "652", "999", "888", "777"],
         'FULL_NAME': [
             "Fernanda Santicioli", "Nadya Pedroso", "Stefany Valentin", "Layla Lopes", 
             "Juliane Gonçalves", "Bianca Lima", "Felipe Paulino", "Danyelle Santos", 
-            "Angelica Santos", "Usuário Teste Extra"
+            "Angelica Santos", "Usuário Outro Setor A", "Usuário Outro Setor B", "Usuário Outro Setor C"
         ]
     })
 
@@ -630,49 +697,56 @@ if __name__ == '__main__':
         print(f"Mock fetch supabase: {data_inicio} a {data_fim}")
         # Dados de exemplo para teste
         data = {
-            'id': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+            'id': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
             'data_criacao': pd.to_datetime([
                 '2023-10-01 10:00:00', '2023-10-01 11:00:00', '2023-10-02 09:00:00',
                 '2023-10-02 14:00:00', '2023-10-03 10:00:00', '2023-10-03 12:00:00',
                 '2023-10-04 10:00:00', '2023-10-04 11:00:00', '2023-10-05 09:00:00',
-                '2023-10-05 14:00:00', '2023-10-06 10:00:00', '2023-10-06 12:00:00'
+                '2023-10-05 14:00:00', '2023-10-06 10:00:00', '2023-10-06 12:00:00',
+                '2023-10-07 10:00:00', '2023-10-07 14:00:00', '2023-10-08 11:00:00'
             ]),
-            'id_card': ['C1', 'C2', 'C3', 'C1', 'C4', 'C2', 'C5', 'C6', 'C7', 'C5', 'C8', 'C9'],
+            'id_card': ['C1', 'C2', 'C3', 'C1', 'C4', 'C2', 'C5', 'C6', 'C7', 'C5', 'C8', 'C9', 'C10', 'C11', 'C12'],
             'previous_stage_id': [ # Estágio de onde saiu
-                "DT1098_92:UC_ZWO7BI", # Montagem Req -> Ganho (Fernanda)
-                "DT1098_94:UC_UZHXWF", # Montagem Req -> Perca (Nadya)
-                "DT1098_92:OTHER_STAGE", # Outro estágio
-                "DT1098_92:UC_ZWO7BI", # Montagem Req -> Ganho Prioridade (Fernanda)
-                "DT1098_94:UC_UZHXWF", # Montagem Req -> Certidão Emitida (Stefany)
-                "DT1098_92:UC_ZWO7BI", # Montagem Req -> Devolução ADM (Layla)
-                "DT1098_92:UC_ZWO7BI", # Montagem Req -> Ganho (Bianca)
-                "DT1098_94:UC_UZHXWF", # Montagem Req -> Perca (Felipe)
-                "DT1098_92:OTHER_STAGE", # Outro estágio
-                "DT1098_92:UC_ZWO7BI", # Montagem Req -> Ganho Prioridade (Danyelle)
-                "DT1098_94:UC_UZHXWF", # Montagem Req -> Certidão Emitida (Angelica)
-                "DT1098_92:UC_ZWO7BI", # Montagem Req -> Devolução ADM (Juliane)
+                "EMISSÕES CASA VERDE/MONTAGEM REQUERIMENTO CARTÓRIO", # Montagem Req -> Ganho (Fernanda)
+                "EMISSÕES TATUAPÉ/MONTAGEM REQUERIMENTO CARTÓRIO", # Montagem Req -> Perca (Nadya)
+                "EMISSÕES CASA VERDE/OUTRO ESTÁGIO", # Outro estágio
+                "EMISSÕES CASA VERDE/MONTAGEM REQUERIMENTO CARTÓRIO", # Montagem Req -> Ganho Prioridade (Fernanda)
+                "EMISSÕES TATUAPÉ/MONTAGEM REQUERIMENTO CARTÓRIO", # Montagem Req -> Certidão Emitida (Stefany)
+                "EMISSÕES CASA VERDE/MONTAGEM REQUERIMENTO CARTÓRIO", # Montagem Req -> Devolução ADM (Layla)
+                "EMISSÕES CASA VERDE/MONTAGEM REQUERIMENTO CARTÓRIO", # Montagem Req -> Ganho (Bianca)
+                "EMISSÕES TATUAPÉ/MONTAGEM REQUERIMENTO CARTÓRIO", # Montagem Req -> Perca (Felipe)
+                "EMISSÕES CASA VERDE/OUTRO ESTÁGIO", # Outro estágio
+                "EMISSÕES CASA VERDE/MONTAGEM REQUERIMENTO CARTÓRIO", # Montagem Req -> Ganho Prioridade (Danyelle)
+                "EMISSÕES TATUAPÉ/MONTAGEM REQUERIMENTO CARTÓRIO", # Montagem Req -> Certidão Emitida (Angelica)
+                "EMISSÕES CASA VERDE/MONTAGEM REQUERIMENTO CARTÓRIO", # Montagem Req -> Devolução ADM (Juliane)
+                "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM", # SOLICITAR CARTÓRIO -> AGUARDANDO (nova métrica)
+                "EMISSÕES TATUAPÉ/SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE", # SOLICITAR PRIORIDADE -> AGUARDANDO (nova métrica)
+                "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM", # SOLICITAR CARTÓRIO -> AGUARDANDO (nova métrica)
             ],
             'stage_id': [ # Estágio para onde foi
-                "DT1098_92:UC_83ZGKS",  # SOLICITAR CARTÓRIO DE ORIGEM
-                "DT1098_94:UC_M6A09E",  # DEVOLVIDO REQUERIMENTO
-                "DT1098_92:UC_83ZGKS",
-                "DT1098_92:UC_6TECYL",  # SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE
-                "DT1098_94:UC_K4JS04",  # CERTIDÃO EMITIDA
-                "DT1098_92:UC_EYBGVD",  # DEVOLUÇÃO ADM
-                "DT1098_92:UC_83ZGKS",  # SOLICITAR CARTÓRIO DE ORIGEM
-                "DT1098_94:UC_M6A09E",  # DEVOLVIDO REQUERIMENTO
-                "DT1098_92:UC_83ZGKS",
-                "DT1098_92:UC_6TECYL",  # SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE
-                "DT1098_94:UC_K4JS04",  # CERTIDÃO EMITIDA
-                "DT1098_92:UC_EYBGVD",  # DEVOLUÇÃO ADM
+                "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM",  # SOLICITAR CARTÓRIO DE ORIGEM
+                "EMISSÕES TATUAPÉ/DEVOLVIDO REQUERIMENTO",  # DEVOLVIDO REQUERIMENTO
+                "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM",
+                "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE",  # SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE
+                "EMISSÕES TATUAPÉ/CERTIDÃO EMITIDA",  # CERTIDÃO EMITIDA
+                "EMISSÕES CASA VERDE/DEVOLUÇÃO ADM",  # DEVOLUÇÃO ADM
+                "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM",  # SOLICITAR CARTÓRIO DE ORIGEM
+                "EMISSÕES TATUAPÉ/DEVOLVIDO REQUERIMENTO",  # DEVOLVIDO REQUERIMENTO
+                "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM",
+                "EMISSÕES CASA VERDE/SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE",  # SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE
+                "EMISSÕES TATUAPÉ/CERTIDÃO EMITIDA",  # CERTIDÃO EMITIDA
+                "EMISSÕES CASA VERDE/DEVOLUÇÃO ADM",  # DEVOLUÇÃO ADM
+                "EMISSÕES CASA VERDE/AGUARDANDO CARTÓRIO ORIGEM",  # AGUARDANDO CARTÓRIO ORIGEM (nova métrica)
+                "EMISSÕES TATUAPÉ/AGUARDANDO CARTÓRIO ORIGEM",  # AGUARDANDO CARTÓRIO ORIGEM (nova métrica)
+                "EMISSÕES CASA VERDE/AGUARDANDO CARTÓRIO ORIGEM",  # AGUARDANDO CARTÓRIO ORIGEM (nova métrica)
             ],
             'movido_por_id': [ # Quem moveu
                 "178", "260", "178", "user_178", "262", 
                 "270", "612", "630", "630", "user_632", 
-                "652", "286"
+                "652", "286", "user_999", "user_888", "777"  # <- Incluir usuários de outros setores para SOLICITAR→AGUARDANDO
             ],
-            'id_familia': ['F1','F2','F3','F1','F4','F2','F5','F6','F7','F5','F8','F9'],
-            'id_requerente': ['R1','R2','R3','R1','R4','R2','R5','R6','R7','R5','R8','R9']
+            'id_familia': ['F1','F2','F3','F1','F4','F2','F5','F6','F7','F5','F8','F9','F10','F11','F12'],
+            'id_requerente': ['R1','R2','R3','R1','R4','R2','R5','R6','R7','R5','R8','R9','R10','R11','R12']
         }
         return pd.DataFrame(data)
 
