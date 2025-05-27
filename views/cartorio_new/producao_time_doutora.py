@@ -85,7 +85,8 @@ IDS_USUARIOS_TIME_DOUTORA = [
     "612",  # Bianca Lima
     "630",  # Felipe Paulino
     "632",  # Danyelle Santos
-    "652"   # Angelica Santos
+    "652",  # Angelica Santos
+    "282"   # Jhenifer
 ]
 # Adicionar prefixo "user_" para compatibilidade com alguns formatos de ID
 IDS_USUARIOS_TIME_DOUTORA_COM_PREFIXO = IDS_USUARIOS_TIME_DOUTORA + [f"user_{id_user}" for id_user in IDS_USUARIOS_TIME_DOUTORA]
