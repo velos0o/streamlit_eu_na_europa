@@ -37,6 +37,16 @@ def ensure_numeric_display(df):
     
     return df_safe
 
+# Função wrapper para compatibilidade com main.py
+def show_higienizacoes(sub_page=None):
+    """
+    Função wrapper para compatibilidade com o sistema de navegação do main.py.
+    Aceita o parâmetro sub_page mas delega para a função principal.
+    """
+    # Por enquanto, ignoramos o sub_page e chamamos a função principal
+    # No futuro, pode ser usado para navegar entre diferentes sub-páginas
+    return show_higienizacao_checklist()
+
 def show_higienizacao_checklist():
     """
     Exibe a página de checklist de produção de higienização.

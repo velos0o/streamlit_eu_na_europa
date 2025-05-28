@@ -22,6 +22,9 @@ from views.extracoes.extracoes_main import show_extracoes
 from views.cartorio_new.cartorio_new_main import show_cartorio_new
 from views.ficha_familia import show_ficha_familia
 from views.higienizacoes.higienizacoes_main import show_higienizacoes
+from views.comune.comune_main import show_comune_main
+from views.comune.producao_comune import show_producao_comune
+from views.comune.funil_certidoes_italianas import show_funil_certidoes_italianas
 
 # Importar os novos componentes
 from components.report_guide import show_guide_sidebar, show_page_guide, show_contextual_help
@@ -35,6 +38,7 @@ ROTAS = {
     "ficha_familia": "Ficha da Família",
     "higienizacoes": "Higienizações", 
     "cartorio_new": "Emissões Brasileiras",
+    "comune": "Comune",
     "extracoes": "Extrações de Dados"
 }
 
@@ -61,6 +65,12 @@ SUB_ROTAS_HIGIENIZACOES = {
     "checklist": "Checklist"
 }
 
+# Mapeamento de sub-rotas para Comune
+SUB_ROTAS_COMUNE = {
+    "producao_comune": "Produção Comune",
+    "funil_certidoes_italianas": "Funil Certidões Italianas"
+}
+
 # Função para inicializar todos os estados da sessão
 def inicializar_estados_sessao():
     """Inicializa todos os estados da sessão necessários"""
@@ -81,6 +91,12 @@ def inicializar_estados_sessao():
         st.session_state.higienizacao_submenu_expanded = False
     if 'higienizacao_subpagina' not in st.session_state:
         st.session_state.higienizacao_subpagina = 'Checklist'
+
+    # Novos estados para o submenu Comune
+    if 'comune_submenu_expanded' not in st.session_state:
+        st.session_state.comune_submenu_expanded = False
+    if 'comune_subpagina' not in st.session_state:
+        st.session_state.comune_subpagina = 'Produção Comune'
 
 # Processar parâmetros da URL
 def processar_parametros_url():
@@ -103,6 +119,12 @@ def processar_parametros_url():
                     st.session_state.higienizacao_subpagina = SUB_ROTAS_HIGIENIZACOES[st.query_params['sub']]
                 else:
                     st.session_state.higienizacao_subpagina = "Checklist"
+            elif rota == 'comune':
+                st.session_state.comune_submenu_expanded = True
+                if 'sub' in st.query_params and st.query_params['sub'] in SUB_ROTAS_COMUNE:
+                    st.session_state.comune_subpagina = SUB_ROTAS_COMUNE[st.query_params['sub']]
+                else:
+                    st.session_state.comune_subpagina = "Produção Comune"
     elif 'pagina_atual_via_url_processada' not in st.session_state:
         st.session_state['pagina_atual_via_url_processada'] = True
 
@@ -301,6 +323,7 @@ def reset_submenu():
     st.session_state.emissao_submenu_expanded = False
     st.session_state.higienizacao_submenu_expanded = False
     st.session_state.adm_submenu_expanded = False
+    st.session_state.comune_submenu_expanded = False
 
 def ir_para_ficha_familia():
     reset_submenu()
@@ -399,6 +422,35 @@ def ir_para_adm_pendencias():
     st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'adm'
 
+# Nova função para toggle do submenu Comune
+def toggle_comune_submenu():
+    st.session_state.comune_submenu_expanded = not st.session_state.get('comune_submenu_expanded', False)
+    st.session_state.emissao_submenu_expanded = False
+    st.session_state.higienizacao_submenu_expanded = False
+    st.session_state.adm_submenu_expanded = False
+    
+    if st.session_state.comune_submenu_expanded:
+        st.session_state['pagina_atual'] = 'Comune'
+        st.query_params['page'] = 'comune'
+        current_subpage = st.session_state.get('comune_subpagina')
+        if current_subpage not in SUB_ROTAS_COMUNE.values():
+            st.session_state.comune_subpagina = 'Produção Comune'
+            st.query_params['sub'] = 'producao_comune'
+
+# Nova função para navegação da sub-aba Produção Comune
+def ir_para_comune_producao():
+    st.session_state['pagina_atual'] = 'Comune'
+    st.session_state.comune_subpagina = 'Produção Comune'
+    st.query_params['page'] = 'comune'
+    st.query_params['sub'] = 'producao_comune'
+
+# Nova função para navegação da sub-aba Funil Certidões Italianas
+def ir_para_comune_funil_certidoes():
+    st.session_state['pagina_atual'] = 'Comune'
+    st.session_state.comune_subpagina = 'Funil Certidões Italianas'
+    st.query_params['page'] = 'comune'
+    st.query_params['sub'] = 'funil_certidoes_italianas'
+
 # Botões de navegação
 st.sidebar.button(
     "Ficha da Família", 
@@ -437,7 +489,7 @@ st.sidebar.button(
     help="Módulo de emissões de cartórios brasileiros"
 )
 
-# Submenu Emissões Brasileiras
+# Submenu Emissões Brasileiras (deve aparecer IMEDIATAMENTE após o botão)
 if st.session_state.get('emissao_submenu_expanded', False):
     with st.sidebar.container():
         st.button(
@@ -511,20 +563,68 @@ if st.session_state.get('emissao_submenu_expanded', False):
             type="primary" if st.session_state.get('emissao_subpagina') == "Pesquisa BR" else "secondary"
         )
 
+# Novo botão para a aba Comune (DEPOIS do submenu de Emissões Brasileiras)
+st.sidebar.button(
+    "Comune",
+    key="btn_comune",
+    on_click=toggle_comune_submenu,
+    use_container_width=True,
+    type="primary" if st.session_state['pagina_atual'] == "Comune" else "secondary",
+    help="Dashboard de Métricas do Comune via Planilha Google"
+)
+
+# Novo submenu para Comune (IMEDIATAMENTE após o botão Comune)
+if st.session_state.get('comune_submenu_expanded', False):
+    with st.sidebar.container():
+        st.button(
+            "Produção Comune",
+            key="subbtn_comune_producao",
+            on_click=ir_para_comune_producao,
+            use_container_width=True,
+            type="primary" if st.session_state.get('comune_subpagina') == "Produção Comune" else "secondary"
+        )
+        st.button(
+            "Funil Certidões Italianas",
+            key="subbtn_comune_funil_certidoes",
+            on_click=ir_para_comune_funil_certidoes,
+            use_container_width=True,
+            type="primary" if st.session_state.get('comune_subpagina') == "Funil Certidões Italianas" else "secondary"
+        )
+
+st.sidebar.button(
+    "Extrações de Dados", 
+    key="btn_extracoes", 
+    on_click=lambda: setattr(st.session_state, 'pagina_atual', 'Extrações de Dados') or st.query_params.update({'page': 'extracoes'}),
+    use_container_width=True,
+    type="primary" if st.session_state['pagina_atual'] == "Extrações de Dados" else "secondary",
+    help="Módulo de extrações e relatórios"
+)
+
 # Exibição da página selecionada
-pagina = st.session_state.get('pagina_atual', 'Ficha da Família')
+current_page = st.session_state.get('pagina_atual', 'Ficha da Família')
 
 try:
-    if pagina == "Ficha da Família":
+    if current_page == "Ficha da Família":
         show_ficha_familia()
-    elif pagina == "Higienizações":
-        show_higienizacoes()
-    elif pagina == "Emissões Brasileiras":
-        show_cartorio_new()
-    elif pagina == "Extrações de Dados":
+    elif current_page == "Higienizações":
+        if st.session_state.get('higienizacao_subpagina') == "Checklist":
+            show_higienizacoes(sub_page="checklist")
+        else:
+            show_higienizacoes()
+    elif current_page == "Emissões Brasileiras":
+        show_cartorio_new()  # Remover os parâmetros que a função não aceita
+    elif current_page == "Comune":
+        if st.session_state.get('comune_subpagina') == "Produção Comune":
+            show_producao_comune()
+        elif st.session_state.get('comune_subpagina') == "Funil Certidões Italianas":
+            show_funil_certidoes_italianas()
+        else:
+            # Fallback para a função principal que agora gerencia as subpáginas
+            show_comune_main()
+    elif current_page == "Extrações de Dados":
         show_extracoes()
     else:
-        st.error(f"Página '{pagina}' não encontrada!")
+        st.error(f"Página '{current_page}' não encontrada!")
         
 except Exception as e:
     st.error(f"Erro ao carregar a página: {str(e)}")

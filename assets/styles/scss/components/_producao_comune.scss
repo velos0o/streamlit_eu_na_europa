@@ -1,0 +1,652 @@
+// assets/styles/scss/components/_producao_comune.scss
+// Estilos específicos para a página Produção Comune
+
+@use 'sass:map';
+@use '../variables' as vars;
+@use '../mixins' as mix;
+
+// === TÍTULOS E HEADERS ===
+.producao-comune-title {
+  color: vars.$primary-dark;
+  font-size: map.get(vars.$font-sizes, '3xl');
+  font-weight: 800;
+  margin-bottom: map.get(vars.$spacing, 5);
+  padding-bottom: map.get(vars.$spacing, 3);
+  border-bottom: 4px solid vars.$primary-light;
+  text-align: left;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: vars.$transition-base;
+}
+
+.producao-comune-subtitle {
+  color: vars.$primary;
+  font-size: map.get(vars.$font-sizes, 'xl');
+  font-weight: 700;
+  margin-top: map.get(vars.$spacing, 4);
+  margin-bottom: map.get(vars.$spacing, 3);
+  padding-bottom: map.get(vars.$spacing, 1);
+  border-bottom: 2px solid vars.$primary-light;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+
+// === MÉTRICAS ===
+.producao-comune-metricas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: map.get(vars.$spacing, 3);
+  margin-bottom: map.get(vars.$spacing, 4);
+  
+  // Variante para st.metric() padrão (fundo cinza neutro)
+  &--neutral {
+    margin-bottom: map.get(vars.$spacing, 4);
+    
+    // Garantir que as st.metric() mantenham estilo padrão (cinza)
+    [data-testid="stMetric"] {
+      background: #F8F9FA !important; // Fundo cinza claro
+      border: 2px solid #DEE2E6 !important; // Borda cinza mais escura
+      border-radius: map.get(vars.$border-radius, 'md') !important;
+      padding: map.get(vars.$spacing, 4) !important;
+      transition: all 0.2s ease !important;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+      min-height: 100px;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+      text-align: center !important;
+      
+      // Efeito hover mais suave
+      &:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+        border-color: #ADB5BD !important; // Borda mais escura no hover
+      }
+      
+      // Label da métrica (título)
+      [data-testid="stMetricLabel"] {
+        p {
+          color: #6C757D !important; // Cinza médio
+          font-weight: 600 !important;
+          font-size: 0.875rem !important; // 14px
+          text-transform: uppercase !important;
+          letter-spacing: 0.05em !important;
+          margin-bottom: 0.5rem !important;
+          text-align: center !important;
+        }
+      }
+      
+      // Valor da métrica (número)
+      [data-testid="stMetricValue"] {
+        color: #495057 !important; // Cinza escuro para o valor
+        font-weight: 700 !important;
+        font-size: 1.875rem !important; // 30px
+        text-align: center !important;
+        line-height: 1.2 !important;
+        margin-bottom: 0.25rem !important;
+      }
+      
+      // Delta (se existir)
+      [data-testid="stMetricDelta"] {
+        color: #6C757D !important;
+        font-size: 0.75rem !important;
+        font-weight: 500 !important;
+        text-align: center !important;
+      }
+    }
+    
+    // Responsividade para telas menores
+    @include mix.responsive(sm) {
+      grid-template-columns: repeat(3, 1fr);
+      gap: map.get(vars.$spacing, 2);
+      
+      [data-testid="stMetric"] {
+        padding: map.get(vars.$spacing, 3) !important;
+        min-height: 90px;
+        
+        [data-testid="stMetricValue"] {
+          font-size: 1.5rem !important; // Menor em telas pequenas
+        }
+      }
+    }
+    
+    @include mix.responsive(xs) {
+      grid-template-columns: repeat(2, 1fr);
+      
+      [data-testid="stMetric"] {
+        min-height: 80px;
+        
+        [data-testid="stMetricLabel"] p {
+          font-size: 0.75rem !important;
+        }
+        
+        [data-testid="stMetricValue"] {
+          font-size: 1.25rem !important;
+        }
+      }
+    }
+  }
+}
+
+// === TABELA DE STATUS ===
+.producao-comune-status-table {
+  @include mix.card-base;
+  margin-bottom: map.get(vars.$spacing, 4);
+  
+  .stDataFrame {
+    border-radius: map.get(vars.$border-radius, 'md');
+    overflow: hidden;
+    
+    thead tr th {
+      background-color: vars.$primary !important;
+      color: white !important;
+      font-weight: 600 !important;
+      text-align: center !important;
+      padding: map.get(vars.$spacing, 3);
+      border-bottom: 2px solid vars.$primary-dark;
+    }
+    
+    tbody tr {
+      transition: background-color 0.15s ease;
+      
+      &:hover {
+        background-color: rgba(vars.$primary, 0.05);
+      }
+      
+      &:nth-child(even) {
+        background-color: vars.$gray-50;
+      }
+      
+      td {
+        padding: map.get(vars.$spacing, 2);
+        border-bottom: 1px solid vars.$gray-200;
+        text-align: center;
+        font-weight: 500;
+        
+        &:first-child {
+          text-align: left;
+          font-weight: 600;
+          color: vars.$gray-700;
+        }
+      }
+    }
+  }
+}
+
+// === GRÁFICO ===
+.producao-comune-chart {
+  @include mix.card-base;
+  padding: map.get(vars.$spacing, 4);
+  margin-bottom: map.get(vars.$spacing, 4);
+  
+  .stChart {
+    border-radius: map.get(vars.$border-radius, 'md');
+  }
+}
+
+// === TABELA DE DADOS PRINCIPAL ===
+.producao-comune-data-table {
+  @include mix.card-base;
+  margin-bottom: map.get(vars.$spacing, 4);
+  
+  .stDataFrame {
+    border-radius: map.get(vars.$border-radius, 'md');
+    overflow: hidden;
+    box-shadow: map.get(vars.$shadows, 'sm');
+    border: 1px solid vars.$gray-200;
+    
+    thead tr th {
+      background-color: vars.$gray-100 !important;
+      color: vars.$gray-800 !important;
+      font-weight: 600 !important;
+      text-align: center !important;
+      padding: map.get(vars.$spacing, 2);
+      border-bottom: 2px solid vars.$gray-300;
+      font-size: map.get(vars.$font-sizes, 'sm');
+    }
+    
+    tbody tr {
+      transition: background-color 0.15s ease;
+      
+      &:hover {
+        background-color: rgba(vars.$primary, 0.05);
+      }
+      
+      &:nth-child(even) {
+        background-color: vars.$gray-50;
+      }
+      
+      td {
+        padding: map.get(vars.$spacing, 2);
+        border-bottom: 1px solid vars.$gray-200;
+        font-size: map.get(vars.$font-sizes, 'sm');
+        
+        // Primeira coluna (buscador)
+        &:first-child {
+          font-weight: 500;
+          text-align: left;
+        }
+        
+        // Outras colunas
+        &:not(:first-child) {
+          text-align: center;
+        }
+      }
+    }
+  }
+}
+
+// === TEMA ESCURO ===
+@include mix.dark-mode {
+  .producao-comune-title {
+    color: vars.$primary-light;
+    border-bottom-color: vars.$primary;
+  }
+  
+  .producao-comune-subtitle {
+    color: vars.$primary-light;
+    border-bottom-color: vars.$primary;
+  }
+  
+  .producao-comune-metricas {
+    // Estilo para métricas neutras no tema escuro
+    &--neutral {
+      [data-testid="stMetric"] {
+        background: #343A40 !important; // Fundo cinza escuro
+        border-color: #495057 !important; // Borda mais clara no dark
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+        
+        &:hover {
+          border-color: #6C757D !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+        }
+        
+        [data-testid="stMetricLabel"] p {
+          color: #ADB5BD !important; // Cinza claro para labels
+        }
+        
+        [data-testid="stMetricValue"] {
+          color: #F8F9FA !important; // Branco para valores
+        }
+        
+        [data-testid="stMetricDelta"] {
+          color: #ADB5BD !important;
+        }
+      }
+    }
+  }
+  
+  .producao-comune-status-table,
+  .producao-comune-chart,
+  .producao-comune-data-table {
+    background-color: vars.$gray-800;
+    border-color: vars.$gray-700;
+    
+    .stDataFrame {
+      border-color: vars.$gray-700;
+      
+      thead tr th {
+        background-color: vars.$gray-900 !important;
+        color: white !important;
+        border-bottom-color: vars.$gray-600;
+      }
+      
+      tbody tr {
+        &:nth-child(even) {
+          background-color: rgba(vars.$gray-700, 0.3);
+        }
+        
+        &:hover {
+          background-color: rgba(vars.$primary, 0.2);
+        }
+        
+        td {
+          border-bottom-color: vars.$gray-700;
+          color: vars.$gray-200;
+        }
+      }
+    }
+  }
+}
+
+// === RESPONSIVIDADE ===
+@include mix.responsive(sm) {
+  .producao-comune-metricas {
+    grid-template-columns: repeat(2, 1fr);
+    gap: map.get(vars.$spacing, 2);
+    
+    [data-testid="stMetric"] {
+      min-height: 100px;
+      padding: map.get(vars.$spacing, 3);
+      
+      [data-testid="stMetricValue"] {
+        font-size: map.get(vars.$font-sizes, 'xl') !important;
+      }
+    }
+  }
+}
+
+@include mix.responsive(xs) {
+  .producao-comune-metricas {
+    grid-template-columns: 1fr;
+    
+    [data-testid="stMetric"] {
+      min-height: 80px;
+      
+      [data-testid="stMetricLabel"] p {
+        font-size: map.get(vars.$font-sizes, 'xs') !important;
+      }
+      
+      [data-testid="stMetricValue"] {
+        font-size: map.get(vars.$font-sizes, 'lg') !important;
+      }
+    }
+  }
+}
+
+/* ================================================= */
+/*               FUNIL CERTIDÕES ITALIANAS           */
+/* ================================================= */
+
+// Métricas customizadas do funil
+.metrica-custom-funil {
+  background: #F8F9FA;
+  border: 2px solid #DEE2E6;
+  border-radius: 6px;
+  padding: 16px;
+  text-align: center;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: #ADB5BD;
+  }
+
+  .label {
+    color: #6C757D;
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+    line-height: 1.2;
+  }
+
+  .valor {
+    color: #495057;
+    font-weight: 700;
+    font-size: 30px;
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+}
+
+.metricas-container-funil {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+// Estilos específicos para os cards de categoria do funil
+.card-visao-geral {
+  &--ganho {
+    border-left: 4px solid #28a745;
+    
+    .card-visao-geral__title {
+      color: #155724;
+    }
+    
+    .card-visao-geral__quantity {
+      color: #28a745;
+    }
+  }
+  
+  &--em-andamento {
+    border-left: 4px solid #ffc107;
+    
+    .card-visao-geral__title {
+      color: #856404;
+    }
+    
+    .card-visao-geral__quantity {
+      color: #ffc107;
+    }
+  }
+  
+  &--perca {
+    border-left: 4px solid #dc3545;
+    
+    .card-visao-geral__title {
+      color: #721c24;
+    }
+    
+    .card-visao-geral__quantity {
+      color: #dc3545;
+    }
+  }
+  
+  &--summary {
+    background: linear-gradient(135deg, rgba(248, 249, 250, 0.9), rgba(233, 236, 239, 0.6));
+    border: 2px solid map.get(vars.$colors, 'gray-300');
+    border-radius: map.get(vars.$border-radius, 'lg');
+    padding: map.get(vars.$spacing, 4);
+    margin-bottom: map.get(vars.$spacing, 3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    
+    .card-visao-geral__title {
+      font-weight: 700;
+      font-size: map.get(vars.$font-sizes, 'sm');
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: map.get(vars.$spacing, 2);
+    }
+    
+    .card-visao-geral__metrics {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .card-visao-geral__quantity {
+      font-size: map.get(vars.$font-sizes, '2xl');
+      font-weight: 800;
+    }
+    
+    .card-visao-geral__percentage {
+      font-size: map.get(vars.$font-sizes, 'lg');
+      font-weight: 600;
+      opacity: 0.8;
+    }
+  }
+}
+
+// Cards grid para o funil
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: map.get(vars.$spacing, 3);
+  margin-top: map.get(vars.$spacing, 3);
+}
+
+// Cabeçalhos de categoria
+.category-header {
+  margin-bottom: map.get(vars.$spacing, 3);
+  
+  .category-title {
+    color: vars.$primary-dark;
+    font-size: map.get(vars.$font-sizes, 'xl');
+    font-weight: 700;
+    margin: 0;
+    padding-bottom: map.get(vars.$spacing, 2);
+    border-bottom: 2px solid vars.$primary-light;
+  }
+}
+
+// === TEMA ESCURO PARA FUNIL ===
+@include mix.dark-mode {
+  .metrica-custom-funil {
+    background: #343A40;
+    border-color: #495057;
+    color: #f8f9fa;
+    
+    .label {
+      color: #adb5bd;
+    }
+    
+    .valor {
+      color: #f8f9fa;
+    }
+    
+    &:hover {
+      border-color: #6c757d;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+  }
+  
+  .card-visao-geral--summary {
+    background: linear-gradient(135deg, rgba(52, 58, 64, 0.9), rgba(73, 80, 87, 0.6));
+    border-color: #495057;
+    color: #f8f9fa;
+  }
+  
+  .category-title {
+    color: vars.$primary-light !important;
+    border-bottom-color: vars.$primary !important;
+  }
+}
+
+// Estilos para a seção de análise de protocolização
+.producao-comune-metricas--success {
+  background: rgba(76, 175, 80, 0.08) !important;
+  border: 2px solid rgba(76, 175, 80, 0.2) !important;
+  
+  .metric-container {
+    color: $success-color;
+  }
+  
+  .metric-value {
+    color: $success-color !important;
+    font-weight: 700;
+  }
+  
+  .metric-label {
+    color: rgba(76, 175, 80, 0.8);
+  }
+}
+
+// Seção de cruzamento Bitrix
+.producao-comune-cruzamento {
+  background: rgba(33, 150, 243, 0.05);
+  border: 1px solid rgba(33, 150, 243, 0.1);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  
+  .cruzamento-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    
+    .cruzamento-icon {
+      font-size: 1.2em;
+      color: $primary-color;
+    }
+    
+    .cruzamento-title {
+      color: $text-dark;
+      font-weight: 600;
+      font-size: 1.1em;
+    }
+  }
+}
+
+// Cards de métricas de protocolização
+.protocolizacao-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+  
+  .protocolizacao-card {
+    background: $card-background;
+    border: 1px solid $border-light;
+    border-radius: 6px;
+    padding: 16px;
+    text-align: center;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    &--protocolizado {
+      border-color: $success-color;
+      background: rgba(76, 175, 80, 0.05);
+      
+      .card-value {
+        color: $success-color;
+      }
+    }
+    
+    &--pendente {
+      border-color: $warning-color;
+      background: rgba(255, 193, 7, 0.05);
+      
+      .card-value {
+        color: $warning-color;
+      }
+    }
+    
+    .card-label {
+      font-size: 0.9em;
+      color: $text-muted;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    
+    .card-value {
+      font-size: 1.8em;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    
+    .card-percentage {
+      font-size: 0.85em;
+      color: $text-muted;
+    }
+  }
+}
+
+// Tabela de status detalhado
+.status-detalhado-table {
+  margin: 16px 0;
+  
+  .status-header {
+    background: $background-light;
+    padding: 12px;
+    border-radius: 6px 6px 0 0;
+    border-bottom: 1px solid $border-light;
+    
+    .status-title {
+      font-weight: 600;
+      color: $text-dark;
+      margin: 0;
+    }
+  }
+  
+  .status-content {
+    background: white;
+    border: 1px solid $border-light;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    overflow: hidden;
+  }
+} 

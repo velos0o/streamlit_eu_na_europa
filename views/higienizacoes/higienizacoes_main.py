@@ -3,16 +3,20 @@ import streamlit as st
 # from views.conclusoes import show_conclusoes # REMOVIDO
 from views.higienizacoes.checklist.higienizacao_checklist import show_higienizacao_checklist
 
-def show_higienizacoes():
+def show_higienizacoes(sub_page=None):
     """
     Função principal que controla a exibição das subpáginas de Higienizações
-    baseada no estado da sessão.
+    baseada no parâmetro sub_page ou no estado da sessão.
     """
     # Título principal da página
     st.title("Higienizações")
     
-    # Verificar qual subpágina exibir com base no estado da sessão
-    subpagina = st.session_state.get('higienizacao_subpagina', 'Checklist') # PADRÃO ATUALIZADO
+    # Determinar qual subpágina exibir
+    # Priorizar o parâmetro sub_page se fornecido, senão usar o estado da sessão
+    if sub_page is not None:
+        subpagina = sub_page
+    else:
+        subpagina = st.session_state.get('higienizacao_subpagina', 'Checklist') # PADRÃO ATUALIZADO
     
     # Exibir a subpágina selecionada
     # REMOVIDO IF PARA PRODUÇÃO

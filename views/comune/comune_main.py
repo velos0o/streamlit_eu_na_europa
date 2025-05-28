@@ -10,6 +10,8 @@ from .visualization import (
     visualizar_tempo_solicitacao_individual, visualizar_estagios_detalhados
 )
 from .mapa_cat58 import visualizar_mapa_cat58
+from .producao_comune import show_producao_comune
+from .funil_certidoes_italianas import show_funil_certidoes_italianas
 
 # Forçar recarregamento do módulo de visualização
 import importlib
@@ -604,6 +606,37 @@ def show_comune():
     else:
         st.warning("Dados do Comune (Cat 22) não carregados para análise de tempo individual.")
 
-# Chamada da função principal para teste local
-if __name__ == "__main__":
-    show_comune() 
+def show_comune_main(sub_page=None):
+    """
+    Função principal que controla a exibição das subpáginas do Comune
+    baseada no parâmetro sub_page ou no estado da sessão.
+    """
+    # Título principal da página
+    st.title("Comune")
+    
+    # Determinar qual subpágina exibir
+    # Priorizar o parâmetro sub_page se fornecido, senão usar o estado da sessão
+    if sub_page is not None:
+        subpagina = sub_page
+    else:
+        subpagina = st.session_state.get('comune_subpagina', 'Produção Comune')
+    
+    # Exibir a subpágina selecionada
+    if subpagina == 'Produção Comune':
+        show_producao_comune()
+    elif subpagina == 'Funil Certidões Italianas':
+        show_funil_certidoes_italianas()
+    else:
+        # Fallback para a subpágina padrão se não for encontrada
+        st.warning(f"Subpágina '{subpagina}' não encontrada. Exibindo Produção Comune.")
+        show_producao_comune()
+
+# Este if __name__ == "__main__": é para testes locais e pode ser removido ou comentado
+# if __name__ == "__main__":
+#     # Para testar esta página individualmente, você pode precisar simular 
+#     # o estado da sessão ou carregar dados de exemplo.
+#     # Exemplo simples:
+#     if 'df_comune' not in st.session_state:
+#         # Simular carregamento de dados ou deixar vazio para a lógica da página lidar com isso
+#         st.session_state['df_comune'] = None # Ou um DataFrame de exemplo
+#     show_comune_main() 
