@@ -643,7 +643,7 @@ def exibir_higienizacao_desempenho():
 
     # --- Merge Final com a Base --- 
     data_base = {
-        'MESA': ['MESA 8', 'MESA 7', 'MESA 6', 'MESA 5', 'MESA 4', 'MESA 3', 'MESA 2', 'MESA 1', 'MESA 0', 'CABINES', 'CARRÃO'],
+        'MESA': ['MESA 8', 'MESA 7', 'MESA 6', 'MESA 5', 'MESA 4', 'MESA 3', 'MESA 2', 'MESA 1', 'MESA 0', 'PROTOCOLADO', 'CARRÃO'],
         'PASTAS TOTAIS': [105, 46, 46, 70, 106, 46, 66, 66, 49, 113, 123],
         'CONSULTOR': ['NADYA', 'FELIPE', 'VITOR', 'BIANCA', 'DANYELE', 'LAYLA', 'LAYLA', 'JULIANE', 'JULIANE', 'STEFANY', 'Fernanda']
     }
@@ -748,8 +748,8 @@ def exibir_higienizacao_desempenho():
     print("df_final com todas as colunas:")
     print(df_final)
 
-    # --- Exibir a Tabela Principal (SEM CABINES) --- 
-    df_final_sem_cabines = df_final[df_final['MESA'] != 'CABINES'].copy()
+    # --- Exibir a Tabela Principal (SEM PROTOCOLADO) --- 
+    df_final_sem_protocolado = df_final[df_final['MESA'] != 'PROTOCOLADO'].copy()
 
     # Verificar se df_final tem as colunas necessárias
     if 'HIGINIZAÇÃO COM ÊXITO' not in df_final.columns:
@@ -758,7 +758,7 @@ def exibir_higienizacao_desempenho():
         df_final['HIGINIZAÇÃO COM ÊXITO'] = 0
     
     # Nos casos em que não há dados reais, mostrar mensagem amigável
-    if df_final_sem_cabines.empty or df_final['HIGINIZAÇÃO COM ÊXITO'].sum() == 0:
+    if df_final_sem_protocolado.empty or df_final['HIGINIZAÇÃO COM ÊXITO'].sum() == 0:
         st.warning("""
         Não foi possível carregar os dados da planilha. Isso pode ocorrer por algumas razões:
         
@@ -775,15 +775,15 @@ def exibir_higienizacao_desempenho():
         st.dataframe(df_base_display, hide_index=True, use_container_width=True)
         return  # Parar a execução da função
 
-    # Debug: Mostrar dados sem CABINES
-    print("\n=== DEBUG: Dados sem CABINES ===")
+    # Debug: Mostrar dados sem PROTOCOLADO
+    print("\n=== DEBUG: Dados sem PROTOCOLADO ===")
     print("Contagem por MESA:")
-    print(df_final_sem_cabines.groupby('MESA')['HIGINIZAÇÃO COM ÊXITO'].sum())
+    print(df_final_sem_protocolado.groupby('MESA')['HIGINIZAÇÃO COM ÊXITO'].sum())
 
     # --- Continuação normal do código se houver dados ---
-    if not df_final_sem_cabines.empty:
+    if not df_final_sem_protocolado.empty:
         # Calcular totais
-        df_total_principal = df_final_sem_cabines.select_dtypes(include=np.number).sum().to_frame().T
+        df_total_principal = df_final_sem_protocolado.select_dtypes(include=np.number).sum().to_frame().T
         df_total_principal['MESA'] = 'TOTAL'
         df_total_principal['CONSULTOR'] = ''  # Campo texto não deve ser somado
         
@@ -818,7 +818,7 @@ def exibir_higienizacao_desempenho():
             df_total_principal['Taxa Emissão Concluída (%)'] = 0.0
             
         # Atualizar df_display_principal com os novos valores
-        df_display_principal = pd.concat([df_final_sem_cabines, df_total_principal], ignore_index=True)
+        df_display_principal = pd.concat([df_final_sem_protocolado, df_total_principal], ignore_index=True)
 
         # --- Calcular e exibir totais em faixas ---
         # Calcular total de Pasta C/Emissão Concluída para MESAS 1-8
@@ -863,9 +863,9 @@ def exibir_higienizacao_desempenho():
         """, unsafe_allow_html=True)
         st.markdown("---")
 
-        # Exibir a tabela principal (sem CABINES e sem CARRÃO)
+        # Exibir a tabela principal (sem PROTOCOLADO e sem CARRÃO)
         df_display_mesas = df_display_principal[
-            ~df_display_principal['MESA'].isin(['CABINES', 'CARRÃO', 'TOTAL'])
+            ~df_display_principal['MESA'].isin(['PROTOCOLADO', 'CARRÃO', 'TOTAL'])
         ].copy()
         
         # Recalcular totais apenas para MESAS 1-8
@@ -949,8 +949,8 @@ def exibir_higienizacao_desempenho():
     else:
         st.info("Não há dados para exibir na tabela principal com os filtros atuais.")
 
-    # --- Exibir a Tabela de CABINES --- 
-    df_cabines_final = df_final[df_final['MESA'] == 'CABINES'].copy()
+    # --- Exibir a Tabela de PROTOCOLADO --- 
+    df_cabines_final = df_final[df_final['MESA'] == 'PROTOCOLADO'].copy()
     if not df_cabines_final.empty:
         # Verificar se a coluna Pasta C/Emissão Concluída existe
         if 'Pasta C/Emissão Concluída' not in df_cabines_final.columns:
@@ -959,10 +959,10 @@ def exibir_higienizacao_desempenho():
             
         # Garantir que é um número inteiro para exibição
         df_cabines_final['Pasta C/Emissão Concluída'] = pd.to_numeric(df_cabines_final['Pasta C/Emissão Concluída'], errors='coerce').fillna(0).astype(int)
-        # Calcular total de Pasta C/Emissão Concluída para CABINES
+        # Calcular total de Pasta C/Emissão Concluída para PROTOCOLADO
         total_cabines = df_cabines_final['Pasta C/Emissão Concluída'].sum()
 
-        # Exibir card de CABINES com design mais profissional e harmônico
+        # Exibir card de PROTOCOLADO com design mais profissional e harmônico
         st.markdown(f"""
         <div style="
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
@@ -980,7 +980,7 @@ def exibir_higienizacao_desempenho():
                 letter-spacing: 0.5px;
                 margin-bottom: 8px;
                 text-align: center;
-            ">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (CABINES)</div>
+            ">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (PROTOCOLADO)</div>
             <div style="
                 color: #212529;
                 font-size: 28px;
@@ -1015,14 +1015,14 @@ def exibir_higienizacao_desempenho():
         
         csv_cabines_detalhes = convert_df_to_csv(df_cabines_final)
         st.download_button(
-            label="Download Detalhes Cabines como CSV",
+            label="Download Detalhes PROTOCOLADO como CSV",
             data=csv_cabines_detalhes,
-            file_name='detalhes_cabines.csv',
+            file_name='detalhes_protocolado.csv',
             mime='text/csv',
-            key='download_cabines_csv'
+            key='download_protocolado_csv'
         )
     else:
-        st.info("Não há dados de CABINES na planilha para exibir detalhes.") 
+        st.info("Não há dados de PROTOCOLADO na planilha para exibir detalhes.") 
 
     st.markdown("---")
 

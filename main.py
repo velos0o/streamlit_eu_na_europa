@@ -22,9 +22,10 @@ from views.extracoes.extracoes_main import show_extracoes
 from views.cartorio_new.cartorio_new_main import show_cartorio_new
 from views.ficha_familia import show_ficha_familia
 from views.higienizacoes.higienizacoes_main import show_higienizacoes
-from views.comune.comune_main import show_comune_main
-from views.comune.producao_comune import show_producao_comune
-from views.comune.funil_certidoes_italianas import show_funil_certidoes_italianas
+import views.comune.comune_main
+import views.comune.producao_comune
+import views.comune.funil_certidoes_italianas
+import views.comune.status_certidao
 
 # Importar os novos componentes
 from components.report_guide import show_guide_sidebar, show_page_guide, show_contextual_help
@@ -68,7 +69,8 @@ SUB_ROTAS_HIGIENIZACOES = {
 # Mapeamento de sub-rotas para Comune
 SUB_ROTAS_COMUNE = {
     "producao_comune": "Produção Comune",
-    "funil_certidoes_italianas": "Funil Certidões Italianas"
+    "funil_certidoes_italianas": "Funil Certidões Italianas",
+    "status_certidao": "Status Certidão"
 }
 
 # Função para inicializar todos os estados da sessão
@@ -451,6 +453,15 @@ def ir_para_comune_funil_certidoes():
     st.query_params['page'] = 'comune'
     st.query_params['sub'] = 'funil_certidoes_italianas'
 
+# Nova função para navegação da sub-aba Status Certidão
+def ir_para_comune_status_certidao():
+    """Navega para a página de Status de Certidão"""
+    st.session_state.pagina_atual = 'Comune'
+    st.session_state.comune_submenu_expanded = True
+    st.session_state.comune_subpagina = 'Status Certidão'
+    st.query_params['page'] = 'comune'
+    st.query_params['sub'] = 'status_certidao'
+
 # Botões de navegação
 st.sidebar.button(
     "Ficha da Família", 
@@ -590,6 +601,13 @@ if st.session_state.get('comune_submenu_expanded', False):
             use_container_width=True,
             type="primary" if st.session_state.get('comune_subpagina') == "Funil Certidões Italianas" else "secondary"
         )
+        st.button(
+            "Status Certidão",
+            key="subbtn_comune_status_certidao",
+            on_click=ir_para_comune_status_certidao,
+            use_container_width=True,
+            type="primary" if st.session_state.get('comune_subpagina') == "Status Certidão" else "secondary"
+        )
 
 st.sidebar.button(
     "Extrações de Dados", 
@@ -615,12 +633,13 @@ try:
         show_cartorio_new()  # Remover os parâmetros que a função não aceita
     elif current_page == "Comune":
         if st.session_state.get('comune_subpagina') == "Produção Comune":
-            show_producao_comune()
+            views.comune.producao_comune.show_producao_comune()
         elif st.session_state.get('comune_subpagina') == "Funil Certidões Italianas":
-            show_funil_certidoes_italianas()
+            views.comune.funil_certidoes_italianas.show_funil_certidoes_italianas()
+        elif st.session_state.get('comune_subpagina') == "Status Certidão":
+            views.comune.status_certidao.show_status_certidao()
         else:
-            # Fallback para a função principal que agora gerencia as subpáginas
-            show_comune_main()
+            views.comune.comune_main.show_comune_main()
     elif current_page == "Extrações de Dados":
         show_extracoes()
     else:

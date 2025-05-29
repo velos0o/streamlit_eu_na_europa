@@ -101,8 +101,8 @@ def exibir_pendencias(df_original):
                     label_visibility="collapsed"
                 )
 
-        # Linha 2: Filtro de Etapas e Busca Responsável
-        col_etapa, col_busca = st.columns([0.6, 0.4])
+        # Linha 2: Filtro de Etapas, Busca Responsável e Protocolizado
+        col_etapa, col_busca, col_protocolizado = st.columns([0.5, 0.3, 0.2])
 
         # Linha 3: Filtro de Família
         # Verificar se a coluna família existe para habilitar o filtro
@@ -125,7 +125,7 @@ def exibir_pendencias(df_original):
             nomes_unicos_familia = df_original[coluna_nome_familia].fillna('Desconhecido').astype(str).unique()
             sugestoes_familia = [ 
                 nome for nome in nomes_unicos_familia 
-                if termo_digitado_familia.lower() in nome.lower()
+                if termo_digitado_familia.lower() in str(nome).lower() # Garantir str 
             ][:5] # Limitar a 5 sugestões
             
             if sugestoes_familia:
@@ -157,7 +157,22 @@ def exibir_pendencias(df_original):
                 key="busca_responsavel_pendencias_widget", 
                 placeholder="Nome...",
                 # label_visibility="collapsed"
-            ) 
+            )
+        
+        with col_protocolizado:
+            # --- Filtro de Protocolizado ---
+            coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
+            filtro_protocolizado_habilitado = coluna_protocolizado in df.columns
+            if filtro_protocolizado_habilitado:
+                filtro_protocolizado = st.selectbox(
+                    "Protocolizado:",
+                    options=["Todos", "Protocolizado", "Não Protocolizado"],
+                    index=0,
+                    key="filtro_protocolizado_pendencias"
+                )
+            else:
+                st.caption(f":warning: Campo protocolizado não encontrado.")
+                filtro_protocolizado = "Todos"
 
     # --- Aplicar Filtros (Fora do Expander) ---
     # Aplicar filtro de data se ativo e datas válidas
@@ -177,6 +192,21 @@ def exibir_pendencias(df_original):
         # Tratar Nulos na coluna antes de filtrar
         df[coluna_nome_familia] = df[coluna_nome_familia].fillna('Desconhecido').astype(str)
         df = df[df[coluna_nome_familia].str.contains(termo_familia, case=False, na=False)]
+
+    # Aplicar filtro de Protocolizado
+    if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
+        if coluna_protocolizado in df.columns:
+            # Converter para string e normalizar valores
+            df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+            
+            if filtro_protocolizado == "Protocolizado":
+                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
+                df = df[df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
+            elif filtro_protocolizado == "Não Protocolizado":
+                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
+                df = df[~df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df[coluna_protocolizado] == '')]
+        else:
+            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
 
     # Verificar se df ficou vazio APÓS filtro de família (e data)
     if df.empty:

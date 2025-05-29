@@ -105,7 +105,7 @@ def exibir_pendencias_adm(df_cartorio_original):
                 )
 
         # Linha 2: Filtro de Etapas e Busca Responsável (ADM de Pasta)
-        col_etapa, col_busca = st.columns([0.6, 0.4])
+        col_etapa, col_busca, col_protocolizado = st.columns([0.5, 0.3, 0.2])
 
         # Linha 3: Filtro de Família
         # Verificar se a coluna família existe para habilitar o filtro
@@ -154,6 +154,21 @@ def exibir_pendencias_adm(df_cartorio_original):
                 key="busca_responsavel_pendencias_adm_widget",
                 placeholder="Nome...",
             )
+        
+        with col_protocolizado:
+            # --- Filtro de Protocolizado ---
+            coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
+            filtro_protocolizado_habilitado = coluna_protocolizado in df.columns
+            if filtro_protocolizado_habilitado:
+                filtro_protocolizado = st.selectbox(
+                    "Protocolizado:",
+                    options=["Todos", "Protocolizado", "Não Protocolizado"],
+                    index=0,
+                    key="filtro_protocolizado_pendencias_adm"
+                )
+            else:
+                st.caption(f":warning: Campo protocolizado não encontrado.")
+                filtro_protocolizado = "Todos"
 
     # --- Aplicar Filtros (Fora do Expander) ---
     if aplicar_filtro_data and data_inicio and data_fim and coluna_data_criacao in df.columns:

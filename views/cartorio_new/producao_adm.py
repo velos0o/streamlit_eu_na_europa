@@ -178,7 +178,7 @@ def exibir_producao_adm(df_cartorio_original):
             return
         
         # Linha 2: Filtros de Categorização
-        col_filtro1, col_filtro2 = st.columns(2)
+        col_filtro1, col_filtro2, col_filtro3 = st.columns(3)
         
         # Filtro de Consultor (ADM)
         with col_filtro1:
@@ -208,6 +208,21 @@ def exibir_producao_adm(df_cartorio_original):
                 options=tipos_pendencia_para_filtro,
                 index=0
             )
+
+        # Filtro de Protocolizado
+        with col_filtro3:
+            coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
+            filtro_protocolizado_habilitado = coluna_protocolizado in df.columns
+            if filtro_protocolizado_habilitado:
+                filtro_protocolizado = st.selectbox(
+                    "Protocolizado:",
+                    options=["Todos", "Protocolizado", "Não Protocolizado"],
+                    index=0,
+                    key="filtro_protocolizado_producao_adm"
+                )
+            else:
+                st.caption(f":warning: Campo protocolizado não encontrado.")
+                filtro_protocolizado = "Todos"
     
     # --- Aplicar Filtros (Fora do Expander) ---
     st.markdown("---")
@@ -261,6 +276,21 @@ def exibir_producao_adm(df_cartorio_original):
                 df_supabase['PROXIMO_MOVED_BY_ID'] = None
                 if 'id' in df_supabase.columns:
                     df_supabase['PROXIMA_MOVIMENTACAO_SUPABASE_ID'] = None
+
+    # Aplicar filtro de Protocolizado
+    if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
+        if coluna_protocolizado in df.columns:
+            # Converter para string e normalizar valores
+            df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+            
+            if filtro_protocolizado == "Protocolizado":
+                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
+                df = df[df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
+            elif filtro_protocolizado == "Não Protocolizado":
+                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
+                df = df[~df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df[coluna_protocolizado] == '')]
+        else:
+            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
 
     # --- VISÃO GERAL SIMPLIFICADA ---
     st.subheader("📌 Resumo de Pendências e Resoluções")

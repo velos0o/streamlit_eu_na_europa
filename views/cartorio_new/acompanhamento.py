@@ -12,6 +12,7 @@ KEY_DATA_INICIO = "data_venda_inicio_acompanhamento"
 KEY_DATA_FIM = "data_venda_fim_acompanhamento"
 KEY_PERCENTUAL = "filtro_percentual_acompanhamento"
 KEY_RESPONSAVEL = "filtro_responsavel_acompanhamento"  # Nova constante para filtro de responsável
+KEY_PROTOCOLIZADO = "filtro_protocolizado_acompanhamento"  # Nova constante para filtro de protocolizado
 
 def exibir_acompanhamento(df_cartorio):
     """
@@ -95,6 +96,26 @@ def exibir_acompanhamento(df_cartorio):
     # Aplicar lógica de precedência para evitar duplicação de contagem
     df = aplicar_logica_precedencia_pipeline_104(df, coluna_id_requerente)
     
+    # --- Aplicar Filtro de Protocolizado ANTES da agregação ---
+    coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
+    if coluna_protocolizado in df.columns:
+        protocolizado_selecionado = st.session_state.get(KEY_PROTOCOLIZADO, "Todos")
+        if protocolizado_selecionado != "Todos":
+            # Converter para string e normalizar valores
+            df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+            
+            if protocolizado_selecionado == "Protocolizado":
+                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
+                df = df[df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
+            elif protocolizado_selecionado == "Não Protocolizado":
+                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
+                df = df[~df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df[coluna_protocolizado] == '')]
+    else:
+        # Se a coluna não existir, emitir um aviso apenas uma vez
+        if 'aviso_protocolizado_emitido' not in st.session_state:
+            st.warning(f"Campo '{coluna_protocolizado}' não encontrado nos dados. Filtro de protocolizado não disponível.")
+            st.session_state['aviso_protocolizado_emitido'] = True
+    
     # --- Agrupamento por Família (pré-filtro) ---
     # Mover agregação para ANTES dos filtros para ter a base completa
     df_agrupado = df.groupby(coluna_nome_familia).agg(
@@ -128,6 +149,8 @@ def exibir_acompanhamento(df_cartorio):
         st.session_state[KEY_PERCENTUAL] = []
     if KEY_RESPONSAVEL not in st.session_state:  # Inicialização do state para responsável
         st.session_state[KEY_RESPONSAVEL] = []
+    if KEY_PROTOCOLIZADO not in st.session_state:  # Inicialização do state para protocolizado
+        st.session_state[KEY_PROTOCOLIZADO] = "Todos"
 
     # --- Função para Limpar Filtros --- 
     def clear_filters():
@@ -136,12 +159,13 @@ def exibir_acompanhamento(df_cartorio):
         st.session_state[KEY_DATA_FIM] = max_date_default
         st.session_state[KEY_PERCENTUAL] = []
         st.session_state[KEY_RESPONSAVEL] = []  # Limpar filtro de responsável
+        st.session_state[KEY_PROTOCOLIZADO] = "Todos"  # Limpar filtro de protocolizado
 
     # --- Filtros --- 
     with st.expander("Filtros", expanded=True): 
-        # Layout: Linha 1 (Família, Data), Linha 2 (Percentual, Responsável), Linha 3 (Botão Limpar)
+        # Layout: Linha 1 (Família, Data), Linha 2 (Percentual, Responsável, Protocolizado), Linha 3 (Botão Limpar)
         col_l1_familia, col_l1_data = st.columns([0.5, 0.5])
-        col_l2_perc, col_l2_resp = st.columns([0.5, 0.5])  # Nova linha com colunas para percentual e responsável
+        col_l2_perc, col_l2_resp, col_l2_protocolo = st.columns([0.4, 0.4, 0.2])  # Nova linha com 3 colunas
         col_l3_empty, col_l3_btn = st.columns([0.8, 0.2])  # Renomear para l3 (linha 3)
         
         with col_l1_familia:
@@ -209,6 +233,14 @@ def exibir_acompanhamento(df_cartorio):
                 placeholder="Selecione um ou mais responsáveis",
                 key=KEY_RESPONSAVEL
             )
+        
+        with col_l2_protocolo:
+            # --- Filtro de Protocolizado ---
+            st.selectbox(
+                "Protocolizado:",
+                options=["Todos", "Protocolizado", "Não Protocolizado"],
+                key=KEY_PROTOCOLIZADO
+            )
             
         with col_l3_btn:
             st.button("Limpar", on_click=clear_filters, help="Limpar todos os filtros")
@@ -221,6 +253,7 @@ def exibir_acompanhamento(df_cartorio):
     data_fim_selecionada = st.session_state[KEY_DATA_FIM]
     faixas_selecionadas = st.session_state[KEY_PERCENTUAL]
     responsaveis_selecionados = st.session_state[KEY_RESPONSAVEL]  # Ler valores de responsáveis selecionados
+    protocolizado_selecionado = st.session_state[KEY_PROTOCOLIZADO]  # Ler valor do filtro de protocolizado
     
     # Processar datas selecionadas
     data_venda_min, data_venda_max = None, None

@@ -36,6 +36,7 @@ def exibir_visao_geral(df_original):
     coluna_cartorio = 'NOME_CARTORIO' 
     coluna_data = 'CREATED_TIME'
     coluna_nome_familia = 'UF_CRM_34_NOME_FAMILIA' # ATUALIZADO para o novo campo SPA
+    coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO' # NOVO: Campo para filtro de protocolizado
     
     # --- Verificação Colunas Essenciais --- 
     if coluna_cartorio not in df_original.columns:
@@ -50,6 +51,7 @@ def exibir_visao_geral(df_original):
     data_inicio = None
     data_fim = None
     filtro_familia_habilitado = False # Default this too
+    filtro_protocolizado = "Todos" # Valor padrão para o filtro de protocolizado
 
     # --- Expander para Filtros --- 
     with st.expander("Filtros", expanded=True):
@@ -93,10 +95,24 @@ def exibir_visao_geral(df_original):
                 elif len(termo_digitado_familia) > 1: 
                     st.caption("Nenhuma família/contrato encontrado.")
 
-        # Linha 2: Filtro de Data
-        col_data1, col_data2, col_data3 = st.columns([0.3, 0.35, 0.35])
+        # Linha 2: Filtro de Data e Protocolizado
+        col_data1, col_data2, col_data3, col_protocolizado = st.columns([0.25, 0.3, 0.3, 0.15])
         with col_data1:
             aplicar_filtro_data = st.checkbox("Data Criação", value=False, key="aplicar_filtro_data_visao")
+
+        with col_protocolizado:
+            # --- Filtro de Protocolizado ---
+            filtro_protocolizado_habilitado = coluna_protocolizado in df_original.columns
+            if filtro_protocolizado_habilitado:
+                filtro_protocolizado = st.selectbox(
+                    "Protocolizado:",
+                    options=["Todos", "Protocolizado", "Não Protocolizado"],
+                    index=0,
+                    key="filtro_protocolizado_visao_geral"
+                )
+            else:
+                st.caption(f":warning: Campo protocolizado não encontrado.")
+                filtro_protocolizado = "Todos"
 
         datas_validas = pd.Series(dtype='datetime64[ns]')
         min_date = date.today()
@@ -136,6 +152,21 @@ def exibir_visao_geral(df_original):
     else:
         st.warning("Selecione pelo menos um cartório para visualizar os dados.")
         st.stop()
+
+    # Filtro Protocolizado
+    if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
+        if coluna_protocolizado in df.columns:
+            # Converter para string e normalizar valores
+            df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+            
+            if filtro_protocolizado == "Protocolizado":
+                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
+                df = df[df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
+            elif filtro_protocolizado == "Não Protocolizado":
+                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
+                df = df[~df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df[coluna_protocolizado] == '')]
+        else:
+            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
 
     # Filtro Família
     termo_familia = termo_busca_familia_widget.strip()

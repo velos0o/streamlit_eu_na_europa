@@ -1,27 +1,9 @@
 import streamlit as st
 from .data_loader import carregar_dados_comune, carregar_dados_negocios, carregar_estagios_bitrix, mapear_estagios_comune, mapear_estagios_macro
 from .analysis import criar_visao_geral_comune, criar_visao_macro, cruzar_comune_deal, analisar_distribuicao_deals, analisar_registros_sem_correspondencia, calcular_tempo_solicitacao, criar_metricas_certidoes, criar_metricas_tempo_dias, calcular_tempo_solicitacao_providencia
-from .visualization import (
-    visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro,
-    visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia,
-    visualizar_tempo_solicitacao, visualizar_metricas_certidoes,
-    visualizar_metricas_tempo_dias, visualizar_analise_evidencia,
-    visualizar_providencias, visualizar_tempo_solicitacao_providencia,
-    visualizar_tempo_solicitacao_individual, visualizar_estagios_detalhados
-)
 from .mapa_cat58 import visualizar_mapa_cat58
 from .producao_comune import show_producao_comune
 from .funil_certidoes_italianas import show_funil_certidoes_italianas
-
-# Forçar recarregamento do módulo de visualização
-import importlib
-import views.comune.visualization
-importlib.reload(views.comune.visualization)
-# Reimportar a função após o reload do módulo
-from views.comune.visualization import (
-    visualizar_tempo_solicitacao_providencia,
-    visualizar_tempo_solicitacao_individual
-)
 
 import pandas as pd
 import io
@@ -64,6 +46,16 @@ def show_comune():
     """
     Exibe a página principal do COMUNE
     """
+    # Importar funções de visualização aqui para evitar importação circular
+    from .visualization import (
+        visualizar_comune_dados, visualizar_funil_comune, visualizar_grafico_macro,
+        visualizar_cruzamento_deal, visualizar_analise_sem_correspondencia,
+        visualizar_tempo_solicitacao, visualizar_metricas_certidoes,
+        visualizar_metricas_tempo_dias, visualizar_analise_evidencia,
+        visualizar_providencias, visualizar_tempo_solicitacao_providencia,
+        visualizar_tempo_solicitacao_individual, visualizar_estagios_detalhados
+    )
+    
     # Aplicar estilo personalizado para botão de atualização
     st.markdown("""
     <style>

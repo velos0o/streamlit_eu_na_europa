@@ -3,6 +3,13 @@ import pandas as pd
 from datetime import datetime, date
 from utils.google_sheets_connector import get_google_sheets_client, fetch_data_from_sheet
 
+# Importar para conectar ao Bitrix24
+import sys
+from pathlib import Path
+api_path = Path(__file__).parents[2] / 'api'
+sys.path.insert(0, str(api_path))
+from bitrix_connector import load_bitrix_data, load_merged_data
+
 # Configurações da planilha
 SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1pB3HTFsaHyqAt3bhxzWG3RjfAxAzl97ydGqT35uYb-w/edit?gid=0#gid=0'
 SHEET_NAME = 'Base Higienização'
@@ -13,6 +20,7 @@ COLUNAS_DA_PLANILHA = [
     'ID FAMILIA',
     'Nome da\nfamilia ',
     'DATA \nSOLICITAÇÃO',
+    'PROTROCOLADO',
     'COMUNE',
     'STATUS\ncomune',  # Coluna AB - nossa coluna principal para o funil
     'HIGIENIZAÇÃO\nHENRIQUE'  # Coluna AT - para calcular famílias higienizadas
@@ -23,6 +31,7 @@ MAPEAMENTO_COLUNAS = {
     'ID FAMILIA': 'id_familia',
     'Nome da\nfamilia ': 'nome_familia',
     'DATA \nSOLICITAÇÃO': 'data_solicitacao',
+    'PROTROCOLADO': 'protocolado',
     'COMUNE': 'comune',
     'STATUS\ncomune': 'status_comune',  # Coluna principal do funil
     'HIGIENIZAÇÃO\nHENRIQUE': 'status_higienizacao_henrique'  # Para métricas de higienização
@@ -72,6 +81,92 @@ def categorizar_status_comune(status):
     else:
         return 'DESCONHECIDO'
 
+@st.cache_data(ttl=300)  # Cache por 5 minutos
+def carregar_dados_bitrix_funil46():
+    """Carrega dados do Bitrix24 funil 46 para cruzamento de protocolização."""
+    try:
+        # Carregar dados do funil 46 usando load_merged_data
+        df_bitrix = load_merged_data(
+            category_id=46,
+            debug=False,
+            force_reload=False
+        )
+        
+        if df_bitrix is not None and not df_bitrix.empty:
+            # Selecionar apenas as colunas necessárias se existirem
+            colunas_necessarias = [
+                'ID', 
+                'UF_CRM_1722605592778',  # Campo para match com ID FAMILIA
+                'UF_CRM_1746046353172'   # Campo de informação de protocolização
+            ]
+            
+            # Verificar quais colunas existem
+            colunas_existentes = [col for col in colunas_necessarias if col in df_bitrix.columns]
+            
+            if colunas_existentes:
+                return df_bitrix[colunas_existentes].copy()
+            else:
+                # Retornar pelo menos as colunas que existem
+                colunas_disponiveis = [col for col in df_bitrix.columns if 'UF_CRM_' in col or col == 'ID'][:10]
+                if colunas_disponiveis:
+                    return df_bitrix[colunas_disponiveis].copy()
+                else:
+                    return df_bitrix.copy()
+        else:
+            return pd.DataFrame()
+            
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar dados do Bitrix24: {str(e)}")
+        return pd.DataFrame()
+
+def fazer_cruzamento_bitrix_funil(df_planilha):
+    """Faz o cruzamento entre dados da planilha e Bitrix24 para protocolização."""
+    
+    # Carregar dados do Bitrix
+    df_bitrix = carregar_dados_bitrix_funil46()
+    
+    if df_bitrix.empty:
+        return df_planilha.copy(), df_bitrix
+    
+    # Preparar dados para cruzamento
+    if 'id_familia' not in df_planilha.columns:
+        return df_planilha.copy(), df_bitrix
+    
+    # Verificar qual coluna usar para o match
+    coluna_match_bitrix = None
+    if 'UF_CRM_1722605592778' in df_bitrix.columns:
+        coluna_match_bitrix = 'UF_CRM_1722605592778'
+    else:
+        # Procurar colunas similares
+        colunas_similares = [col for col in df_bitrix.columns if '1722605592778' in str(col)]
+        if colunas_similares:
+            coluna_match_bitrix = colunas_similares[0]
+        else:
+            return df_planilha.copy(), df_bitrix
+    
+    # Preparar dados para merge (garantir que sejam strings)
+    df_planilha_prep = df_planilha.copy()
+    df_bitrix_prep = df_bitrix.copy()
+    
+    df_planilha_prep['id_familia'] = df_planilha_prep['id_familia'].astype(str).str.strip()
+    df_bitrix_prep[coluna_match_bitrix] = df_bitrix_prep[coluna_match_bitrix].astype(str).str.strip()
+    
+    # Fazer o merge baseado em ID FAMILIA
+    try:
+        df_cruzado = df_planilha_prep.merge(
+            df_bitrix_prep,
+            left_on='id_familia',
+            right_on=coluna_match_bitrix,
+            how='left',
+            suffixes=('', '_bitrix')
+        )
+        
+        return df_cruzado, df_bitrix
+        
+    except Exception as e:
+        st.error(f"❌ Erro no cruzamento de dados: {str(e)}")
+        return df_planilha.copy(), df_bitrix
+
 def show_funil_certidoes_italianas():
     """Exibe o funil de certidões italianas baseado na coluna STATUS comune."""
     
@@ -110,6 +205,9 @@ def show_funil_certidoes_italianas():
         st.markdown('</div>', unsafe_allow_html=True)
         return
 
+    # Fazer cruzamento com Bitrix24 para protocolização
+    df_cruzado, df_bitrix = fazer_cruzamento_bitrix_funil(df_processado)
+
     # Definir colunas importantes
     coluna_status = 'status_comune'
     coluna_familia = 'nome_familia'
@@ -118,8 +216,8 @@ def show_funil_certidoes_italianas():
 
     # --- Filtros ---
     with st.expander("Filtros", expanded=True):
-        # Linha 1: Comune e Família
-        col_f1_comune, col_f1_familia = st.columns([0.6, 0.4])
+        # Linha 1: Comune, Família e Protocolização
+        col_f1_comune, col_f1_familia, col_f1_protocolo = st.columns([0.4, 0.3, 0.3])
 
         with col_f1_comune:
             # Filtro de Comune - texto livre
@@ -150,6 +248,15 @@ def show_funil_certidoes_italianas():
                 placeholder="Digite o nome da família..."
             )
 
+        with col_f1_protocolo:
+            # Filtro de Protocolização
+            filtro_protocolizado = st.selectbox(
+                "Status Protocolização:",
+                options=["TODOS", "PROTOCOLADO", "NÃO PROTOCOLADO"],
+                index=0,
+                key="filtro_protocolizado_funil"
+            )
+
         # Linha 2: Filtro de Data
         col_data1, col_data2, col_data3 = st.columns([0.3, 0.35, 0.35])
         with col_data1:
@@ -172,7 +279,7 @@ def show_funil_certidoes_italianas():
                     data_fim = st.date_input("Até:", value=max_date, min_value=min_date, max_value=max_date, key="data_fim_funil", label_visibility="collapsed")
 
     # Aplicar filtros
-    df = aplicar_filtros_funil(df_processado, termo_busca_comune, termo_busca_familia, aplicar_filtro_data, data_inicio, data_fim, coluna_comune, coluna_familia, coluna_data)
+    df = aplicar_filtros_funil(df_processado, termo_busca_comune, termo_busca_familia, aplicar_filtro_data, data_inicio, data_fim, coluna_comune, coluna_familia, coluna_data, filtro_protocolizado, df_cruzado)
 
     if df.empty:
         st.info("Nenhum dado encontrado para os filtros selecionados.")
@@ -335,7 +442,7 @@ def processar_dados_funil(df):
     
     return df_renomeado
 
-def aplicar_filtros_funil(df, termo_comune, termo_familia, aplicar_data, data_inicio, data_fim, col_comune, col_familia, col_data):
+def aplicar_filtros_funil(df, termo_comune, termo_familia, aplicar_data, data_inicio, data_fim, col_comune, col_familia, col_data, filtro_protocolizado, df_cruzado):
     """Aplica os filtros selecionados aos dados."""
     
     df_filtrado = df.copy()
@@ -360,6 +467,19 @@ def aplicar_filtros_funil(df, termo_comune, termo_familia, aplicar_data, data_in
             (df_filtrado[col_data] >= start_datetime) &
             (df_filtrado[col_data] < end_datetime)
         ]
+    
+    # Filtro de Protocolização
+    if filtro_protocolizado != "TODOS" and df_cruzado is not None:
+        # Verificar se há dados do Bitrix para determinar protocolização
+        if 'UF_CRM_1746046353172' in df_cruzado.columns:
+            mask_protocolizado = df_cruzado['UF_CRM_1746046353172'].str.contains('PROTOCOL', case=False, na=False)
+            
+            if filtro_protocolizado == "PROTOCOLADO":
+                indices_protocolizados = df_cruzado[mask_protocolizado].index
+                df_filtrado = df_filtrado.loc[df_filtrado.index.intersection(indices_protocolizados)]
+            elif filtro_protocolizado == "NÃO PROTOCOLADO":
+                indices_nao_protocolizados = df_cruzado[~mask_protocolizado].index
+                df_filtrado = df_filtrado.loc[df_filtrado.index.intersection(indices_nao_protocolizados)]
     
     return df_filtrado
 

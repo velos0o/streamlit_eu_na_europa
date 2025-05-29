@@ -17,7 +17,7 @@
 3048,,,,,nao especificado,nao especificado,Giovanni Oian,DT1052_22:SUCCESS
 3188,,,,,nao especificado,nao especificado,Genaro Avenia,DT1052_22:SUCCESS
 3236,,,,,nao especificado,nao especificado,Maria Olivetto,DT1052_22:SUCCESS
-3246,,,,,nao especificado,nao especificado,José Garibaldi,DT1052_22:FAIL
+3246,,,,,nao especificado,nao especificado,José Garibaldi,DT1052_22:NEW
 3260,,,,,nao especificado,nao especificado,Amedeo Bertolassi,DT1052_22:SUCCESS
 3370,,,,,nao especificado,nao especificado,José Pieretti,DT1052_22:SUCCESS
 3548,,,,,nao especificado,nao especificado,Carlos Grandolfi,DT1052_22:SUCCESS
@@ -142,7 +142,7 @@
 58696,,,,,nao especificado,nao especificado,Emilia Trenta Denardi ,DT1052_22:SUCCESS
 58756,,,,,nao especificado,nao especificado,Maximiano Bovo,DT1052_22:SUCCESS
 58758,,,,,nao especificado,nao especificado,Henrico Parietti,DT1052_22:SUCCESS
-58768,,,,,nao especificado,nao especificado,Francesco Giuseppe Matteazzi,DT1052_22:NEW
+58768,,,,,nao especificado,nao especificado,Francesco Giuseppe Matteazzi,DT1052_22:CLIENT
 58774,,,,,nao especificado,nao especificado,Cecilia Deluqui Fonseca ,DT1052_22:FAIL
 58780,,,,,nao especificado,nao especificado,Bartolo Donatoni,DT1052_22:SUCCESS
 58782,,,,,nao especificado,nao especificado,adriano,DT1052_22:FAIL
@@ -158,7 +158,7 @@
 62756,,,,,nao especificado,nao especificado,Dante Ugo Camilo Zacconi,DT1052_22:SUCCESS
 69154,,,,,nao especificado,nao especificado,Dionisio Stefano Angeli,DT1052_22:SUCCESS
 70796,,,,,nao especificado,nao especificado,Griguol (Paolo Griguol) ,DT1052_22:SUCCESS
-73274,,,,,nao especificado,nao especificado,Deise Siviero,DT1052_22:UC_X13KZS
+73274,,,,,nao especificado,nao especificado,Deise Siviero,DT1052_22:CLIENT
 77624,,,,,nao especificado,nao especificado,Egidio Domenico Baccili ,DT1052_22:SUCCESS
 90054,,,,,nao especificado,nao especificado,Julio Sartori,DT1052_22:SUCCESS
 91300,,,,,nao especificado,nao especificado,CASSIANO PANIZZA,DT1052_22:SUCCESS
@@ -233,7 +233,6 @@
 271252,,,,,nao especificado,nao especificado,DALLA PORTA MAFALDA ,DT1052_22:NEW
 271342,,,,,nao especificado,nao especificado,Arcangelo Buratto,DT1052_22:NEW
 271566,,,,,nao especificado,nao especificado,LUIGI MARCHESE,DT1052_22:NEW
-276800,,,,,nao especificado,nao especificado,Guerino / Eustacchio PAOLON,DT1052_22:NEW
 276802,,,,,nao especificado,nao especificado,Luigi Vittorio Casati ,DT1052_22:NEW
 277276,,,,,nao especificado,nao especificado,Caterina Lovato,DT1052_22:NEW
 277438,,,,,nao especificado,nao especificado,Amadeu Cologni,DT1052_22:FAIL
@@ -251,11 +250,10 @@
 278452,,,,,nao especificado,nao especificado,Domingas ,DT1052_22:NEW
 278756,,,,,nao especificado,nao especificado,Maria Senhoreta Paes,DT1052_22:NEW
 278874,,,,,nao especificado,nao especificado,ANTONIO SIGNORETTI,DT1052_22:NEW
-278920,,,,,nao especificado,nao especificado,Augusto Possamai ,DT1052_22:NEW
 279286,,,,,nao especificado,nao especificado,Francesco Menegatti,DT1052_22:NEW
 279318,,,,,nao especificado,nao especificado,Ulderico Belotti,DT1052_22:NEW
 279342,,,,,nao especificado,nao especificado,Gasparotto,DT1052_22:NEW
-279458,,,,,nao especificado,nao especificado,Pietro Trevisan,DT1052_22:NEW
+279458,,,,,nao especificado,nao especificado,Pietro Trevisan,DT1052_22:UC_4RQBZV
 279540,,,,,nao especificado,nao especificado,PENDENTE,DT1052_22:NEW
 279768,,,,,nao especificado,nao especificado,Domingos Dorigon,DT1052_22:NEW
 279922,,,,,nao especificado,nao especificado,Afonso,DT1052_22:NEW
@@ -282,7 +280,6 @@
 284746,,,,,nao especificado,nao especificado,Eu Na Europa Cidadania,DT1052_22:NEW
 284844,,,,,nao especificado,nao especificado,Augusto Emilio Beta ,DT1052_22:NEW
 284958,,,,,nao especificado,nao especificado,Vittorio Donega,DT1052_22:CLIENT
-284994,,,,,nao especificado,nao especificado,Barbara Virginia Stuani,DT1052_22:NEW
 285028,,,,,nao especificado,nao especificado,JOÃO PIFFERO,DT1052_22:NEW
 285490,,,,,nao especificado,nao especificado,GIUSUÉ ,DT1052_22:NEW
 286482,,,,,nao especificado,nao especificado,Genaro Avenia,DT1052_22:NEW
@@ -305,7 +302,6 @@
 287352,,,,,nao especificado,nao especificado,Augusto Chinazzo,DT1052_22:NEW
 287354,,,,,nao especificado,nao especificado, Atílio Beletato,DT1052_22:NEW
 287356,,,,,nao especificado,nao especificado,José Guilherme,DT1052_22:NEW
-287370,,,,,nao especificado,nao especificado,Fábio Volpi ,DT1052_22:NEW
 287436,,,,,nao especificado,nao especificado,Dusolina Leme Junqueira,DT1052_22:NEW
 287462,,,,,nao especificado,nao especificado,Manfredo Ernesto Gioachino Sita,DT1052_22:NEW
 287658,,,,,nao especificado,nao especificado,Névio Valério,DT1052_22:NEW
@@ -319,6 +315,7 @@
 288656,,,,,nao especificado,nao especificado,PIETRO BUSCARIOL,DT1052_22:NEW
 290992,,,,,nao especificado,nao especificado,Carmela Antonia Famá,DT1052_22:NEW
 291138,,,,,nao especificado,nao especificado,Giovanni Marino,DT1052_22:FAIL
+291394,,,,,nao especificado,nao especificado,Fábio Volpi ,DT1052_22:NEW
 269370,,,,,nao especificado,nao especificado,Gaetano Salvatore Granata ,DT1052_58:FAIL
 272302,,,,,nao especificado,nao especificado,197 CECAGNO GIUSUÉ DEONISIO,DT1052_58:NEW
 273272,,,,,nao especificado,nao especificado,196 CATTERINA FULVIA POLLACHINI,DT1052_58:NEW

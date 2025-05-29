@@ -204,35 +204,23 @@ def exibir_producao_time_doutora(df_cartorio_original):
         mapa_nomes_usuarios_global.update({f"user_{id_user}": f"Usuário {id_user}" for id_user in IDS_USUARIOS_TIME_DOUTORA})
 
 
-    # --- Filtros ---
-    st.subheader("🗓️ Filtros para Análise de Produção")
-
-    # Usar expander com filtros-container como padrão do projeto
-    with st.expander("Filtros", expanded=True):
-        st.markdown('<div class="filtros-container">', unsafe_allow_html=True)
+    # --- FILTROS ---
+    with st.expander("🔍 Filtros", expanded=True):
+        col_filtro1, col_filtro2, col_filtro3, col_filtro4 = st.columns([0.25, 0.25, 0.25, 0.25])
         
-        # Layout: Linha 1 (Datas), Linha 2 (Usuário), Linha 3 (Botão)
-        col_data1, col_data2 = st.columns(2)
-        col_usuario = st.columns(1)[0]  # Uma coluna para usuário
-        col_btn, col_empty = st.columns([0.3, 0.7])  # Botão na esquerda e maior
-        
-        with col_data1:
+        with col_filtro1:
             st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
             st.markdown('<label class="filtro-label">Data Inicial</label>', unsafe_allow_html=True)
             data_inicio_analise = st.date_input("", value=datetime.now().date() - pd.Timedelta(days=30), key="doutora_data_inicio", label_visibility="collapsed")
             st.markdown('</div>', unsafe_allow_html=True)
             
-        with col_data2:
+        with col_filtro2:
             st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
             st.markdown('<label class="filtro-label">Data Final</label>', unsafe_allow_html=True)
             data_fim_analise = st.date_input("", value=datetime.now().date(), key="doutora_data_fim", label_visibility="collapsed")
             st.markdown('</div>', unsafe_allow_html=True)
 
-        if data_inicio_analise > data_fim_analise:
-            st.warning("A data inicial não pode ser posterior à data final.")
-            return
-
-        with col_usuario:
+        with col_filtro3:
             st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
             st.markdown('<label class="filtro-label">Usuário do Time Doutora</label>', unsafe_allow_html=True)
             # Filtro por usuário do Time Doutora
@@ -245,20 +233,35 @@ def exibir_producao_time_doutora(df_cartorio_original):
                 label_visibility="collapsed"
             )
             st.markdown('</div>', unsafe_allow_html=True)
-        
-        with col_btn:
-            st.markdown('<div class="espacamento-cartorio espacamento-cartorio--button">', unsafe_allow_html=True)
-            # Função simples para resetar filtros via rerun (pode ser melhorada com session_state)
-            if st.button("Resetar", help="Resetar filtros para valores padrão", use_container_width=True):
-                st.rerun()
+
+        with col_filtro4:
+            st.markdown('<div class="filtro-section">', unsafe_allow_html=True)
+            st.markdown('<label class="filtro-label">Protocolizado</label>', unsafe_allow_html=True)
+            # Filtro de Protocolizado
+            coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
+            filtro_protocolizado_habilitado = coluna_protocolizado in df_cartorio_original.columns if df_cartorio_original is not None else False
+            if filtro_protocolizado_habilitado:
+                filtro_protocolizado = st.selectbox(
+                    "",  # Label vazio pois usamos HTML
+                    options=["Todos", "Protocolizado", "Não Protocolizado"],
+                    index=0,
+                    key="filtro_protocolizado_time_doutora",
+                    label_visibility="collapsed"
+                )
+            else:
+                st.caption(f":warning: Campo protocolizado não encontrado.")
+                filtro_protocolizado = "Todos"
             st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)  # Fecha filtros-container
+
+    if data_inicio_analise > data_fim_analise:
+        st.warning("A data inicial não pode ser posterior à data final.")
+        return
 
     st.info(f"""
     **Filtros Aplicados:**
     - Período: {data_inicio_analise.strftime('%d/%m/%Y')} a {data_fim_analise.strftime('%d/%m/%Y')}
     - Usuário: {usuario_selecionado_nome}
+    - Protocolizado: {filtro_protocolizado}
     """)
     st.markdown("---")
 
@@ -274,6 +277,29 @@ def exibir_producao_time_doutora(df_cartorio_original):
         return
 
     df_movimentacoes = df_supabase_raw.copy()
+
+    # Aplicar filtro de Protocolizado se o DataFrame original estiver disponível
+    if df_cartorio_original is not None and filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
+        if coluna_protocolizado in df_cartorio_original.columns:
+            # Converter para string e normalizar valores
+            df_cartorio_original[coluna_protocolizado] = df_cartorio_original[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+            
+            # Criar um conjunto de IDs que atendem ao critério de protocolização
+            if filtro_protocolizado == "Protocolizado":
+                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
+                ids_protocolizados = set(df_cartorio_original[df_cartorio_original[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]['ID'].astype(str))
+            else:  # "Não Protocolizado"
+                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
+                ids_protocolizados = set(df_cartorio_original[~df_cartorio_original[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df_cartorio_original[coluna_protocolizado] == '')]['ID'].astype(str))
+            
+            # Filtrar df_movimentacoes para incluir apenas os IDs que atendem ao critério
+            df_movimentacoes = df_movimentacoes[df_movimentacoes['id_card'].astype(str).isin(ids_protocolizados)]
+            
+            if df_movimentacoes.empty:
+                st.warning(f"Nenhum registro encontrado para o filtro de protocolizado: {filtro_protocolizado}")
+                return
+        else:
+            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
 
     # --- Processamento dos Dados ---
     # Garantir que as colunas necessárias existem com verificação flexível

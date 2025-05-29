@@ -247,11 +247,12 @@ def exibir_pesquisa_br(df_cartorio):
 
     st.markdown("---")
 
-    # --- Filtros ---
-    with st.expander("Filtros", expanded=False):
-        col_filtro1, col_filtro2 = st.columns(2)
-        
-        with col_filtro1:
+    # Filtros
+    with st.expander("🔍 Filtros", expanded=True):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Filtro de Estágio
             estagios_unicos = sorted(df_pesquisa['ESTAGIO_LEGIVEL'].unique().tolist())
             filtro_estagio = st.selectbox(
                 "Filtrar por Estágio",
@@ -259,96 +260,116 @@ def exibir_pesquisa_br(df_cartorio):
                 index=0,
                 key="filtro_estagio_pesquisa_br"
             )
-        
-        with col_filtro2:
-            responsaveis_unicos = sorted(df_pesquisa['ASSIGNED_BY_NAME'].unique().tolist())
-            filtro_responsavel = st.selectbox(
-                "Filtrar por Responsável",
-                options=['Todos'] + responsaveis_unicos,
-                index=0,
-                key="filtro_responsavel_pesquisa_br"
-            )
+
+        with col2:
+            # Filtro de Protocolizado
+            coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
+            filtro_protocolizado_habilitado = coluna_protocolizado in df_pesquisa.columns
+            if filtro_protocolizado_habilitado:
+                filtro_protocolizado = st.selectbox(
+                    "Protocolizado:",
+                    options=["Todos", "Protocolizado", "Não Protocolizado"],
+                    index=0,
+                    key="filtro_protocolizado_pesquisa_br"
+                )
+            else:
+                st.caption(f":warning: Campo protocolizado não encontrado.")
+                filtro_protocolizado = "Todos"
 
     # Aplicar filtros
     df_filtrado = df_pesquisa.copy()
-    
+
+    # Filtro de Estágio
     if filtro_estagio != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['ESTAGIO_LEGIVEL'] == filtro_estagio]
-    
-    if filtro_responsavel != 'Todos':
-        df_filtrado = df_filtrado[df_filtrado['ASSIGNED_BY_NAME'] == filtro_responsavel]
+
+    # Aplicar filtro de Protocolizado
+    if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
+        if coluna_protocolizado in df_filtrado.columns:
+            # Converter para string e normalizar valores
+            df_filtrado[coluna_protocolizado] = df_filtrado[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+            
+            if filtro_protocolizado == "Protocolizado":
+                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
+                df_filtrado = df_filtrado[df_filtrado[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
+            elif filtro_protocolizado == "Não Protocolizado":
+                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
+                df_filtrado = df_filtrado[~df_filtrado[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df_filtrado[coluna_protocolizado] == '')]
+        else:
+            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
+
+    if df_filtrado.empty:
+        st.warning("Nenhum registro encontrado para os filtros selecionados.")
+        return
 
     # --- Tabela Detalhada ---
     st.markdown("#### 📋 Detalhamento das Pesquisas")
     
-    if df_filtrado.empty:
-        st.warning("Nenhum registro encontrado com os filtros aplicados.")
-    else:
-        # Preparar dados para exibição
-        df_display = df_filtrado[[
-            'UF_CRM_34_NOME_FAMILIA',
-            'UF_CRM_34_ID_REQUERENTE', 
-            'ESTAGIO_LEGIVEL',
-            'ASSIGNED_BY_NAME'
-        ]].copy()
-        
-        df_display = df_display.rename(columns={
-            'UF_CRM_34_NOME_FAMILIA': 'Nome da Família',
-            'UF_CRM_34_ID_REQUERENTE': 'ID Requerente',
-            'ESTAGIO_LEGIVEL': 'Estágio Atual',
-            'ASSIGNED_BY_NAME': 'Responsável'
-        })
-        
-        # Ordenar por estágio e família
-        ordem_estagios = [
-            'AGUARDANDO PESQUISADOR',
-            'PESQUISA EM ANDAMENTO',
-            'PESQUISA PRONTA PARA EMISSÃO',
-            'PESQUISA NÃO ENCONTRADA'
-        ]
-        
-        df_display['ORDEM_ESTAGIO'] = df_display['Estágio Atual'].map({
-            estágio: i for i, estágio in enumerate(ordem_estagios)
-        }).fillna(999)
-        
-        df_display = df_display.sort_values(['ORDEM_ESTAGIO', 'Nome da Família'])
-        df_display = df_display.drop(columns=['ORDEM_ESTAGIO'])
-        
-        # Configurar cores por estágio
-        def color_estagio(val):
-            colors = {
-                'AGUARDANDO PESQUISADOR': 'background-color: #FFF3E0',
-                'PESQUISA EM ANDAMENTO': 'background-color: #E3F2FD',
-                'PESQUISA PRONTA PARA EMISSÃO': 'background-color: #E8F5E8',
-                'PESQUISA NÃO ENCONTRADA': 'background-color: #FFEBEE'
-            }
-            return colors.get(val, '')
-        
-        # Aplicar estilo
-        styled_df = df_display.style.applymap(
-            color_estagio, 
-            subset=['Estágio Atual']
-        )
-        
-        st.dataframe(
-            styled_df,
-            hide_index=True,
-            use_container_width=True,
-            column_config={
-                "Nome da Família": st.column_config.TextColumn("Nome da Família", width="medium"),
-                "ID Requerente": st.column_config.TextColumn("ID Requerente", width="small"),
-                "Estágio Atual": st.column_config.TextColumn("Estágio Atual", width="medium"),
-                "Responsável": st.column_config.TextColumn("Responsável", width="medium")
-            }
-        )
-        
-        st.caption(f"Exibindo {len(df_filtrado)} de {total_pesquisas} pesquisas")
+    # Preparar dados para exibição
+    df_display = df_filtrado[[
+        'UF_CRM_34_NOME_FAMILIA',
+        'UF_CRM_34_ID_REQUERENTE', 
+        'ESTAGIO_LEGIVEL',
+        'ASSIGNED_BY_NAME'
+    ]].copy()
+    
+    df_display = df_display.rename(columns={
+        'UF_CRM_34_NOME_FAMILIA': 'Nome da Família',
+        'UF_CRM_34_ID_REQUERENTE': 'ID Requerente',
+        'ESTAGIO_LEGIVEL': 'Estágio Atual',
+        'ASSIGNED_BY_NAME': 'Responsável'
+    })
+    
+    # Ordenar por estágio e família
+    ordem_estagios = [
+        'AGUARDANDO PESQUISADOR',
+        'PESQUISA EM ANDAMENTO',
+        'PESQUISA PRONTA PARA EMISSÃO',
+        'PESQUISA NÃO ENCONTRADA'
+    ]
+    
+    df_display['ORDEM_ESTAGIO'] = df_display['Estágio Atual'].map({
+        estágio: i for i, estágio in enumerate(ordem_estagios)
+    }).fillna(999)
+    
+    df_display = df_display.sort_values(['ORDEM_ESTAGIO', 'Nome da Família'])
+    df_display = df_display.drop(columns=['ORDEM_ESTAGIO'])
+    
+    # Configurar cores por estágio
+    def color_estagio(val):
+        colors = {
+            'AGUARDANDO PESQUISADOR': 'background-color: #FFF3E0',
+            'PESQUISA EM ANDAMENTO': 'background-color: #E3F2FD',
+            'PESQUISA PRONTA PARA EMISSÃO': 'background-color: #E8F5E8',
+            'PESQUISA NÃO ENCONTRADA': 'background-color: #FFEBEE'
+        }
+        return colors.get(val, '')
+    
+    # Aplicar estilo
+    styled_df = df_display.style.applymap(
+        color_estagio, 
+        subset=['Estágio Atual']
+    )
+    
+    st.dataframe(
+        styled_df,
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "Nome da Família": st.column_config.TextColumn("Nome da Família", width="medium"),
+            "ID Requerente": st.column_config.TextColumn("ID Requerente", width="small"),
+            "Estágio Atual": st.column_config.TextColumn("Estágio Atual", width="medium"),
+            "Responsável": st.column_config.TextColumn("Responsável", width="medium")
+        }
+    )
+    
+    st.caption(f"Exibindo {len(df_filtrado)} de {total_pesquisas} pesquisas")
 
     # --- Análise por Responsável ---
     st.markdown("---")
     st.markdown("#### 👥 Análise por Responsável")
     
-    analise_responsavel = df_pesquisa.groupby('ASSIGNED_BY_NAME').agg({
+    analise_responsavel = df_filtrado.groupby('ASSIGNED_BY_NAME').agg({
         'ID': 'count',
         'UF_CRM_34_ID_REQUERENTE': pd.Series.nunique
     }).reset_index()
@@ -361,7 +382,7 @@ def exibir_pesquisa_br(df_cartorio):
     
     # Adicionar estatísticas por estágio para cada responsável
     for estagio in ['AGUARDANDO PESQUISADOR', 'PESQUISA EM ANDAMENTO', 'PESQUISA PRONTA PARA EMISSÃO', 'PESQUISA NÃO ENCONTRADA']:
-        contagem_estagio = df_pesquisa[df_pesquisa['ESTAGIO_LEGIVEL'] == estagio].groupby('ASSIGNED_BY_NAME').size().reset_index(name=estagio)
+        contagem_estagio = df_filtrado[df_filtrado['ESTAGIO_LEGIVEL'] == estagio].groupby('ASSIGNED_BY_NAME').size().reset_index(name=estagio)
         contagem_estagio = contagem_estagio.rename(columns={'ASSIGNED_BY_NAME': 'Responsável'})
         analise_responsavel = analise_responsavel.merge(contagem_estagio, on='Responsável', how='left')
         analise_responsavel[estagio] = analise_responsavel[estagio].fillna(0).astype(int)
