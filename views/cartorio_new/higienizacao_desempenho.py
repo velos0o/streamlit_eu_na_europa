@@ -510,7 +510,7 @@ def exibir_higienizacao_desempenho():
         'DT1098_102:PREPARATION': 'Brasileiras Pendências',
         'DT1098_102:CLIENT': 'Brasileiras Emitida',
         'DT1098_102:UC_45SBLC': 'Brasileiras Pendências',  # Devolução ADM como pendência
-        'DT1098_102:SUCCESS': 'Brasileiras Emitida',  # Certidão Entregue
+        'DT1098_102:SUCCESS': 'Brasileiras Dispensada',  # Certidão Entregue # ALTERADO DE Emitida PARA Dispensada (SOLICITAÇÃO DUPLICADA)
         'DT1098_102:FAIL': 'Brasileiras Dispensada',  # Cancelado
         'DT1098_102:UC_676WIG': 'Brasileiras Dispensada',  # Certidão Dispensada
         'DT1098_102:UC_UHPXE8': 'Brasileiras Emitida',  # Certidão Entregue
@@ -527,11 +527,6 @@ def exibir_higienizacao_desempenho():
 
     if not df_cartorio.empty and 'STAGE_ID' in df_cartorio.columns and col_id_familia_bitrix in df_cartorio.columns:
         df_cartorio['CATEGORIA_EMISSAO'] = df_cartorio['STAGE_ID'].map(mapeamento_stages).fillna('Categoria Desconhecida')
-        
-        # NOVO: Adicionar coluna de conclusão corrigida para cada registro
-        df_cartorio['CONCLUIDA_CORRIGIDA'] = df_cartorio.apply(
-            lambda row: calcular_conclusao_corrigida_por_pipeline(row), axis=1
-        )
         
         df_bitrix_agg = pd.crosstab(df_cartorio[col_id_familia_bitrix], df_cartorio['CATEGORIA_EMISSAO'])
         
@@ -552,34 +547,53 @@ def exibir_higienizacao_desempenho():
 
         df_bitrix_agg = df_bitrix_agg.reindex(columns=categorias_bitrix_contagem, fill_value=0)
         
-        # CORRIGIDO: Calcular "Pasta C/Emissão Concluída" usando a lógica corrigida
-        # Primeiro, agrupar por família e verificar se TODAS as certidões estão realmente concluídas
-        conclusao_por_familia = df_cartorio.groupby(col_id_familia_bitrix).agg({
-            'CONCLUIDA_CORRIGIDA': ['count', 'sum']
-        })
-        conclusao_por_familia.columns = ['total_certidoes', 'total_concluidas']
-        conclusao_por_familia = conclusao_por_familia.reset_index()
+        # --- NOVA LÓGICA PARA Pasta C/Emissão Concluída ---
+        # Uma família é considerada concluída se TODAS as suas certidões nos funis 92, 94, 102 estão "Emitidas"
         
-        # Uma família está "C/Emissão Concluída" apenas se TODAS as certidões estão concluídas
-        # E se há pelo menos uma certidão (evitar divisão por zero)
-        conclusao_por_familia['familia_concluida'] = (
-            (conclusao_por_familia['total_certidoes'] > 0) &
-            (conclusao_por_familia['total_concluidas'] == conclusao_por_familia['total_certidoes'])
-        ).astype(int)
+        # Filtrar apenas certidões dos funis principais para a lógica de conclusão da pasta
+        df_funis_principais = df_cartorio[
+            df_cartorio['CATEGORY_ID'].astype(str).isin(['92', '94', '102'])
+        ].copy()
+
+        if not df_funis_principais.empty:
+            # Agrupar por família e contar total de certidões e total de certidões emitidas nesses funis
+            conclusao_por_familia = df_funis_principais.groupby(col_id_familia_bitrix).agg(
+                total_certidoes_principais = ('STAGE_ID', 'count'),
+                total_emitidas_principais = ('CATEGORIA_EMISSAO', lambda x: (x == 'Brasileiras Emitida').sum())
+            ).reset_index()
+
+            # Marcar família como concluída se todas as certidões dos funis principais foram emitidas
+            # E se existe pelo menos uma certidão nos funis principais
+            conclusao_por_familia['familia_concluida_logica_nova'] = (
+                (conclusao_por_familia['total_certidoes_principais'] > 0) &
+                (conclusao_por_familia['total_emitidas_principais'] == conclusao_por_familia['total_certidoes_principais'])
+            ).astype(int)
+
+            # Merge com df_bitrix_agg para adicionar a nova coluna de conclusão
+            df_bitrix_agg = pd.merge(
+                df_bitrix_agg.reset_index(), # Resetar índice se col_id_familia_bitrix não for índice ainda
+                conclusao_por_familia[[col_id_familia_bitrix, 'familia_concluida_logica_nova']],
+                on=col_id_familia_bitrix,
+                how='left'
+            )
+            df_bitrix_agg['Pasta C/Emissão Concluída'] = df_bitrix_agg['familia_concluida_logica_nova'].fillna(0).astype(int)
+            df_bitrix_agg = df_bitrix_agg.drop(columns=['familia_concluida_logica_nova', 'index'], errors='ignore')
+        else:
+            # Se não houver certidões nos funis principais (raro, mas para segurança)
+            if col_id_familia_bitrix in df_bitrix_agg.columns:
+                 df_bitrix_agg = df_bitrix_agg.reset_index() # Assegurar que col_id_familia_bitrix é coluna
+            df_bitrix_agg['Pasta C/Emissão Concluída'] = 0
         
-        # Merge com df_bitrix_agg para adicionar a coluna corrigida
-        df_bitrix_agg = pd.merge(
-            df_bitrix_agg.reset_index(),
-            conclusao_por_familia[[col_id_familia_bitrix, 'familia_concluida']],
-            on=col_id_familia_bitrix,
-            how='left'
-        )
-        
-        # Renomear e garantir que existe
-        df_bitrix_agg['Pasta C/Emissão Concluída'] = df_bitrix_agg['familia_concluida'].fillna(0).astype(int)
-        df_bitrix_agg = df_bitrix_agg.drop(columns=['familia_concluida'], errors='ignore')
-        
-        print(f"[DEBUG HIGIENIZAÇÃO] Cálculo corrigido: {df_bitrix_agg['Pasta C/Emissão Concluída'].sum()} famílias com emissão concluída")
+        # Garantir que a coluna de ID da família esteja presente se df_bitrix_agg foi recriado ou ficou vazio
+        if col_id_familia_bitrix not in df_bitrix_agg.columns and not df_bitrix_agg.empty:
+            # Se o ID da família era o índice e foi perdido, tentar recuperar (caso específico)
+            # Esta situação é menos provável com o reset_index() acima, mas como fallback.
+            if 'index' in df_bitrix_agg.columns and df_bitrix_agg['index'].nunique() == len(df_bitrix_agg):
+                 df_bitrix_agg[col_id_familia_bitrix] = df_bitrix_agg['index']
+            # Se não, e a coluna realmente sumiu, pode ser necessário recriar com IDs únicos se possível
+            # ou aceitar que o merge com df_conclusao_raw pode falhar parcialmente.
+
+        print(f"[DEBUG HIGIENIZAÇÃO] Nova lógica: {df_bitrix_agg['Pasta C/Emissão Concluída'].sum()} famílias com emissão concluída")
         
     else:
         df_bitrix_agg = pd.DataFrame()
@@ -1045,39 +1059,4 @@ def exibir_higienizacao_desempenho():
     else:
         st.info("Não há dados de CARRÃO na planilha para exibir detalhes.") 
 
-    st.markdown("---")
-
-def calcular_conclusao_corrigida_por_pipeline(row):
-    """
-    Calcula se uma certidão está concluída usando a lógica corrigida para pipeline 104.
-    
-    CORRIGIDO DEZEMBRO 2024: Mesma lógica aplicada no acompanhamento.py
-    
-    Pipeline 102 (Paróquia): Lógica normal
-    Pipeline 104 (Pesquisa BR): APENAS SUCCESS ou FAIL são considerados finalizados
-    Outros pipelines: Lógica normal baseada em mapeamento
-    """
-    category_id = str(row.get('CATEGORY_ID', ''))
-    stage_id = str(row.get('STAGE_ID', ''))
-    categoria_emissao = row.get('CATEGORIA_EMISSAO', '')
-    
-    # Pipeline 102 (Paróquia): Tratar como pipeline normal
-    if category_id == '102':
-        return categoria_emissao == 'Brasileiras Emitida'
-    
-    # Pipeline 104 (Pesquisa BR): CORRIGIDO - Lógica mais restritiva
-    elif category_id == '104':
-        # CORREÇÃO CRÍTICA: Apenas considerar realmente finalizado
-        if 'SUCCESS' in stage_id:
-            # Se chegou ao SUCCESS final (se existir mapeamento específico)
-            return True
-        elif 'FAIL' in stage_id:
-            # Se foi dispensada/cancelada (processo finalizado)
-            return True
-        else:
-            # Qualquer outro estado (incluindo "PRONTA PARA EMISSÃO") NÃO é conclusão final
-            return False
-    
-    # Pipelines 92 e 94 (Cartórios): Lógica normal baseada no mapeamento
-    else:
-        return categoria_emissao == 'Brasileiras Emitida' 
+    st.markdown("---") 
