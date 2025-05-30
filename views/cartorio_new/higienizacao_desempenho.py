@@ -643,11 +643,14 @@ def exibir_higienizacao_desempenho():
 
     # --- Merge Final com a Base --- 
     data_base = {
-        'MESA': ['MESA 8', 'MESA 7', 'MESA 6', 'MESA 5', 'MESA 4', 'MESA 3', 'MESA 2', 'MESA 1', 'MESA 0', 'PROTOCOLADO', 'CARRÃO'],
+        'MESA': ['MESA 8', 'MESA 7', 'MESA 6', 'MESA 5', 'MESA 4', 'MESA 3', 'MESA 2', 'MESA 1', 'MESA 0', 'Cabines', 'CARRÃO'],
         'PASTAS TOTAIS': [105, 46, 46, 70, 106, 46, 66, 66, 49, 113, 123],
         'CONSULTOR': ['NADYA', 'FELIPE', 'VITOR', 'BIANCA', 'DANYELE', 'LAYLA', 'LAYLA', 'JULIANE', 'JULIANE', 'STEFANY', 'Fernanda']
     }
     df_base = pd.DataFrame(data_base)
+
+    # Garantir que a coluna MESA em df_base esteja em maiúsculas para o merge
+    df_base['MESA'] = df_base['MESA'].str.upper()
 
     # Debug: Mostrar dados antes do merge
     print("\n=== DEBUG: Dados antes do merge final ===")
@@ -702,12 +705,6 @@ def exibir_higienizacao_desempenho():
         if col in df_final.columns:
             df_final[col] = df_final[col].fillna(0).astype(int)
 
-    # Debug: Mostrar resultado final do merge
-    print("\nResultado final do merge:")
-    print(df_final)
-    print("\nSoma de HIGINIZAÇÃO COM ÊXITO:")
-    print(df_final['HIGINIZAÇÃO COM ÊXITO'].sum())
-
     # --- Calcular métricas ---
     df_final['CONVERSÃO (%)'] = np.where(
         df_final['PASTAS TOTAIS'] > 0,
@@ -748,19 +745,59 @@ def exibir_higienizacao_desempenho():
     print("df_final com todas as colunas:")
     print(df_final)
 
-    # --- Exibir a Tabela Principal (SEM PROTOCOLADO) --- 
-    df_final_sem_protocolado = df_final[df_final['MESA'] != 'PROTOCOLADO'].copy()
+    # Renomear 'CABINES' para 'PROTOCOLADO' para exibição (após o merge ter usado 'CABINES')
+    df_final['MESA'] = df_final['MESA'].replace('CABINES', 'PROTOCOLADO')
 
-    # Verificar se df_final tem as colunas necessárias
-    if 'HIGINIZAÇÃO COM ÊXITO' not in df_final.columns:
-        print("ALERTA: Coluna 'HIGINIZAÇÃO COM ÊXITO' não encontrada no DataFrame final!")
-        # Adicionar a coluna ausente
-        df_final['HIGINIZAÇÃO COM ÊXITO'] = 0
+    # --- Exibir a Tabela Principal (APENAS MESAS 1-8, para alinhar com o card acima) --- 
+    mesas_1_8_list = [f'MESA {i}' for i in range(1, 9)] # Definindo a lista de mesas 1-8
+
+    # Card para MESAS 1-8
+    # Garantir que a coluna existe antes de somar
+    if 'Pasta C/Emissão Concluída' not in df_final.columns:
+        df_final['Pasta C/Emissão Concluída'] = 0
+    df_final['Pasta C/Emissão Concluída'] = pd.to_numeric(df_final['Pasta C/Emissão Concluída'], errors='coerce').fillna(0).astype(int)
     
-    # Nos casos em que não há dados reais, mostrar mensagem amigável
-    if df_final_sem_protocolado.empty or df_final['HIGINIZAÇÃO COM ÊXITO'].sum() == 0:
+    total_mesas_1_8_card = df_final[df_final['MESA'].isin(mesas_1_8_list)]['Pasta C/Emissão Concluída'].sum()
+
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    ">
+        <div style="
+            color: #495057;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            text-align: center;
+        ">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (MESAS 1-8)</div>
+        <div style="
+            color: #212529;
+            font-size: 28px;
+            font-weight: 700;
+            text-align: center;
+            margin: 0;
+        ">{int(total_mesas_1_8_card)} PASTAS</div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("---")
+    
+    # Filtrar dados para a tabela de MESAS 1-8 (excluindo PROTOCOLADO e CARRÃO explicitamente)
+    df_display_mesas = df_final[
+        df_final['MESA'].isin(mesas_1_8_list)
+    ].copy()
+
+    # Nos casos em que não há dados reais para MESAS 1-8, mostrar mensagem amigável
+    # Usar df_display_mesas para a verificação
+    if df_display_mesas.empty or ('HIGINIZAÇÃO COM ÊXITO' in df_display_mesas.columns and df_display_mesas['HIGINIZAÇÃO COM ÊXITO'].sum() == 0):
         st.warning("""
-        Não foi possível carregar os dados da planilha. Isso pode ocorrer por algumas razões:
+        Não foi possível carregar os dados da planilha para as MESAS 1-8. Isso pode ocorrer por algumas razões:
         
         1. A planilha pode estar com formato diferente do esperado
         2. Os cabeçalhos da planilha podem ter sido alterados
@@ -769,129 +806,41 @@ def exibir_higienizacao_desempenho():
         Por favor, verifique a planilha e tente novamente.
         """)
         
-        # Mostrar tabela básica com as mesas e pastas totais (pelo menos isso estará disponível)
-        st.markdown("### Dados Básicos (Metas por Mesa)")
-        df_base_display = df_base.copy()
-        st.dataframe(df_base_display, hide_index=True, use_container_width=True)
-        return  # Parar a execução da função
-
-    # Debug: Mostrar dados sem PROTOCOLADO
-    print("\n=== DEBUG: Dados sem PROTOCOLADO ===")
-    print("Contagem por MESA:")
-    print(df_final_sem_protocolado.groupby('MESA')['HIGINIZAÇÃO COM ÊXITO'].sum())
-
-    # --- Continuação normal do código se houver dados ---
-    if not df_final_sem_protocolado.empty:
-        # Calcular totais
-        df_total_principal = df_final_sem_protocolado.select_dtypes(include=np.number).sum().to_frame().T
-        df_total_principal['MESA'] = 'TOTAL'
-        df_total_principal['CONSULTOR'] = ''  # Campo texto não deve ser somado
-        
-        # Recalcular percentuais para a linha de total
-        try:
-            if df_total_principal['PASTAS TOTAIS'].iloc[0] > 0:
-                # Verificar se a coluna HIGINIZAÇÃO COM ÊXITO existe
-                if 'HIGINIZAÇÃO COM ÊXITO' not in df_total_principal.columns:
-                    print("ALERTA: Criando coluna 'HIGINIZAÇÃO COM ÊXITO' em df_total_principal")
-                    df_total_principal['HIGINIZAÇÃO COM ÊXITO'] = 0
-                    
-                # Calcular conversão como float, não como string formatado
-                df_total_principal['CONVERSÃO (%)'] = (
-                    df_total_principal['HIGINIZAÇÃO COM ÊXITO'] / df_total_principal['PASTAS TOTAIS'] * 100
-                ).round(2)
-                
-                # Verificar se a coluna Pasta C/Emissão Concluída existe
-                if 'Pasta C/Emissão Concluída' not in df_total_principal.columns:
-                    print("ALERTA: Criando coluna 'Pasta C/Emissão Concluída' em df_total_principal")
-                    df_total_principal['Pasta C/Emissão Concluída'] = 0
-                    
-                # Calcular taxa de emissão como float, não como string formatado
-                df_total_principal['Taxa Emissão Concluída (%)'] = (
-                    df_total_principal['Pasta C/Emissão Concluída'] / df_total_principal['PASTAS TOTAIS'] * 100
-                ).round(2)
-            else:
-                df_total_principal['CONVERSÃO (%)'] = 0.0
-                df_total_principal['Taxa Emissão Concluída (%)'] = 0.0
-        except Exception as e:
-            print(f"ERRO ao calcular percentuais: {str(e)}")
-            df_total_principal['CONVERSÃO (%)'] = 0.0
-            df_total_principal['Taxa Emissão Concluída (%)'] = 0.0
-            
-        # Atualizar df_display_principal com os novos valores
-        df_display_principal = pd.concat([df_final_sem_protocolado, df_total_principal], ignore_index=True)
-
-        # --- Calcular e exibir totais em faixas ---
-        # Calcular total de Pasta C/Emissão Concluída para MESAS 1-8
-        mesas_1_8_list = [f'MESA {i}' for i in range(1, 9)]
-        
-        # Verificar se a coluna Pasta C/Emissão Concluída existe em df_final
-        if 'Pasta C/Emissão Concluída' not in df_final.columns:
-            print("ALERTA: Criando coluna 'Pasta C/Emissão Concluída' em df_final")
-            df_final['Pasta C/Emissão Concluída'] = 0
-            
-        # Garantir que é um número inteiro para evitar erros de exibição
-        df_final['Pasta C/Emissão Concluída'] = pd.to_numeric(df_final['Pasta C/Emissão Concluída'], errors='coerce').fillna(0).astype(int)
-        total_mesas_1_8 = df_final[df_final['MESA'].isin(mesas_1_8_list)]['Pasta C/Emissão Concluída'].sum()
-
-        # Exibir card de totais com design mais profissional e harmônico
-        st.markdown(f"""
-        <div style="
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 15px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        ">
-            <div style="
-                color: #495057;
-                font-size: 14px;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                margin-bottom: 8px;
-                text-align: center;
-            ">TOTAL DE PASTAS COM EMISSÃO CONCLUÍDA (MESAS 1-8)</div>
-            <div style="
-                color: #212529;
-                font-size: 28px;
-                font-weight: 700;
-                text-align: center;
-                margin: 0;
-            ">{int(total_mesas_1_8)} PASTAS</div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("---")
-
-        # Exibir a tabela principal (sem PROTOCOLADO e sem CARRÃO)
-        df_display_mesas = df_display_principal[
-            ~df_display_principal['MESA'].isin(['PROTOCOLADO', 'CARRÃO', 'TOTAL'])
-        ].copy()
-        
-        # Recalcular totais apenas para MESAS 1-8
+        # Mostrar tabela básica com as metas para MESAS 1-8 se os dados da planilha falharem
+        df_base_mesas_1_8 = df_base[df_base['MESA'].isin(mesas_1_8_list)].copy()
+        # Renomear 'Cabines' para 'PROTOCOLADO' também em df_base se for exibido
+        df_base_mesas_1_8['MESA'] = df_base_mesas_1_8['MESA'].replace('Cabines', 'PROTOCOLADO') 
+        st.markdown("### Dados Básicos (Metas por Mesa 1-8)")
+        st.dataframe(df_base_mesas_1_8, hide_index=True, use_container_width=True)
+        # Não retornar a função inteira, apenas a seção de MESAS 1-8
+    else:
+        # --- Continuação normal do código se houver dados para MESAS 1-8 ---
+        # Calcular totais para MESAS 1-8
         df_total_mesas = df_display_mesas.select_dtypes(include=np.number).sum().to_frame().T
         df_total_mesas['MESA'] = 'TOTAL'
-        df_total_mesas['CONSULTOR'] = ''
+        df_total_mesas['CONSULTOR'] = '' 
         
         # Recalcular percentuais para a linha de total
-        if df_total_mesas['PASTAS TOTAIS'].iloc[0] > 0:
+        if 'PASTAS TOTAIS' in df_total_mesas.columns and df_total_mesas['PASTAS TOTAIS'].iloc[0] > 0:
+            if 'HIGINIZAÇÃO COM ÊXITO' not in df_total_mesas.columns:
+                df_total_mesas['HIGINIZAÇÃO COM ÊXITO'] = 0
             df_total_mesas['CONVERSÃO (%)'] = (
                 df_total_mesas['HIGINIZAÇÃO COM ÊXITO'] / df_total_mesas['PASTAS TOTAIS'] * 100
             ).round(2)
+            
+            if 'Pasta C/Emissão Concluída' not in df_total_mesas.columns:
+                df_total_mesas['Pasta C/Emissão Concluída'] = 0
             df_total_mesas['Taxa Emissão Concluída (%)'] = (
                 df_total_mesas['Pasta C/Emissão Concluída'] / df_total_mesas['PASTAS TOTAIS'] * 100
             ).round(2)
-
-        # Aplicar formatação numérica para garantir compatibilidade com Arrow
-        df_total_mesas = ensure_numeric_display(df_total_mesas)
-
-        # Concatenar mesas com seu total
+        else:
+            df_total_mesas['CONVERSÃO (%)'] = 0.0
+            df_total_mesas['Taxa Emissão Concluída (%)'] = 0.0
+            
+        df_total_mesas = ensure_numeric_display(df_total_mesas) # Aplicar formatação
         df_display_mesas_final = pd.concat([df_display_mesas, df_total_mesas], ignore_index=True)
-        
-        # Aplicar formatação numérica a todo o DataFrame final
         df_display_mesas_final = ensure_numeric_display(df_display_mesas_final)
 
-        # Renderizar como HTML em vez de st.dataframe para evitar problemas de PyArrow
         st.markdown("""
         <style>
         table.dataframe {
@@ -925,18 +874,15 @@ def exibir_higienizacao_desempenho():
         </style>
         """, unsafe_allow_html=True)
         
-        # Formatar as colunas de porcentagem antes de converter para HTML
         df_percent = df_display_mesas_final.copy()
         if 'CONVERSÃO (%)' in df_percent.columns:
             df_percent['CONVERSÃO (%)'] = df_percent['CONVERSÃO (%)'].apply(lambda x: f"{x:.2f}%")
         if 'Taxa Emissão Concluída (%)' in df_percent.columns:
             df_percent['Taxa Emissão Concluída (%)'] = df_percent['Taxa Emissão Concluída (%)'].apply(lambda x: f"{x:.2f}%")
         
-        # Converter para HTML e exibir
         html_table = df_percent.to_html(index=False, classes='dataframe')
         st.markdown(html_table, unsafe_allow_html=True)
 
-        # Botão de download para tabela principal (MESAS 1-8)
         csv_principal = convert_df_to_csv(df_display_mesas_final)
         st.download_button(
             label="Download Tabela MESAS 1-8 como CSV",
@@ -946,8 +892,6 @@ def exibir_higienizacao_desempenho():
             key='download_mesas_1_8_csv'
         )
         st.markdown("---")
-    else:
-        st.info("Não há dados para exibir na tabela principal com os filtros atuais.")
 
     # --- Exibir a Tabela de PROTOCOLADO --- 
     df_cabines_final = df_final[df_final['MESA'] == 'PROTOCOLADO'].copy()
