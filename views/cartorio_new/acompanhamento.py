@@ -231,7 +231,8 @@ def exibir_acompanhamento(df_cartorio):
                 "Filtrar por Responsável:",
                 options=responsaveis_unicos,
                 placeholder="Selecione um ou mais responsáveis",
-                key=KEY_RESPONSAVEL
+                key=KEY_RESPONSAVEL,
+                help="Você pode selecionar um ou mais responsáveis para filtrar os resultados."
             )
         
         with col_l2_protocolo:
