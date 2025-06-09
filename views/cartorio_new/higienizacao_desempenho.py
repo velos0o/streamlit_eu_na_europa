@@ -450,13 +450,13 @@ def exibir_higienizacao_desempenho():
         df_cartorio['UF_CRM_34_PROTOCOLIZADO'] = df_cartorio['UF_CRM_34_PROTOCOLIZADO'].astype(str).fillna('nan')
         
         if protocolizado_selecionado_valor == "Sim":
-            # VALOR PARA "SIM" (PROTOCOLIZADO) - AJUSTAR SE NECESSÁRIO
-            valor_protocolizado_sim = '358' 
+            # VALOR PARA "SIM" (PROTOCOLIZADO) - AJUSTADO PARA TEXTO
+            valor_protocolizado_sim = 'PROTOCOLIZADO' 
             df_cartorio = df_cartorio[df_cartorio['UF_CRM_34_PROTOCOLIZADO'] == valor_protocolizado_sim].copy()
             st.info(f"Filtrando por Protocolizado: Sim. {len(df_cartorio)} registros correspondentes.")
         elif protocolizado_selecionado_valor == "Não":
-            # VALOR PARA "NÃO" (NÃO PROTOCOLIZADO) - AJUSTAR SE NECESSÁRIO
-            valor_protocolizado_nao = '360'
+            # VALOR PARA "NÃO" (NÃO PROTOCOLIZADO) - AJUSTADO PARA TEXTO
+            valor_protocolizado_nao = 'NÃO PROTOCOLIZADO'
             df_cartorio = df_cartorio[df_cartorio['UF_CRM_34_PROTOCOLIZADO'] == valor_protocolizado_nao].copy()
             st.info(f"Filtrando por Protocolizado: Não. {len(df_cartorio)} registros correspondentes.")
         # Se "Todos", nenhum filtro é aplicado aqui.
