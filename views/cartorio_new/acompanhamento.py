@@ -138,13 +138,18 @@ def exibir_acompanhamento(df_cartorio):
     min_date_default = df_agrupado_com_data['data_venda_familia'].min().date() if not df_agrupado_com_data.empty else date.today()
     max_date_default = df_agrupado_com_data['data_venda_familia'].max().date() if not df_agrupado_com_data.empty else date.today()
 
-    # --- Inicialização do Session State --- 
+    # --- Inicialização e VALIDAÇÃO do Session State --- 
     if KEY_BUSCA_FAMILIA not in st.session_state:
         st.session_state[KEY_BUSCA_FAMILIA] = ""
-    if KEY_DATA_INICIO not in st.session_state:
+
+    # VALIDAÇÃO DAS DATAS: Previne erro se os filtros mudarem o min/max das datas.
+    # Garante que as datas na sessão estão sempre dentro dos limites válidos.
+    if KEY_DATA_INICIO not in st.session_state or not (min_date_default <= st.session_state.get(KEY_DATA_INICIO, min_date_default) <= max_date_default):
         st.session_state[KEY_DATA_INICIO] = min_date_default
-    if KEY_DATA_FIM not in st.session_state:
+        
+    if KEY_DATA_FIM not in st.session_state or not (min_date_default <= st.session_state.get(KEY_DATA_FIM, max_date_default) <= max_date_default):
         st.session_state[KEY_DATA_FIM] = max_date_default
+    
     if KEY_PERCENTUAL not in st.session_state:
         st.session_state[KEY_PERCENTUAL] = []
     if KEY_RESPONSAVEL not in st.session_state:  # Inicialização do state para responsável
@@ -584,11 +589,7 @@ def aplicar_logica_precedencia_pipeline_104(df, coluna_id_requerente):
                 # APENAS remover se há clara duplicação 
                 # (pesquisa pronta + pipeline superior ativo)
                 requerentes_para_ajustar_104.append(id_requerente)
-                print(f"[DEBUG ACOMPANHAMENTO] ID_REQUERENTE {id_requerente}: Pipeline 104 pronto com pipeline superior ativo, ajustando para evitar duplicação")
-            else:
-                print(f"[DEBUG ACOMPANHAMENTO] ID_REQUERENTE {id_requerente}: Pipeline 104 e superiores coexistindo normalmente")
-        else:
-            print(f"[DEBUG ACOMPANHAMENTO] ID_REQUERENTE {id_requerente}: Apenas pipeline 104 ou sem conflito")
+                
     
     # AJUSTE CONSERVADOR: Em vez de remover, apenas marcar para não contar como "concluído"
     # se há duplicação real
@@ -604,6 +605,6 @@ def aplicar_logica_precedencia_pipeline_104(df, coluna_id_requerente):
             # Em vez de remover, vamos deixar o registro mas não contar como concluído
             # (isso será tratado na função de conclusão revisada)
             if mask_104_pronto.any():
-                print(f"[DEBUG ACOMPANHAMENTO] Mantendo registros do pipeline 104 para {id_req}, mas ajustando lógica de conclusão")
+                pass
     
     return df_processado 
