@@ -101,15 +101,15 @@ def exibir_acompanhamento(df_cartorio):
     if coluna_protocolizado in df.columns:
         protocolizado_selecionado = st.session_state.get(KEY_PROTOCOLIZADO, "Todos")
         if protocolizado_selecionado != "Todos":
-            # Converter para string e normalizar valores
-            df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+            # Assegurar que a coluna é tratada como string e convertida para maiúsculas para consistência
+            df[coluna_protocolizado] = df[coluna_protocolizado].astype(str).fillna('').str.upper()
             
             if protocolizado_selecionado == "Protocolizado":
-                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
-                df = df[df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
+                # Filtra pelo valor exato "PROTOCOLIZADO"
+                df = df[df[coluna_protocolizado] == 'PROTOCOLIZADO']
             elif protocolizado_selecionado == "Não Protocolizado":
-                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
-                df = df[~df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df[coluna_protocolizado] == '')]
+                # Filtra pelo valor exato "NÃO PROTOCOLIZADO"
+                df = df[df[coluna_protocolizado] == 'NÃO PROTOCOLIZADO']
     else:
         # Se a coluna não existir, emitir um aviso apenas uma vez
         if 'aviso_protocolizado_emitido' not in st.session_state:
