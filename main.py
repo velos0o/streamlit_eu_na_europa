@@ -22,6 +22,7 @@ from views.extracoes.extracoes_main import show_extracoes
 from views.cartorio_new.cartorio_new_main import show_cartorio_new
 from views.ficha_familia import show_ficha_familia
 from views.higienizacoes.higienizacoes_main import show_higienizacoes
+from views.negociacao.negociacao_main import show_negociacao
 import views.comune.comune_main
 import views.comune.producao_comune
 import views.comune.funil_certidoes_italianas
@@ -40,6 +41,7 @@ ROTAS = {
     "higienizacoes": "Higienizações", 
     "cartorio_new": "Emissões Brasileiras",
     "comune": "Comune",
+    "negociacao": "Negociação",
     "extracoes": "Extrações de Dados"
 }
 
@@ -103,28 +105,29 @@ def inicializar_estados_sessao():
 # Processar parâmetros da URL
 def processar_parametros_url():
     """Processa parâmetros da URL para navegação direta"""
-    if 'pagina_atual_via_url_processada' not in st.session_state and 'page' in st.query_params:
-        rota = st.query_params['page'].lower()
+    query_params = st.experimental_get_query_params()
+    if 'pagina_atual_via_url_processada' not in st.session_state and 'page' in query_params:
+        rota = query_params['page'][0].lower()
         if rota in ROTAS:
             st.session_state['pagina_atual'] = ROTAS[rota]
             st.session_state['pagina_atual_via_url_processada'] = True
 
             if rota == 'cartorio_new':
                 st.session_state.emissao_submenu_expanded = True
-                if 'sub' in st.query_params and st.query_params['sub'] in SUB_ROTAS_EMISSOES:
-                    st.session_state.emissao_subpagina = SUB_ROTAS_EMISSOES[st.query_params['sub']]
+                if 'sub' in query_params and query_params['sub'][0] in SUB_ROTAS_EMISSOES:
+                    st.session_state.emissao_subpagina = SUB_ROTAS_EMISSOES[query_params['sub'][0]]
                 else:
                     st.session_state.emissao_subpagina = "Funil Certidões"
             elif rota == 'higienizacoes':
                 st.session_state.higienizacao_submenu_expanded = True
-                if 'sub' in st.query_params and st.query_params['sub'] in SUB_ROTAS_HIGIENIZACOES:
-                    st.session_state.higienizacao_subpagina = SUB_ROTAS_HIGIENIZACOES[st.query_params['sub']]
+                if 'sub' in query_params and query_params['sub'][0] in SUB_ROTAS_HIGIENIZACOES:
+                    st.session_state.higienizacao_subpagina = SUB_ROTAS_HIGIENIZACOES[query_params['sub'][0]]
                 else:
                     st.session_state.higienizacao_subpagina = "Checklist"
             elif rota == 'comune':
                 st.session_state.comune_submenu_expanded = True
-                if 'sub' in st.query_params and st.query_params['sub'] in SUB_ROTAS_COMUNE:
-                    st.session_state.comune_subpagina = SUB_ROTAS_COMUNE[st.query_params['sub']]
+                if 'sub' in query_params and query_params['sub'][0] in SUB_ROTAS_COMUNE:
+                    st.session_state.comune_subpagina = SUB_ROTAS_COMUNE[query_params['sub'][0]]
                 else:
                     st.session_state.comune_subpagina = "Produção Comune"
     elif 'pagina_atual_via_url_processada' not in st.session_state:
@@ -330,9 +333,7 @@ def reset_submenu():
 def ir_para_ficha_familia():
     reset_submenu()
     st.session_state['pagina_atual'] = 'Ficha da Família'
-    st.query_params['page'] = 'ficha_familia'
-    if 'sub' in st.query_params:
-        del st.query_params['sub']
+    st.experimental_set_query_params(page='ficha_familia')
 
 def toggle_emissao_submenu():
     st.session_state.emissao_submenu_expanded = not st.session_state.get('emissao_submenu_expanded', False)
@@ -341,11 +342,13 @@ def toggle_emissao_submenu():
     
     if st.session_state.emissao_submenu_expanded:
         st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-        st.query_params['page'] = 'cartorio_new'
         current_subpage = st.session_state.get('emissao_subpagina')
         if current_subpage not in SUB_ROTAS_EMISSOES.values():
             st.session_state.emissao_subpagina = 'Funil Certidões'
-            st.query_params['sub'] = 'funil_certidoes'
+            st.experimental_set_query_params(page='cartorio_new', sub='funil_certidoes')
+        else:
+            sub_route = [k for k, v in SUB_ROTAS_EMISSOES.items() if v == current_subpage][0]
+            st.experimental_set_query_params(page='cartorio_new', sub=sub_route)
 
 def toggle_higienizacao_submenu():
     st.session_state.higienizacao_submenu_expanded = not st.session_state.get('higienizacao_submenu_expanded', False)
@@ -353,76 +356,72 @@ def toggle_higienizacao_submenu():
     
     if st.session_state.higienizacao_submenu_expanded:
         st.session_state['pagina_atual'] = 'Higienizações'
-        st.query_params['page'] = 'higienizacoes'
         if st.session_state.get('pagina_atual') != 'Higienizações':
             st.session_state.higienizacao_subpagina = 'Checklist'
-            st.query_params['sub'] = 'checklist'
+            st.experimental_set_query_params(page='higienizacoes', sub='checklist')
+        else:
+            st.experimental_set_query_params(page='higienizacoes')
 
 def ir_para_emissao_funil_certidoes():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Funil Certidões'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'funil_certidoes'
+    st.experimental_set_query_params(page='cartorio_new', sub='funil_certidoes')
 
 def ir_para_emissao_emissoes_por_familia():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Emissões Por Família'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'emissoes_por_familia'
+    st.experimental_set_query_params(page='cartorio_new', sub='emissoes_por_familia')
 
 def ir_para_emissao_certidoes_pendentes():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Certidões Pendentes por responsável'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'certidoes_pendentes_responsavel'
+    st.experimental_set_query_params(page='cartorio_new', sub='certidoes_pendentes_responsavel')
 
 def ir_para_emissao_desempenho_conclusao():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Desempenho Conclusão de Pasta'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'desempenho_conclusao_pasta'
+    st.experimental_set_query_params(page='cartorio_new', sub='desempenho_conclusao_pasta')
 
 def ir_para_emissao_adm():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'ADM'
     st.session_state.adm_submenu_expanded = True
     st.session_state.adm_subpagina = 'Produção ADM'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'adm'
+    st.experimental_set_query_params(page='cartorio_new', sub='adm')
 
 def ir_para_emissao_producao_time_doutora():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Produção Time Doutora'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'producao_time_doutora'
+    st.experimental_set_query_params(page='cartorio_new', sub='producao_time_doutora')
 
 def ir_para_emissao_pesquisa_br():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Pesquisa BR'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'pesquisa_br'
+    st.experimental_set_query_params(page='cartorio_new', sub='pesquisa_br')
 
 def ir_para_higienizacao_checklist():
     st.session_state['pagina_atual'] = 'Higienizações'
     st.session_state.higienizacao_subpagina = 'Checklist'
-    st.query_params['page'] = 'higienizacoes'
-    st.query_params['sub'] = 'checklist'
+    st.experimental_set_query_params(page='higienizacoes', sub='checklist')
 
 def ir_para_adm_producao():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'ADM'
     st.session_state.adm_submenu_expanded = True
     st.session_state.adm_subpagina = 'Produção ADM'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'adm'
+    st.experimental_set_query_params(page='cartorio_new', sub='adm')
 
 def ir_para_adm_pendencias():
     st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'ADM'
     st.session_state.adm_submenu_expanded = True
     st.session_state.adm_subpagina = 'Certidões Pendentes por ADM'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'adm'
+    st.experimental_set_query_params(page='cartorio_new', sub='adm')
+
+def ir_para_negociacao():
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Negociação'
+    st.experimental_set_query_params(page='negociacao')
 
 # Nova função para toggle do submenu Comune
 def toggle_comune_submenu():
@@ -433,25 +432,25 @@ def toggle_comune_submenu():
     
     if st.session_state.comune_submenu_expanded:
         st.session_state['pagina_atual'] = 'Comune'
-        st.query_params['page'] = 'comune'
         current_subpage = st.session_state.get('comune_subpagina')
         if current_subpage not in SUB_ROTAS_COMUNE.values():
             st.session_state.comune_subpagina = 'Produção Comune'
-            st.query_params['sub'] = 'producao_comune'
+            st.experimental_set_query_params(page='comune', sub='producao_comune')
+        else:
+            sub_route = [k for k, v in SUB_ROTAS_COMUNE.items() if v == current_subpage][0]
+            st.experimental_set_query_params(page='comune', sub=sub_route)
 
 # Nova função para navegação da sub-aba Produção Comune
 def ir_para_comune_producao():
     st.session_state['pagina_atual'] = 'Comune'
     st.session_state.comune_subpagina = 'Produção Comune'
-    st.query_params['page'] = 'comune'
-    st.query_params['sub'] = 'producao_comune'
+    st.experimental_set_query_params(page='comune', sub='producao_comune')
 
 # Nova função para navegação da sub-aba Funil Certidões Italianas
 def ir_para_comune_funil_certidoes():
     st.session_state['pagina_atual'] = 'Comune'
     st.session_state.comune_subpagina = 'Funil Certidões Italianas'
-    st.query_params['page'] = 'comune'
-    st.query_params['sub'] = 'funil_certidoes_italianas'
+    st.experimental_set_query_params(page='comune', sub='funil_certidoes_italianas')
 
 # Nova função para navegação da sub-aba Status Certidão
 def ir_para_comune_status_certidao():
@@ -459,8 +458,7 @@ def ir_para_comune_status_certidao():
     st.session_state.pagina_atual = 'Comune'
     st.session_state.comune_submenu_expanded = True
     st.session_state.comune_subpagina = 'Status Certidão'
-    st.query_params['page'] = 'comune'
-    st.query_params['sub'] = 'status_certidao'
+    st.experimental_set_query_params(page='comune', sub='status_certidao')
 
 # Botões de navegação
 st.sidebar.button(
@@ -610,9 +608,18 @@ if st.session_state.get('comune_submenu_expanded', False):
         )
 
 st.sidebar.button(
+    "Negociação", 
+    key="btn_negociacao",
+    on_click=ir_para_negociacao,
+    use_container_width=True,
+    type="primary" if st.session_state['pagina_atual'] == "Negociação" else "secondary",
+    help="Módulo de Negociação"
+)
+
+st.sidebar.button(
     "Extrações de Dados", 
     key="btn_extracoes", 
-    on_click=lambda: setattr(st.session_state, 'pagina_atual', 'Extrações de Dados') or st.query_params.update({'page': 'extracoes'}),
+    on_click=lambda: (setattr(st.session_state, 'pagina_atual', 'Extrações de Dados'), st.experimental_set_query_params(page='extracoes')),
     use_container_width=True,
     type="primary" if st.session_state['pagina_atual'] == "Extrações de Dados" else "secondary",
     help="Módulo de extrações e relatórios"
@@ -640,6 +647,8 @@ try:
             views.comune.status_certidao.show_status_certidao()
         else:
             views.comune.comune_main.show_comune_main()
+    elif current_page == "Negociação":
+        show_negociacao()
     elif current_page == "Extrações de Dados":
         show_extracoes()
     else:
