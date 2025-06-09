@@ -75,36 +75,41 @@ def show_negociacao():
     # Análise por Responsável
     st.header("Análise por Responsável")
 
-    if 'ASSIGNED_BY_NAME' not in df_negociacao.columns:
-        st.warning("A coluna de responsáveis ('ASSIGNED_BY_NAME') não foi encontrada.")
+    if 'ASSIGNED_BY_NAME' not in df_negociacao.columns or 'STAGE_ID' not in df_negociacao.columns:
+        st.warning("As colunas necessárias ('ASSIGNED_BY_NAME', 'STAGE_ID') não foram encontradas para gerar a análise.")
         return
 
-    # Tabela de contagem por responsável
-    st.subheader("Contagem de Famílias por Responsável")
+    # Tabela de contagem geral por responsável
+    st.subheader("Contagem Total de Famílias por Responsável")
     contagem_responsaveis = df_negociacao['ASSIGNED_BY_NAME'].value_counts().reset_index()
     contagem_responsaveis.columns = ['Responsável', 'Nº de Famílias']
     st.dataframe(contagem_responsaveis, use_container_width=True)
 
-    # Funil por responsável
-    st.subheader("Funil de Negociação por Responsável")
-    lista_responsaveis = sorted(df_negociacao['ASSIGNED_BY_NAME'].unique())
+    # Tabela pivotada com responsáveis nas linhas e etapas nas colunas
+    st.subheader("Visão Detalhada por Etapa e Responsável")
     
-    responsavel_selecionado = st.selectbox(
-        "Selecione um responsável para ver seu funil:",
-        options=lista_responsaveis
+    # Mapear STAGE_ID para nomes de etapas
+    df_negociacao['stage_name'] = df_negociacao['STAGE_ID'].apply(lambda x: STATUS_NEGOCIACAO.get(x, {}).get('nome', 'Desconhecido'))
+    
+    # Filtrar etapas desconhecidas
+    df_pivot_data = df_negociacao[df_negociacao['stage_name'] != 'Desconhecido']
+
+    # Criar tabela pivotada
+    pivot_table = pd.pivot_table(
+        df_pivot_data,
+        index='ASSIGNED_BY_NAME',
+        columns='stage_name',
+        aggfunc='size',
+        fill_value=0
     )
 
-    if responsavel_selecionado:
-        df_filtrado = df_negociacao[df_negociacao['ASSIGNED_BY_NAME'] == responsavel_selecionado]
-        fig_responsavel, stage_counts_responsavel = create_funnel_chart(df_filtrado, f"Funil de {responsavel_selecionado}")
-        
-        if fig_responsavel:
-            st.plotly_chart(fig_responsavel, use_container_width=True)
-            
-            st.subheader(f"Tabela de Etapas para {responsavel_selecionado}")
-            tabela_etapas = stage_counts_responsavel[['stage_name', 'count']].rename(
-                columns={'stage_name': 'Etapa', 'count': 'Quantidade'}
-            )
-            st.dataframe(tabela_etapas, use_container_width=True)
-        else:
-            st.info(f"Não há dados de funil para exibir para {responsavel_selecionado}.") 
+    # Ordenar as colunas da tabela pivotada de acordo com a ordem do funil
+    ordered_stages = sorted(STATUS_NEGOCIACAO.values(), key=lambda x: x['ordem'])
+    ordered_stage_names = [stage['nome'] for stage in ordered_stages]
+    
+    # Garantir que apenas as colunas existentes na pivot_table sejam usadas para reordenar
+    final_ordered_columns = [name for name in ordered_stage_names if name in pivot_table.columns]
+    
+    pivot_table_ordered = pivot_table[final_ordered_columns]
+
+    st.dataframe(pivot_table_ordered, use_container_width=True) 
