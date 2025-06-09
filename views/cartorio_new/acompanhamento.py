@@ -138,18 +138,27 @@ def exibir_acompanhamento(df_cartorio):
     min_date_default = df_agrupado_com_data['data_venda_familia'].min().date() if not df_agrupado_com_data.empty else date.today()
     max_date_default = df_agrupado_com_data['data_venda_familia'].max().date() if not df_agrupado_com_data.empty else date.today()
 
-    # --- Inicialização e VALIDAÇÃO do Session State --- 
+    # --- Inicialização e VALIDAÇÃO do Session State (Robusto para Produção) ---
     if KEY_BUSCA_FAMILIA not in st.session_state:
         st.session_state[KEY_BUSCA_FAMILIA] = ""
 
     # VALIDAÇÃO DAS DATAS: Previne erro se os filtros mudarem o min/max das datas.
-    # Garante que as datas na sessão estão sempre dentro dos limites válidos.
-    if KEY_DATA_INICIO not in st.session_state or not (min_date_default <= st.session_state.get(KEY_DATA_INICIO, min_date_default) <= max_date_default):
-        st.session_state[KEY_DATA_INICIO] = min_date_default
-        
-    if KEY_DATA_FIM not in st.session_state or not (min_date_default <= st.session_state.get(KEY_DATA_FIM, max_date_default) <= max_date_default):
-        st.session_state[KEY_DATA_FIM] = max_date_default
+    # Pega os valores da sessão ou usa os defaults.
+    start_date_from_session = st.session_state.get(KEY_DATA_INICIO, min_date_default)
+    end_date_from_session = st.session_state.get(KEY_DATA_FIM, max_date_default)
+
+    # "Clampa" os valores da sessão para garantir que estão dentro do novo range válido.
+    validated_start_date = max(min_date_default, min(start_date_from_session, max_date_default))
+    validated_end_date = max(min_date_default, min(end_date_from_session, max_date_default))
     
+    # Garante que a data de início não seja posterior à de fim.
+    if validated_start_date > validated_end_date:
+        validated_start_date = validated_end_date
+
+    # Atualiza a sessão com os valores validados ANTES de renderizar o widget.
+    st.session_state[KEY_DATA_INICIO] = validated_start_date
+    st.session_state[KEY_DATA_FIM] = validated_end_date
+
     if KEY_PERCENTUAL not in st.session_state:
         st.session_state[KEY_PERCENTUAL] = []
     if KEY_RESPONSAVEL not in st.session_state:  # Inicialização do state para responsável
@@ -590,6 +599,7 @@ def aplicar_logica_precedencia_pipeline_104(df, coluna_id_requerente):
                 # (pesquisa pronta + pipeline superior ativo)
                 requerentes_para_ajustar_104.append(id_requerente)
                 
+        
     
     # AJUSTE CONSERVADOR: Em vez de remover, apenas marcar para não contar como "concluído"
     # se há duplicação real
