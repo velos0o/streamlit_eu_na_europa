@@ -96,37 +96,35 @@ def exibir_acompanhamento(df_cartorio):
     # Aplicar lógica de precedência para evitar duplicação de contagem
     df = aplicar_logica_precedencia_pipeline_104(df, coluna_id_requerente)
     
-    # --- Aplicar Filtro de Protocolizado ANTES da agregação ---
-    coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
-    if coluna_protocolizado in df.columns:
-        protocolizado_selecionado = st.session_state.get(KEY_PROTOCOLIZADO, "Todos")
-        if protocolizado_selecionado != "Todos":
-            # Assegurar que a coluna é tratada como string e convertida para maiúsculas para consistência
-            df[coluna_protocolizado] = df[coluna_protocolizado].astype(str).fillna('').str.upper()
-            
-            if protocolizado_selecionado == "Protocolizado":
-                # Filtra pelo valor exato "PROTOCOLIZADO"
-                df = df[df[coluna_protocolizado] == 'PROTOCOLIZADO']
-            elif protocolizado_selecionado == "Não Protocolizado":
-                # Filtra pelo valor exato "NÃO PROTOCOLIZADO"
-                df = df[df[coluna_protocolizado] == 'NÃO PROTOCOLIZADO']
-    else:
-        # Se a coluna não existir, emitir um aviso apenas uma vez
-        if 'aviso_protocolizado_emitido' not in st.session_state:
-            st.warning(f"Campo '{coluna_protocolizado}' não encontrado nos dados. Filtro de protocolizado não disponível.")
-            st.session_state['aviso_protocolizado_emitido'] = True
-    
     # --- Agrupamento por Família (pré-filtro) ---
-    # Mover agregação para ANTES dos filtros para ter a base completa
-    df_agrupado = df.groupby(coluna_nome_familia).agg(
-        total_certidoes=('ID', 'count'),
-        total_requerentes=(coluna_id_requerente, pd.Series.nunique),
-        concluidas=('CONCLUIDA', 'sum'),
-        # Usar 'first' aqui é seguro porque data_venda_familia já foi agregada no loader
-        data_venda_familia=(coluna_data_venda_familia, 'first'),
-        # Pegar o primeiro responsável encontrado para a família
-        responsavel=(coluna_responsavel, 'first')
-    ).reset_index()
+    coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
+
+    def check_protocolado(series):
+        # Normaliza para maiúsculas e lida com possíveis NaNs
+        normalized_series = series.astype(str).str.upper().fillna('')
+        if 'PROTOCOLIZADO' in normalized_series.values:
+            return 'PROTOCOLIZADO'
+        return 'NÃO PROTOCOLIZADO'
+
+    # Dicionário de agregação base
+    agg_dict = {
+        'total_certidoes': ('ID', 'count'),
+        'total_requerentes': (coluna_id_requerente, pd.Series.nunique),
+        'concluidas': ('CONCLUIDA', 'sum'),
+        'data_venda_familia': (coluna_data_venda_familia, 'first'),
+        'responsavel': (coluna_responsavel, 'first')
+    }
+
+    # Adiciona a agregação de protocolado dinamicamente se a coluna existir
+    if coluna_protocolizado in df.columns:
+        agg_dict['protocolado_familia'] = (coluna_protocolizado, check_protocolado)
+    else:
+        # Emite aviso se a coluna não for encontrada
+        if 'aviso_protocolizado_emitido' not in st.session_state:
+            st.warning(f"Campo '{coluna_protocolizado}' não encontrado. Filtro de protocolizado não disponível.")
+            st.session_state['aviso_protocolizado_emitido'] = True
+
+    df_agrupado = df.groupby(coluna_nome_familia).agg(**agg_dict).reset_index()
 
     # Calcular Percentual de Conclusão
     df_agrupado['percentual_conclusao'] = (
@@ -317,6 +315,12 @@ def exibir_acompanhamento(df_cartorio):
     if responsaveis_selecionados:
         df_filtrado_agrupado = df_filtrado_agrupado[
             df_filtrado_agrupado['responsavel'].isin(responsaveis_selecionados)
+        ]
+
+    # Aplicar filtro por protocolado (agora no dataframe agrupado)
+    if protocolizado_selecionado != "Todos" and 'protocolado_familia' in df_filtrado_agrupado.columns:
+        df_filtrado_agrupado = df_filtrado_agrupado[
+            df_filtrado_agrupado['protocolado_familia'] == protocolizado_selecionado.upper()
         ]
 
     # --- Cálculos Macro DIN MICOS (após filtros) ---
