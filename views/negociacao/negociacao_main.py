@@ -17,9 +17,9 @@ STATUS_NEGOCIACAO = {
 }
 
 def create_funnel_chart(df, title):
-    """Cria um gráfico de funil com base no DataFrame fornecido."""
+    """Cria um gráfico de funil e retorna a figura e os dados da tabela."""
     if df.empty or 'STAGE_ID' not in df.columns:
-        return None
+        return None, None
 
     stage_counts = df['STAGE_ID'].value_counts().reset_index()
     stage_counts.columns = ['STAGE_ID', 'count']
@@ -30,7 +30,7 @@ def create_funnel_chart(df, title):
     stage_counts = stage_counts[stage_counts['stage_name'] != 'Desconhecido'].sort_values('order')
 
     if stage_counts.empty:
-        return None
+        return None, None
 
     fig = go.Figure(go.Funnel(
         y=stage_counts['stage_name'],
@@ -49,7 +49,7 @@ def create_funnel_chart(df, title):
         height=500,
         margin=dict(l=50, r=50, t=50, b=50)
     )
-    return fig
+    return fig, stage_counts
 
 def show_negociacao():
     st.title("Funil de Negociação - Famílias")
@@ -63,7 +63,7 @@ def show_negociacao():
 
     # Funil Geral
     st.header("Funil Geral de Negociação")
-    fig_geral = create_funnel_chart(df_negociacao, "Distribuição Geral de Negócios por Estágio")
+    fig_geral, _ = create_funnel_chart(df_negociacao, "Distribuição Geral de Negócios por Estágio")
     
     if fig_geral:
         st.plotly_chart(fig_geral, use_container_width=True)
@@ -96,9 +96,15 @@ def show_negociacao():
 
     if responsavel_selecionado:
         df_filtrado = df_negociacao[df_negociacao['ASSIGNED_BY_NAME'] == responsavel_selecionado]
-        fig_responsavel = create_funnel_chart(df_filtrado, f"Funil de {responsavel_selecionado}")
+        fig_responsavel, stage_counts_responsavel = create_funnel_chart(df_filtrado, f"Funil de {responsavel_selecionado}")
         
         if fig_responsavel:
             st.plotly_chart(fig_responsavel, use_container_width=True)
+            
+            st.subheader(f"Tabela de Etapas para {responsavel_selecionado}")
+            tabela_etapas = stage_counts_responsavel[['stage_name', 'count']].rename(
+                columns={'stage_name': 'Etapa', 'count': 'Quantidade'}
+            )
+            st.dataframe(tabela_etapas, use_container_width=True)
         else:
             st.info(f"Não há dados de funil para exibir para {responsavel_selecionado}.") 
