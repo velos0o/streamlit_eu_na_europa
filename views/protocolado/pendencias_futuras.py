@@ -30,6 +30,19 @@ def show_pendencias_futuras(df_filtrado):
             return
         df[col] = pd.to_datetime(df[col], errors='coerce')
 
+    # --- Métricas de Resumo ---
+    st.markdown("---")
+    total_familias_filtro = df['ID FAMÍLIA'].nunique()
+    final_stage_col = pipeline['Drive']
+    total_concluidas = df[df[final_stage_col].notna()]['ID FAMÍLIA'].nunique()
+    total_em_andamento = total_familias_filtro - total_concluidas
+
+    m_col1, m_col2, m_col3 = st.columns(3)
+    m_col1.metric("Total de Famílias (no filtro)", total_familias_filtro)
+    m_col2.metric("Famílias com Processo Concluído", total_concluidas)
+    m_col3.metric("Famílias com Processo em Andamento", total_em_andamento)
+    st.markdown("---")
+
     # Lógica de "Trabalho Total Pendente"
     demanda_futura = {}
     

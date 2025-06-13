@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 
-def _create_section(title, df, end_date_col, start_date_col, status_col, other_cols=None):
+def _create_section(title, df, end_date_col, start_date_col, status_col, completion_statuses, other_cols=None):
     """
     Cria uma seção de análise compacta, focada em métricas de desempenho.
     """
@@ -41,15 +41,23 @@ def _create_section(title, df, end_date_col, start_date_col, status_col, other_c
 
     with col1:
         st.subheader("Desempenho")
-        total_concluidas = df_concluido['ID FAMÍLIA'].nunique()
         
-        if not df_concluido.empty:
-            df_concluido['TEMPO_PROCESSAMENTO'] = (df_concluido[end_date_col] - df_concluido[start_date_col]).dt.days
-            tempo_medio_dias = f"{int(df_concluido['TEMPO_PROCESSAMENTO'].mean())} dias" if pd.notna(df_concluido['TEMPO_PROCESSAMENTO'].mean()) else 'N/A'
+        # Os status de conclusão agora são configuráveis
+        completion_statuses_lower = [s.lower() for s in completion_statuses]
+        df_com_status_concluido = df_status[df_status[status_col].str.strip().str.lower().isin(completion_statuses_lower)]
+        
+        # A métrica deve contar o total de TAREFAS, para corresponder à tabela.
+        total_tarefas_concluidas = len(df_com_status_concluido)
+        
+        # O tempo médio, no entanto, só pode ser calculado com as datas.
+        df_com_datas = df_section[df_section[end_date_col].notna()].copy()
+        if not df_com_datas.empty:
+            df_com_datas['TEMPO_PROCESSAMENTO'] = (df_com_datas[end_date_col] - df_com_datas[start_date_col]).dt.days
+            tempo_medio_dias = f"{int(df_com_datas['TEMPO_PROCESSAMENTO'].mean())} dias" if pd.notna(df_com_datas['TEMPO_PROCESSAMENTO'].mean()) else 'N/A'
         else:
             tempo_medio_dias = 'N/A'
 
-        st.metric(f"Total de Famílias Concluídas", total_concluidas)
+        st.metric(f"Total de Tarefas Concluídas", total_tarefas_concluidas)
         st.metric("Tempo Médio de Conclusão", tempo_medio_dias)
 
     with col2:
@@ -62,11 +70,11 @@ def _create_section(title, df, end_date_col, start_date_col, status_col, other_c
             st.info("Nenhum status encontrado para esta etapa.")
 
     # --- Tabela de Detalhes ---
-    if not df_concluido.empty:
-        with st.expander(f"Ver detalhes das {total_concluidas} famílias concluídas"):
+    if not df_com_datas.empty:
+        with st.expander(f"Ver detalhes das tarefas concluídas"):
             cols_to_show = ['ID FAMÍLIA', start_date_col, end_date_col, status_col, 'TEMPO_PROCESSAMENTO'] + other_cols
-            cols_existentes = [col for col in cols_to_show if col in df_concluido.columns]
-            st.dataframe(df_concluido[cols_existentes].sort_values(by=end_date_col, ascending=False), use_container_width=True)
+            cols_existentes = [col for col in cols_to_show if col in df_com_datas.columns]
+            st.dataframe(df_com_datas[cols_existentes].sort_values(by=end_date_col, ascending=False), use_container_width=True)
 
 
 def show_pendencias_liberadas(df_filtrado):
@@ -84,30 +92,35 @@ def show_pendencias_liberadas(df_filtrado):
             "start_date_col": "PROCURAÇÃO - DATA ENVIO",
             "end_date_col": "PROCURAÇÃO - DATA CONCLUSÃO",
             "status_col": "PROCURAÇÃO - STATUS",
+            "completion_statuses": ["Concluido"],
             "other_cols": ["PROCURAÇÃO - ADM RESPONSAVEL"]
         },
         "Análise Documental": {
             "start_date_col": "ANALISE - DATA DE ENVIO",
             "end_date_col": "ANALISE - DATA CONCLUSÃO",
             "status_col": "ANALISE - STATUS",
+            "completion_statuses": ["Positiva", "Negativa"], # Ambos os status finalizam a análise
             "other_cols": ["ANALISE - RESPONSÁVEL"]
         },
         "Tradução": {
             "start_date_col": "TRADUÇÃO - DATA DE INICIO",
             "end_date_col": "TRADUÇÃO - DATA DE ENTREGA",
             "status_col": "TRADUÇÃO - STATUS",
+            "completion_statuses": ["Concluido"],
             "other_cols": []
         },
         "Apostila": {
             "start_date_col": "APOSTILA - DATA DE INICIO",
             "end_date_col": "APOSTILA - DATA DE ENTREGA",
             "status_col": "APOSTILA - STATUS",
+            "completion_statuses": ["Concluido"],
             "other_cols": []
         },
         "Drive": {
             "start_date_col": "DRIVE - DATA DE INICIO",
             "end_date_col": "DRIVE - DATA DE ENTREGA",
             "status_col": "DRIVE - STATUS",
+            "completion_statuses": ["Concluido"],
             "other_cols": []
         }
     }
