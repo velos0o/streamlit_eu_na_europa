@@ -23,8 +23,15 @@ def carregar_dados_protocolados():
         data = worksheet.get_all_values()
         if len(data) < 3:
             return pd.DataFrame()
+
+        data_rows = data[2:]
+        cleaned_rows = [row for row in data_rows if any(cell for cell in row)]
+
+        if not cleaned_rows:
+            st.warning("Nenhum dado válido encontrado após o cabeçalho.")
+            return pd.DataFrame()
             
-        df = pd.DataFrame(data[2:])
+        df = pd.DataFrame(cleaned_rows)
         
         num_cols = len(df.columns)
         col_names = [chr(ord('A') + i) for i in range(num_cols)]

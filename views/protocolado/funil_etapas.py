@@ -81,13 +81,13 @@ def show_funil_etapas(df_filtrado):
     </style>
     """, unsafe_allow_html=True)
     
-    st.subheader("Funil de Pendências por Etapa", divider='blue')
+    st.subheader("Funil de Conclusão (Etapas sem Pendência)", divider='blue')
 
     if df_filtrado.empty:
         st.warning("Não há dados para exibir com os filtros selecionados.")
         return
 
-    # Ordem das etapas do funil, conforme solicitado
+    # Ordem das etapas do funil
     ordem_etapas = [
         'Emissão',
         'Comune',
@@ -98,31 +98,28 @@ def show_funil_etapas(df_filtrado):
         'Drive'
     ]
 
-    # 1. Exibir o total de famílias no topo (estilo neutro)
+    # 1. Exibir o total de famílias no topo
     total_familias = df_filtrado['ID FAMÍLIA'].nunique()
     st.markdown(get_funil_html("Total de Famílias", total_familias), unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True) # Espaçamento
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # DataFrame contendo apenas famílias com alguma pendência
-    df_com_pendencias = df_filtrado[df_filtrado['PENDENCIAS'] != 'SEM PENDENCIAS'].copy()
-
-    # 2. Contagem e exibição para cada tipo de pendência (estilo 'andamento')
-    st.markdown("##### PENDÊNCIAS ATUAIS")
-    # Usando st.columns para organizar os cards
-    num_cols = 4  # Ajuste o número de colunas conforme necessário
+    # 2. Contagem e exibição para cada etapa concluída (sem a pendência)
+    st.markdown("##### FAMÍLIAS LIBERADAS POR ETAPA")
+    num_cols = 4
     cols = st.columns(num_cols)
     col_idx = 0
 
     for etapa in ordem_etapas:
-        count = df_com_pendencias['PENDENCIAS'].str.contains(etapa, case=False, na=False).sum()
+        # CONTRÁRIO: Conta famílias que NÃO têm a pendência
+        count = (~df_filtrado['PENDENCIAS'].str.contains(etapa, case=False, na=False)).sum()
         html = get_funil_html(etapa, count, tipo='andamento')
         with cols[col_idx]:
             st.markdown(html, unsafe_allow_html=True)
         col_idx = (col_idx + 1) % num_cols
 
-    st.markdown("---") # Divisor
+    st.markdown("---") 
 
-    # 3. Contagem de famílias "SEM PENDENCIAS" no final (estilo 'sucesso')
+    # 3. Contagem de famílias que concluíram TUDO
     sem_pendencias_count = df_filtrado[df_filtrado['PENDENCIAS'] == 'SEM PENDENCIAS']['ID FAMÍLIA'].nunique()
-    st.markdown(get_funil_html("Sem Pendências", sem_pendencias_count, tipo='sucesso'), unsafe_allow_html=True) 
+    st.markdown(get_funil_html("Processo Finalizado", sem_pendencias_count, tipo='sucesso'), unsafe_allow_html=True) 

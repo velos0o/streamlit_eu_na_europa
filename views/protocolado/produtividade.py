@@ -27,26 +27,37 @@ def show_produtividade(df_filtrado):
     lista_tarefas = []
     for etapa, data_col in mapeamento_etapas.items():
         if data_col in df_filtrado.columns:
+            # A produtividade é SEMPRE atribuída ao 'CONSULTOR RESPONSÁVEL'
             df_etapa = df_filtrado[['ID FAMÍLIA', 'CONSULTOR RESPONSÁVEL', data_col]].copy()
-            df_etapa.dropna(subset=[data_col], inplace=True)
+            
+            # Remove linhas onde a data de conclusão ou o responsável estão vazios
+            df_etapa.dropna(subset=[data_col, 'CONSULTOR RESPONSÁVEL'], inplace=True)
+            df_etapa = df_etapa[df_etapa['CONSULTOR RESPONSÁVEL'].str.strip() != '']
+
+            if df_etapa.empty:
+                continue
+
             df_etapa[data_col] = pd.to_datetime(df_etapa[data_col], errors='coerce')
+            df_etapa.dropna(subset=[data_col], inplace=True)
+            
             df_etapa.rename(columns={data_col: 'Data Conclusão'}, inplace=True)
             df_etapa['Etapa'] = etapa
             lista_tarefas.append(df_etapa)
     
     if not lista_tarefas:
-        st.error("Nenhuma das colunas de data de conclusão foi encontrada. Verifique os nomes das colunas na planilha.")
+        st.error("Nenhuma tarefa concluída com responsável atribuído foi encontrada.")
         return
         
-    df_produtividade = pd.concat(lista_tarefas, ignore_index=True).dropna(subset=['Data Conclusão'])
+    df_produtividade = pd.concat(lista_tarefas, ignore_index=True)
 
     # --- Filtros ---
     col1, col2 = st.columns([2, 1])
     with col1:
+        consultores_unicos = sorted(df_produtividade['CONSULTOR RESPONSÁVEL'].unique())
         consultores_selecionados = st.multiselect(
             "Selecione o(s) Consultor(es)",
-            options=sorted(df_produtividade['CONSULTOR RESPONSÁVEL'].unique()),
-            default=sorted(df_produtividade['CONSULTOR RESPONSÁVEL'].unique())
+            options=consultores_unicos,
+            default=consultores_unicos
         )
     with col2:
         min_date = df_produtividade['Data Conclusão'].min().date()

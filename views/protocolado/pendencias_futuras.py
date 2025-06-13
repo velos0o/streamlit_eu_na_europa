@@ -30,30 +30,15 @@ def show_pendencias_futuras(df_filtrado):
             return
         df[col] = pd.to_datetime(df[col], errors='coerce')
 
-    # Dicionário para armazenar a demanda futura e a lista de famílias
-    demanda_futura = {etapa: [] for etapa in pipeline.keys()}
-    pipeline_etapas = list(pipeline.keys())
+    # Lógica de "Trabalho Total Pendente"
+    demanda_futura = {}
+    
+    # Para cada etapa, a demanda é o total de famílias que ainda não a concluíram.
+    for etapa, col_conclusao in pipeline.items():
+        familias_pendentes = df[df[col_conclusao].isna()]
+        demanda_futura[etapa] = familias_pendentes['ID FAMÍLIA'].tolist()
 
-    # Identifica o último estágio concluído para cada família
-    for _, familia in df.iterrows():
-        ultimo_estagio_concluido_idx = -1
-        
-        # Encontra o índice do último estágio com data de conclusão
-        for i, col in enumerate(pipeline.values()):
-            if pd.notna(familia[col]):
-                ultimo_estagio_concluido_idx = i
-
-        # Se um estágio foi concluído, os próximos são demanda futura
-        if ultimo_estagio_concluido_idx > -1:
-            # Itera a partir do estágio seguinte ao último concluído
-            for i in range(ultimo_estagio_concluido_idx + 1, len(pipeline_etapas)):
-                etapa_futura = pipeline_etapas[i]
-                col_futura = pipeline[etapa_futura]
-                # Adiciona a família à lista de demanda se ela ainda não concluiu essa etapa futura
-                if pd.isna(familia[col_futura]):
-                    demanda_futura[etapa_futura].append(familia['ID FAMÍLIA'])
-
-    st.subheader("Demanda Futura por Etapa", divider='blue')
+    st.subheader("Trabalho Total Pendente por Etapa", divider='blue')
 
     # Exibir a demanda futura em métricas e permitir detalhamento
     if not any(demanda_futura.values()):
@@ -68,7 +53,7 @@ def show_pendencias_futuras(df_filtrado):
         count = len(set(familias)) # Usa set para garantir contagem única
         if count > 0:
             with cols[col_idx % num_cols]:
-                st.metric(f"Demanda para {etapa}", count)
+                st.metric(f"Pendentes em {etapa}", count)
                 with st.expander(f"Ver {count} famílias"):
                     st.dataframe(pd.DataFrame(list(set(familias)), columns=['ID FAMÍLIA']), hide_index=True)
             col_idx += 1
