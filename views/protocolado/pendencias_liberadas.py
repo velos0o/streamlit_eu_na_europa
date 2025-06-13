@@ -92,35 +92,35 @@ def show_pendencias_liberadas(df_filtrado):
             "start_date_col": "PROCURAÇÃO - DATA ENVIO",
             "end_date_col": "PROCURAÇÃO - DATA CONCLUSÃO",
             "status_col": "PROCURAÇÃO - STATUS",
-            "completion_statuses": ["Concluido"],
+            "completion_statuses": ["Concluida"],
             "other_cols": ["PROCURAÇÃO - ADM RESPONSAVEL"]
         },
         "Análise Documental": {
             "start_date_col": "ANALISE - DATA DE ENVIO",
             "end_date_col": "ANALISE - DATA CONCLUSÃO",
             "status_col": "ANALISE - STATUS",
-            "completion_statuses": ["Positiva", "Negativa"], # Ambos os status finalizam a análise
+            "completion_statuses": ["Positiva"], # Apenas "Positiva" conta como concluída
             "other_cols": ["ANALISE - RESPONSÁVEL"]
         },
         "Tradução": {
             "start_date_col": "TRADUÇÃO - DATA DE INICIO",
             "end_date_col": "TRADUÇÃO - DATA DE ENTREGA",
             "status_col": "TRADUÇÃO - STATUS",
-            "completion_statuses": ["Concluido"],
+            "completion_statuses": ["Concluido", "Concluida"],
             "other_cols": []
         },
         "Apostila": {
             "start_date_col": "APOSTILA - DATA DE INICIO",
             "end_date_col": "APOSTILA - DATA DE ENTREGA",
             "status_col": "APOSTILA - STATUS",
-            "completion_statuses": ["Concluido"],
+            "completion_statuses": ["Concluido", "Concluida"],
             "other_cols": []
         },
         "Drive": {
             "start_date_col": "DRIVE - DATA DE INICIO",
             "end_date_col": "DRIVE - DATA DE ENTREGA",
             "status_col": "DRIVE - STATUS",
-            "completion_statuses": ["Concluido"],
+            "completion_statuses": ["Concluido", "Concluida"],
             "other_cols": []
         }
     }
