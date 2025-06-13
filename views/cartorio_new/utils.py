@@ -331,4 +331,118 @@ def carregar_dados_usuarios_bitrix():
 #     print("WARN: load_data_cached não definida globalmente em utils.py. Definindo stub.")
 #     def load_data_cached(table_name: str, filters: dict | None = None):
 #         # ... (código do stub) ...
-#         return pd.DataFrame() 
+#         return pd.DataFrame()
+
+# --- Função Utilitária para Filtro de Protocolado ---
+def aplicar_filtro_protocolado(df, filtro_valor, coluna_protocolizado='UF_CRM_34_PROTOCOLIZADO'):
+    """
+    Aplica o filtro de protocolado de forma consistente em todos os módulos.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame a ser filtrado
+        filtro_valor (str): Valor do filtro ("Todos", "Protocolizado", "Não Protocolizado")
+        coluna_protocolizado (str): Nome da coluna de protocolado
+        
+    Returns:
+        pandas.DataFrame: DataFrame filtrado
+    """
+    if coluna_protocolizado not in df.columns:
+        st.warning(f"Coluna {coluna_protocolizado} não encontrada. Filtro de protocolado não aplicado.")
+        return df
+        
+    if filtro_valor == "Todos":
+        return df
+        
+    # Criar cópia para evitar modificar o DataFrame original
+    df_filtrado = df.copy()
+    
+    # Normalizar valores da coluna de protocolado
+    df_filtrado[coluna_protocolizado] = (
+        df_filtrado[coluna_protocolizado]
+        .fillna('')
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+    
+    # Valores considerados como "Protocolizado"
+    valores_protocolizado = ['Y', 'YES', '1', 'TRUE', 'SIM']
+    
+    if filtro_valor == "Protocolizado":
+        return df_filtrado[df_filtrado[coluna_protocolizado].isin(valores_protocolizado)]
+    elif filtro_valor == "Não Protocolizado":
+        # Incluir valores vazios e valores que não estão na lista de protocolado
+        return df_filtrado[
+            ~df_filtrado[coluna_protocolizado].isin(valores_protocolizado) | 
+            (df_filtrado[coluna_protocolizado] == '')
+        ]
+    
+    # Se chegou aqui, valor do filtro não é reconhecido
+    st.warning(f"Valor de filtro não reconhecido: {filtro_valor}. Retornando dados sem filtro.")
+    return df
+
+def normalizar_valor_protocolado(valor):
+    """
+    Normaliza um valor individual de protocolado para formato padrão.
+    
+    Args:
+        valor: Valor a ser normalizado
+        
+    Returns:
+        str: "PROTOCOLIZADO", "NÃO PROTOCOLIZADO" ou "INDETERMINADO"
+    """
+    if pd.isna(valor) or valor == '' or valor is None:
+        return "NÃO PROTOCOLIZADO"
+    
+    valor_normalizado = str(valor).strip().upper()
+    valores_protocolizado = ['Y', 'YES', '1', 'TRUE', 'SIM']
+    
+    if valor_normalizado in valores_protocolizado:
+        return "PROTOCOLIZADO"
+    else:
+        return "NÃO PROTOCOLIZADO"
+
+def verificar_coluna_protocolado(df, coluna_protocolizado='UF_CRM_34_PROTOCOLIZADO'):
+    """
+    Verifica se a coluna de protocolado existe e retorna estatísticas.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame a ser verificado
+        coluna_protocolizado (str): Nome da coluna de protocolado
+        
+    Returns:
+        dict: Dicionário com informações sobre a coluna
+    """
+    resultado = {
+        'existe': False,
+        'total_registros': len(df),
+        'valores_unicos': [],
+        'contagem_valores': {},
+        'percentual_protocolado': 0.0
+    }
+    
+    if coluna_protocolizado not in df.columns:
+        return resultado
+    
+    resultado['existe'] = True
+    
+    # Analisar valores únicos
+    valores_normalizados = (
+        df[coluna_protocolizado]
+        .fillna('')
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+    
+    resultado['valores_unicos'] = sorted(valores_normalizados.unique().tolist())
+    resultado['contagem_valores'] = valores_normalizados.value_counts().to_dict()
+    
+    # Calcular percentual de protocolado
+    valores_protocolizado = ['Y', 'YES', '1', 'TRUE', 'SIM']
+    total_protocolado = valores_normalizados.isin(valores_protocolizado).sum()
+    
+    if len(df) > 0:
+        resultado['percentual_protocolado'] = (total_protocolado / len(df)) * 100
+    
+    return resultado 

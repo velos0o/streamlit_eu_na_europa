@@ -5,7 +5,7 @@ import numpy as np
 import os # Importar os para manipulação de caminhos
 
 # Funções que podem ser úteis
-from .utils import simplificar_nome_estagio, fetch_supabase_producao_data, carregar_dados_usuarios_bitrix
+from .utils import simplificar_nome_estagio, fetch_supabase_producao_data, carregar_dados_usuarios_bitrix, aplicar_filtro_protocolado
 
 # Obter o diretório do arquivo atual
 _PRODUCAO_ADM_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -279,18 +279,7 @@ def exibir_producao_adm(df_cartorio_original):
 
     # Aplicar filtro de Protocolizado
     if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
-        if coluna_protocolizado in df.columns:
-            # Converter para string e normalizar valores
-            df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
-            
-            if filtro_protocolizado == "Protocolizado":
-                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
-                df = df[df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
-            elif filtro_protocolizado == "Não Protocolizado":
-                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
-                df = df[~df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df[coluna_protocolizado] == '')]
-        else:
-            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
+        df = aplicar_filtro_protocolado(df, filtro_protocolizado, coluna_protocolizado)
 
     # --- VISÃO GERAL SIMPLIFICADA ---
     st.subheader("📌 Resumo de Pendências e Resoluções")

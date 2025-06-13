@@ -4,7 +4,7 @@ from datetime import datetime, date # Adicionar date
 
 # Reutilizar as funções de visao_geral para consistência
 # from .visao_geral import simplificar_nome_estagio, categorizar_estagio # Comentado
-from .utils import simplificar_nome_estagio, categorizar_estagio # Adicionado
+from .utils import simplificar_nome_estagio, categorizar_estagio, aplicar_filtro_protocolado # Adicionado
 
 # --- Constantes Chaves Session State ---
 KEY_BUSCA_FAMILIA = "busca_familia_acompanhamento"
@@ -100,11 +100,29 @@ def exibir_acompanhamento(df_cartorio):
     coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
 
     def check_protocolado(series):
-        # Normaliza para maiúsculas e lida com possíveis NaNs
-        normalized_series = series.astype(str).str.upper().fillna('')
-        if 'PROTOCOLIZADO' in normalized_series.values:
+        """
+        FUNÇÃO CORRIGIDA: Normaliza valores de protocolado para formato padrão.
+        Retorna o valor mais comum na série (para casos onde há valores mistos na família).
+        """
+        # Normalizar valores
+        valores_normalizados = series.fillna('').astype(str).str.strip().str.upper()
+        
+        # Valores considerados como protocolado
+        valores_protocolizado = ['Y', 'YES', 'SIM', '1', 'TRUE']
+        
+        # Contar protocolados e não protocolados
+        protocolados = valores_normalizados.isin(valores_protocolizado).sum()
+        total = len(valores_normalizados)
+        nao_protocolados = total - protocolados
+        
+        # Retornar o valor mais comum
+        if protocolados > nao_protocolados:
             return 'PROTOCOLIZADO'
-        return 'NÃO PROTOCOLIZADO'
+        elif nao_protocolados > protocolados:
+            return 'NÃO PROTOCOLIZADO'
+        else:
+            # Em caso de empate, considerar como não protocolado por segurança
+            return 'NÃO PROTOCOLIZADO'
 
     # Dicionário de agregação base
     agg_dict = {
@@ -317,13 +335,79 @@ def exibir_acompanhamento(df_cartorio):
             df_filtrado_agrupado['responsavel'].isin(responsaveis_selecionados)
         ]
 
-    # Aplicar filtro por protocolado (agora no dataframe agrupado)
-    if protocolizado_selecionado != "Todos" and 'protocolado_familia' in df_filtrado_agrupado.columns:
-        df_filtrado_agrupado = df_filtrado_agrupado[
-            df_filtrado_agrupado['protocolado_familia'] == protocolizado_selecionado.upper()
-        ]
+    # CORREÇÃO CRÍTICA: Aplicar filtro por protocolado ANTES do agrupamento
+    # Remover o código antigo que aplicava no DataFrame agrupado
+    # if protocolizado_selecionado != "Todos" and 'protocolado_familia' in df_filtrado_agrupado.columns:
+    #     df_filtrado_agrupado = df_filtrado_agrupado[
+    #         df_filtrado_agrupado['protocolado_familia'] == protocolizado_selecionado.upper()
+    #     ]
 
-    # --- Cálculos Macro DIN MICOS (após filtros) ---
+    # --- NOVO: Aplicar filtro de protocolado no DataFrame original ANTES do agrupamento ---
+    # Se o filtro de protocolado foi selecionado, precisamos reagrupar os dados
+    if protocolizado_selecionado != "Todos":
+        # Filtrar o DataFrame original
+        df_filtrado_protocolado = aplicar_filtro_protocolado(df, protocolizado_selecionado, coluna_protocolizado)
+        
+        # Recalcular o agrupamento com os dados filtrados
+        if not df_filtrado_protocolado.empty:
+            # Reaplicar o agrupamento com os dados filtrados por protocolado
+            df_agrupado_protocolado = df_filtrado_protocolado.groupby(coluna_nome_familia).agg(**agg_dict).reset_index()
+            
+            # Recalcular percentual de conclusão
+            df_agrupado_protocolado['percentual_conclusao'] = (
+                (df_agrupado_protocolado['concluidas'] / df_agrupado_protocolado['total_certidoes'] * 100)
+            ).fillna(0)
+            
+            # Aplicar outros filtros no DataFrame reagrupado
+            df_filtrado_final = df_agrupado_protocolado.copy()
+            
+            # Reaplicar filtros de busca, data, percentual e responsável
+            if search_term:
+                df_filtrado_final = df_filtrado_final[
+                    df_filtrado_final[coluna_nome_familia].str.contains(search_term, case=False, na=False)
+                ]
+
+            if data_venda_min and data_venda_max:
+                df_filtrado_final = df_filtrado_final.dropna(subset=['data_venda_familia']) 
+                df_filtrado_final = df_filtrado_final[
+                    (df_filtrado_final['data_venda_familia'] >= data_venda_min) & 
+                    (df_filtrado_final['data_venda_familia'] < data_venda_max) 
+                ]
+
+            if faixas_selecionadas:
+                condicoes_reagrupadas = [] 
+                for faixa in faixas_selecionadas:
+                    if faixa == "0% - 9%":
+                        condicoes_reagrupadas.append((df_filtrado_final['percentual_conclusao'] >= 0) & (df_filtrado_final['percentual_conclusao'] < 10))
+                    elif faixa == "10% - 30%":
+                        condicoes_reagrupadas.append((df_filtrado_final['percentual_conclusao'] >= 10) & (df_filtrado_final['percentual_conclusao'] < 31))
+                    elif faixa == "31% - 50%":
+                        condicoes_reagrupadas.append((df_filtrado_final['percentual_conclusao'] >= 31) & (df_filtrado_final['percentual_conclusao'] < 51))
+                    elif faixa == "51% - 70%":
+                        condicoes_reagrupadas.append((df_filtrado_final['percentual_conclusao'] >= 51) & (df_filtrado_final['percentual_conclusao'] < 71))
+                    elif faixa == "71% - 90%":
+                        condicoes_reagrupadas.append((df_filtrado_final['percentual_conclusao'] >= 71) & (df_filtrado_final['percentual_conclusao'] < 91))
+                    elif faixa == "91% - 99%":
+                        condicoes_reagrupadas.append((df_filtrado_final['percentual_conclusao'] >= 91) & (df_filtrado_final['percentual_conclusao'] < 100))
+                    elif faixa == "100%":
+                        condicoes_reagrupadas.append(df_filtrado_final['percentual_conclusao'] == 100)
+
+                if condicoes_reagrupadas:
+                    filtro_combinado_reagrupado = pd.concat(condicoes_reagrupadas, axis=1).any(axis=1)
+                    df_filtrado_final = df_filtrado_final[filtro_combinado_reagrupado]
+            
+            if responsaveis_selecionados:
+                df_filtrado_final = df_filtrado_final[
+                    df_filtrado_final['responsavel'].isin(responsaveis_selecionados)
+                ]
+            
+            # Usar o DataFrame reagrupado e refiltrado
+            df_filtrado_agrupado = df_filtrado_final
+        else:
+            # Se não há dados após filtro de protocolado, criar DataFrame vazio
+            df_filtrado_agrupado = pd.DataFrame(columns=df_agrupado.columns)
+
+    # --- Cálculos Macro DINÂMICOS (após filtros) ---
     # Obter a lista de famílias que passaram pelos filtros
     familias_filtradas = df_filtrado_agrupado[coluna_nome_familia].unique()
 

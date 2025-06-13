@@ -8,7 +8,7 @@ import numpy as np
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode, JsCode
 
 # Importar funções do novo utils
-from .utils import simplificar_nome_estagio, categorizar_estagio
+from .utils import simplificar_nome_estagio, categorizar_estagio, aplicar_filtro_protocolado
 
 # --- Função Auxiliar Copiada de visao_geral.py ---
 # TODO: Considerar mover esta função para um módulo utils compartilhado
@@ -195,18 +195,8 @@ def exibir_pendencias(df_original):
 
     # Aplicar filtro de Protocolizado
     if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
-        if coluna_protocolizado in df.columns:
-            # Converter para string e normalizar valores
-            df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
-            
-            if filtro_protocolizado == "Protocolizado":
-                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
-                df = df[df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
-            elif filtro_protocolizado == "Não Protocolizado":
-                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
-                df = df[~df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df[coluna_protocolizado] == '')]
-        else:
-            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
+        # CORREÇÃO: Usar a função utilitária centralizada
+        df = aplicar_filtro_protocolado(df, filtro_protocolizado, coluna_protocolizado)
 
     # Verificar se df ficou vazio APÓS filtro de família (e data)
     if df.empty:

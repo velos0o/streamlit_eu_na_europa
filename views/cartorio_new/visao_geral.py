@@ -5,7 +5,7 @@ from datetime import datetime, date # Adicionado datetime e date
 import os # Importar os para manipulação de caminhos
 
 # Importar funções do novo utils
-from .utils import simplificar_nome_estagio, categorizar_estagio
+from .utils import simplificar_nome_estagio, categorizar_estagio, aplicar_filtro_protocolado
 
 # Obter o diretório do arquivo atual
 _VISAO_GERAL_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -155,18 +155,22 @@ def exibir_visao_geral(df_original):
 
     # Filtro Protocolizado
     if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
-        if coluna_protocolizado in df.columns:
-            # Converter para string e normalizar valores
-            df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
-            
-            if filtro_protocolizado == "Protocolizado":
-                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
-                df = df[df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
-            elif filtro_protocolizado == "Não Protocolizado":
-                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
-                df = df[~df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df[coluna_protocolizado] == '')]
-        else:
-            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
+        # CORREÇÃO: Usar a função utilitária centralizada
+        df = aplicar_filtro_protocolado(df, filtro_protocolizado, coluna_protocolizado)
+        
+        # CÓDIGO ANTIGO REMOVIDO:
+        # if coluna_protocolizado in df.columns:
+        #     # Converter para string e normalizar valores
+        #     df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+        #     
+        #     if filtro_protocolizado == "Protocolizado":
+        #         # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
+        #         df = df[df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
+        #     elif filtro_protocolizado == "Não Protocolizado":
+        #         # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
+        #         df = df[~df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df[coluna_protocolizado] == '')]
+        # else:
+        #     st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
 
     # Filtro Família
     termo_familia = termo_busca_familia_widget.strip()

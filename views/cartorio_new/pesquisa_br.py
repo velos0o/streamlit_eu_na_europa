@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date
-from .utils import simplificar_nome_estagio, categorizar_estagio
+from .utils import simplificar_nome_estagio, categorizar_estagio, aplicar_filtro_protocolado
 
 def exibir_pesquisa_br(df_cartorio):
     """
@@ -285,18 +285,7 @@ def exibir_pesquisa_br(df_cartorio):
 
     # Aplicar filtro de Protocolizado
     if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
-        if coluna_protocolizado in df_filtrado.columns:
-            # Converter para string e normalizar valores
-            df_filtrado[coluna_protocolizado] = df_filtrado[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
-            
-            if filtro_protocolizado == "Protocolizado":
-                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
-                df_filtrado = df_filtrado[df_filtrado[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
-            elif filtro_protocolizado == "Não Protocolizado":
-                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
-                df_filtrado = df_filtrado[~df_filtrado[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df_filtrado[coluna_protocolizado] == '')]
-        else:
-            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
+        df_filtrado = aplicar_filtro_protocolado(df_filtrado, filtro_protocolizado, coluna_protocolizado)
 
     if df_filtrado.empty:
         st.warning("Nenhum registro encontrado para os filtros selecionados.")
