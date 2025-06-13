@@ -284,11 +284,11 @@ def exibir_producao_adm(df_cartorio_original):
             df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
             
             if filtro_protocolizado == "Protocolizado":
-                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
-                df = df[df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
+                # Os valores no campo são "PROTOCOLIZADO"
+                df = df[df[coluna_protocolizado] == 'PROTOCOLIZADO']
             elif filtro_protocolizado == "Não Protocolizado":
-                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
-                df = df[~df[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df[coluna_protocolizado] == '')]
+                # Consideramos como não protocolizado qualquer valor diferente de "PROTOCOLIZADO"
+                df = df[df[coluna_protocolizado] != 'PROTOCOLIZADO']
         else:
             st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
 
