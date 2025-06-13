@@ -19,10 +19,10 @@ from .pesquisa_br import exibir_pesquisa_br
 # Importar componente TOC - REMOVIDO
 # from components.table_of_contents import render_toc 
 
-def show_cartorio_new():
+def show_cartorio_new(subpagina_selecionada, adm_subpagina):
     """
     Função principal para exibir a página refatorada de Emissões Brasileiras.
-    Renderiza a subpágina correta com base em st.session_state.emissao_subpagina.
+    Renderiza a subpágina correta com base nos parâmetros recebidos.
     """
     # --- Carregar CSS Compilado ---
     try:
@@ -47,8 +47,6 @@ def show_cartorio_new():
         return
         
     # --- Renderização Condicional da View baseada no Estado da Sessão de main.py ---
-    subpagina_selecionada = st.session_state.get('emissao_subpagina', 'Funil Certidões')
-    
     if subpagina_selecionada == "Funil Certidões":
         exibir_visao_geral(df_cartorio)
     elif subpagina_selecionada == "Emissões Por Família":
@@ -59,8 +57,6 @@ def show_cartorio_new():
         exibir_higienizacao_desempenho()
     elif subpagina_selecionada == "ADM":
         # Submenu ADM
-        adm_subpagina = st.session_state.get('adm_subpagina', 'Produção ADM')
-        
         if adm_subpagina == "Produção ADM":
             exibir_producao_adm(df_cartorio)
         elif adm_subpagina == "Certidões Pendentes por ADM":
