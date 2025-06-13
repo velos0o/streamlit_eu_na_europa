@@ -23,7 +23,7 @@ from views.cartorio_new.cartorio_new_main import show_cartorio_new
 from views.ficha_familia import show_ficha_familia
 from views.higienizacoes.higienizacoes_main import show_higienizacoes
 from views.negociacao.negociacao_main import show_negociacao
-from views.protocolado.protocolados import show_protocolados
+from views.protocolado.protocolado_main import show_protocolados
 import views.comune.comune_main
 import views.comune.producao_comune
 import views.comune.funil_certidoes_italianas
@@ -77,6 +77,15 @@ SUB_ROTAS_COMUNE = {
     "status_certidao": "Status Certidão"
 }
 
+# Mapeamento de sub-rotas para Protocolados
+SUB_ROTAS_PROTOCOLADOS = {
+    "dados_macros": "Dados Macros",
+    "funil_etapas": "Funil - Etapas",
+    "pendencias_liberadas": "Pendências Liberadas",
+    "pendencias_futuras": "Pendências Futuras",
+    "produtividade": "Produtividade"
+}
+
 # Função para inicializar todos os estados da sessão
 def inicializar_estados_sessao():
     """Inicializa todos os estados da sessão necessários"""
@@ -103,6 +112,12 @@ def inicializar_estados_sessao():
         st.session_state.comune_submenu_expanded = False
     if 'comune_subpagina' not in st.session_state:
         st.session_state.comune_subpagina = 'Produção Comune'
+
+    # Novos estados para o submenu Protocolados
+    if 'protocolado_submenu_expanded' not in st.session_state:
+        st.session_state.protocolado_submenu_expanded = False
+    if 'protocolado_subpagina' not in st.session_state:
+        st.session_state.protocolado_subpagina = 'Dados Macros'
 
 # Processar parâmetros da URL
 def processar_parametros_url():
@@ -132,6 +147,12 @@ def processar_parametros_url():
                     st.session_state.comune_subpagina = SUB_ROTAS_COMUNE[query_params['sub']]
                 else:
                     st.session_state.comune_subpagina = "Produção Comune"
+            elif rota == 'protocolados':
+                st.session_state.protocolado_submenu_expanded = True
+                if 'sub' in query_params and query_params['sub'] in SUB_ROTAS_PROTOCOLADOS:
+                    st.session_state.protocolado_subpagina = SUB_ROTAS_PROTOCOLADOS[query_params['sub']]
+                else:
+                    st.session_state.protocolado_subpagina = "Dados Macros"
     elif 'pagina_atual_via_url_processada' not in st.session_state:
         st.session_state['pagina_atual_via_url_processada'] = True
 
@@ -327,10 +348,12 @@ st.sidebar.subheader("Navegação")
 
 # Funções de navegação
 def reset_submenu():
+    """Reseta todos os submenus para o estado fechado"""
     st.session_state.emissao_submenu_expanded = False
-    st.session_state.higienizacao_submenu_expanded = False
     st.session_state.adm_submenu_expanded = False
+    st.session_state.higienizacao_submenu_expanded = False
     st.session_state.comune_submenu_expanded = False
+    st.session_state.protocolado_submenu_expanded = False
 
 def ir_para_ficha_familia():
     reset_submenu()
@@ -442,11 +465,12 @@ def ir_para_negociacao():
     st.query_params['page'] = 'negociacao'
     
 def ir_para_protocolados():
+    reset_submenu()
     st.session_state['pagina_atual'] = 'Protocolados'
-    st.session_state.emissao_submenu_expanded = False
-    st.session_state.higienizacao_submenu_expanded = False
-    st.session_state.comune_submenu_expanded = False
-    st.query_params['page'] = 'protocolados'
+    st.session_state.protocolado_submenu_expanded = True
+    # Mantém a subpágina atual ou vai para o padrão
+    sub_rota = next((key for key, value in SUB_ROTAS_PROTOCOLADOS.items() if value == st.session_state.protocolado_subpagina), 'dados_macros')
+    st.query_params = {'page': 'protocolados', 'sub': sub_rota}
 
 # Nova função para toggle do submenu Comune
 def toggle_comune_submenu():
@@ -482,12 +506,28 @@ def ir_para_comune_funil_certidoes():
 
 # Nova função para navegação da sub-aba Status Certidão
 def ir_para_comune_status_certidao():
-    """Navega para a página de Status de Certidão"""
-    st.session_state.pagina_atual = 'Comune'
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Comune'
     st.session_state.comune_submenu_expanded = True
     st.session_state.comune_subpagina = 'Status Certidão'
-    st.query_params['page'] = 'comune'
-    st.query_params['sub'] = 'status_certidao'
+    st.query_params = {'page': 'comune', 'sub': 'status_certidao'}
+
+def toggle_protocolado_submenu():
+    reset_submenu()
+    st.session_state.pagina_atual = 'Protocolados'
+    st.session_state.protocolado_submenu_expanded = not st.session_state.get('protocolado_submenu_expanded', False)
+    sub_rota = next((key for key, value in SUB_ROTAS_PROTOCOLADOS.items() if value == st.session_state.protocolado_subpagina), 'dados_macros')
+    st.query_params = {'page': 'protocolados', 'sub': sub_rota}
+
+def ir_para_protocolado_subpagina(sub_pagina_nome):
+    def navigate():
+        reset_submenu()
+        st.session_state.pagina_atual = 'Protocolados'
+        st.session_state.protocolado_submenu_expanded = True
+        st.session_state.protocolado_subpagina = sub_pagina_nome
+        sub_rota_key = next((k for k, v in SUB_ROTAS_PROTOCOLADOS.items() if v == sub_pagina_nome), 'dados_macros')
+        st.query_params = {'page': 'protocolados', 'sub': sub_rota_key}
+    return navigate
 
 def ir_para_extracoes():
     reset_submenu()
@@ -655,11 +695,20 @@ st.sidebar.button(
 st.sidebar.button(
     "Protocolados", 
     key="btn_protocolados",
-    on_click=ir_para_protocolados,
+    on_click=toggle_protocolado_submenu,
     use_container_width=True,
     type="primary" if st.session_state['pagina_atual'] == "Protocolados" else "secondary",
     help="Módulo de Protocolados"
 )
+
+if st.session_state.get('protocolado_submenu_expanded', False):
+    with st.sidebar.container():
+        def sub_button(label, key, is_active, on_click):
+            st.button(label, key=f"subbtn_{key}", on_click=on_click, use_container_width=True, type="primary" if is_active else "secondary")
+
+        for sub_key, sub_value in SUB_ROTAS_PROTOCOLADOS.items():
+            is_active = st.session_state.get('protocolado_subpagina') == sub_value
+            sub_button(sub_value, f"protocolado_{sub_key}", is_active, ir_para_protocolado_subpagina(sub_value))
 
 st.sidebar.button(
     "Extrações de Dados", 
@@ -695,7 +744,7 @@ try:
     elif current_page == "Negociação":
         show_negociacao()
     elif current_page == "Protocolados":
-        show_protocolados()
+        show_protocolados(st.session_state.get('protocolado_subpagina'))
     elif current_page == "Extrações de Dados":
         show_extracoes()
     else:
@@ -703,4 +752,4 @@ try:
         
 except Exception as e:
     st.error(f"Erro ao carregar a página: {str(e)}")
-    st.error("Verifique se todos os arquivos necessários estão disponíveis.") 
+    st.error("Verifique se todos os arquivos necessários estão disponíveis.")
