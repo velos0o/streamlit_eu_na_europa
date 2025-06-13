@@ -162,7 +162,7 @@ def exibir_pendencias_adm(df_cartorio_original):
             if filtro_protocolizado_habilitado:
                 filtro_protocolizado = st.selectbox(
                     "Protocolizado:",
-                    options=["Todos", "Protocolizado", "Não Protocolizado"],
+                    options=["Todos", "PROTOCOLIZADO", "NÃO PROTOCOLIZADO"],
                     index=0,
                     key="filtro_protocolizado_pendencias_adm"
                 )
@@ -184,6 +184,15 @@ def exibir_pendencias_adm(df_cartorio_original):
     if termo_familia and filtro_familia_habilitado and coluna_nome_familia in df.columns:
         df[coluna_nome_familia] = df[coluna_nome_familia].fillna('Desconhecido').astype(str)
         df = df[df[coluna_nome_familia].str.contains(termo_familia, case=False, na=False)]
+
+    # --- Aplicar Filtro de Protocolizado ---
+    if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
+        if coluna_protocolizado in df.columns:
+            df[coluna_protocolizado] = df[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+            if filtro_protocolizado == "PROTOCOLIZADO":
+                df = df[df[coluna_protocolizado] == 'PROTOCOLIZADO']
+            elif filtro_protocolizado == "NÃO PROTOCOLIZADO":
+                df = df[df[coluna_protocolizado] != 'PROTOCOLIZADO']
 
     if df.empty:
         st.info("Nenhum dado encontrado para os filtros de data e/ou família aplicados.")
