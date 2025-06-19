@@ -67,6 +67,12 @@ def show_protocolados(subpagina):
     if 'PENDENCIAS' in df.columns:
         df['PENDENCIAS'] = df['PENDENCIAS'].fillna('SEM PENDENCIAS').replace('', 'SEM PENDENCIAS')
 
+    # A página de Produtividade tem seus próprios filtros internos e não usa a sidebar.
+    if subpagina == "Produtividade":
+        show_produtividade(df)  # Passa o DataFrame não filtrado
+        return  # Impede a renderização dos filtros da sidebar
+
+    # Filtros na sidebar para todas as outras páginas
     st.sidebar.header("Filtros de Análise")
     
     consultores_unicos = sorted(df['CONSULTOR RESPONSÁVEL'].dropna().unique())
@@ -92,8 +98,6 @@ def show_protocolados(subpagina):
         show_pendencias_liberadas(df_filtrado)
     elif subpagina == "Pendências Futuras":
         show_pendencias_futuras(df_filtrado)
-    elif subpagina == "Produtividade":
-        show_produtividade(df_filtrado)
     else:
         st.error(f"Sub-página '{subpagina}' não encontrada.")
         show_dados_macros(df_filtrado) 

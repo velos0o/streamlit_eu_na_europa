@@ -2,15 +2,16 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 
-def show_produtividade(df_filtrado):
+def show_produtividade(df_protocolados):
     """
     Exibe a análise de produtividade, mostrando tarefas concluídas por responsável e por data.
+    Esta página gerencia seus próprios filtros.
     """
     st.header("Análise de Produtividade", divider='rainbow')
     st.write("Acompanhe o número de tarefas concluídas pelos consultores ao longo do tempo.")
 
-    if df_filtrado.empty:
-        st.warning("Não há dados para exibir com os filtros selecionados.")
+    if df_protocolados.empty:
+        st.warning("Não há dados de protocolados para exibir.")
         return
 
     # --- Mapeamento de Etapas e Colunas de Conclusão ---
@@ -23,14 +24,10 @@ def show_produtividade(df_filtrado):
     }
 
     # --- Preparação dos Dados ---
-    # Transforma o DataFrame de formato largo para longo, criando uma linha para cada tarefa concluída
     lista_tarefas = []
     for etapa, data_col in mapeamento_etapas.items():
-        if data_col in df_filtrado.columns:
-            # A produtividade é SEMPRE atribuída ao 'CONSULTOR RESPONSÁVEL'
-            df_etapa = df_filtrado[['ID FAMÍLIA', 'CONSULTOR RESPONSÁVEL', data_col]].copy()
-            
-            # Remove linhas onde a data de conclusão ou o responsável estão vazios
+        if data_col in df_protocolados.columns:
+            df_etapa = df_protocolados[['ID FAMÍLIA', 'CONSULTOR RESPONSÁVEL', data_col]].copy()
             df_etapa.dropna(subset=[data_col, 'CONSULTOR RESPONSÁVEL'], inplace=True)
             df_etapa = df_etapa[df_etapa['CONSULTOR RESPONSÁVEL'].str.strip() != '']
 
@@ -45,13 +42,15 @@ def show_produtividade(df_filtrado):
             lista_tarefas.append(df_etapa)
     
     if not lista_tarefas:
-        st.error("Nenhuma tarefa concluída com responsável atribuído foi encontrada.")
+        st.info("Nenhuma tarefa concluída foi encontrada.")
         return
         
     df_produtividade = pd.concat(lista_tarefas, ignore_index=True)
 
     # --- Filtros ---
-    col1, col2 = st.columns([2, 1])
+    st.subheader("Filtros", divider='blue')
+    col1, col2 = st.columns(2)
+
     with col1:
         consultores_unicos = sorted(df_produtividade['CONSULTOR RESPONSÁVEL'].unique())
         consultores_selecionados = st.multiselect(
@@ -59,10 +58,18 @@ def show_produtividade(df_filtrado):
             options=consultores_unicos,
             default=consultores_unicos
         )
+    
     with col2:
-        min_date = df_produtividade['Data Conclusão'].min().date()
-        max_date = df_produtividade['Data Conclusão'].max().date()
+        # Filtra o dataframe de produtividade para obter o intervalo de datas correto
+        df_para_datas = df_produtividade[df_produtividade['CONSULTOR RESPONSÁVEL'].isin(consultores_selecionados)]
         
+        if not df_para_datas.empty:
+            min_date = df_para_datas['Data Conclusão'].min().date()
+            max_date = df_para_datas['Data Conclusão'].max().date()
+        else:
+            min_date = pd.Timestamp('today').date()
+            max_date = pd.Timestamp('today').date()
+            
         data_selecionada = st.date_input(
             "Selecione o Período",
             value=(min_date, max_date),
@@ -73,8 +80,8 @@ def show_produtividade(df_filtrado):
 
     # Garante que o filtro de data tenha um início e um fim
     if len(data_selecionada) != 2:
-        st.info("Por favor, selecione um período de início e fim no filtro de data.")
-        return
+        st.warning("Por favor, selecione um período de início e fim no filtro de data para continuar.")
+        st.stop()
         
     start_date, end_date = pd.to_datetime(data_selecionada[0]), pd.to_datetime(data_selecionada[1])
 
@@ -101,11 +108,9 @@ def show_produtividade(df_filtrado):
     # --- Gráficos ---
     st.subheader("Visualização da Produtividade", divider='blue')
     
-    # Prepara os dados para o gráfico
     produtividade_diaria = df_filtrado_prod.groupby(df_filtrado_prod['Data Conclusão'].dt.date).size().reset_index(name='Contagem')
     produtividade_diaria.rename(columns={'Data Conclusão': 'Data'}, inplace=True)
     
-    # Cria o gráfico base com a linha e os pontos
     base = alt.Chart(produtividade_diaria).encode(
         x=alt.X('Data:T', title='Data da Conclusão'),
         y=alt.Y('Contagem:Q', title='Nº de Tarefas Concluídas'),
@@ -115,16 +120,14 @@ def show_produtividade(df_filtrado):
     linha = base.mark_line(color='#1E88E5', point=True)
     pontos = base.mark_point(size=80, filled=True, color='#1E88E5')
     
-    # Cria os rótulos de texto acima dos pontos
     texto = base.mark_text(
         align='center',
         baseline='bottom',
-        dy=-10  # Deslocamento vertical para ficar acima do ponto
+        dy=-10
     ).encode(
         text='Contagem:Q'
     )
 
-    # Combina as camadas do gráfico
     chart = (linha + pontos + texto).interactive().properties(
         title='Produtividade Diária (Tarefas Concluídas)'
     )
