@@ -11,7 +11,7 @@ from bitrix_connector import load_merged_data
 
 def carregar_dados_negociacao(force_reload=False):
     """
-    Carrega os dados de negócios para a categoria 'Negociação Familias' (ID 34).
+    Carrega os dados de negócios para a categoria 'Negociação' (ID 54).
 
     Args:
         force_reload (bool): Se True, força o recarregamento dos dados do Bitrix.
@@ -21,14 +21,14 @@ def carregar_dados_negociacao(force_reload=False):
     """
     try:
         # Chama a função genérica para carregar dados com a category_id específica
-        df_negociacao = load_merged_data(category_id='34', force_reload=force_reload, debug=False)
+        df_negociacao = load_merged_data(category_id='54', force_reload=force_reload, debug=False)
         
         if df_negociacao.empty:
-            st.warning("Não foram encontrados dados de negociação (Categoria 34) ou ocorreu um erro ao carregar.")
+            st.warning("Não foram encontrados dados de Negociação (Categoria 54) ou ocorreu um erro ao carregar.")
             return pd.DataFrame()
             
         return df_negociacao
         
     except Exception as e:
-        st.error(f"Ocorreu um erro ao carregar os dados de negociação: {e}")
+        st.error(f"Ocorreu um erro ao carregar os dados de Negociação: {e}")
         return pd.DataFrame() 

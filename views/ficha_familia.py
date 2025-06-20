@@ -110,8 +110,43 @@ def load_page_specific_css(file_path):
 # Função removida - agora usamos load_data_all_pipelines() do views.cartorio_new.data_loader
 
 def exibir_ficha_familia(familia_serie, emissoes_df):
-    # Iniciar a string HTML com o contêiner principal e adicionar título
+    # --- NOVO: Injetar CSS para animação do banner se necessário ---
+    mapa_inicial_flag = familia_serie.get('UF_CRM_1750454794052', 'NÃO')
+    if str(mapa_inicial_flag).strip().upper() == 'SIM':
+        st.markdown("""
+        <style>
+        @keyframes border-pulse-animation {
+            0% { box-shadow: 0 0 4px rgba(255, 193, 7, 0.5); }
+            50% { box-shadow: 0 0 12px 4px rgba(255, 193, 7, 0.8); }
+            100% { box-shadow: 0 0 4px rgba(255, 193, 7, 0.5); }
+        }
+        .mapa-inicial-banner {
+            position: fixed;
+            top: 80px;
+            right: 0;
+            width: 100px;
+            height: 100px;
+            background-color: #ffc107; /* Amarelo chamativo */
+            color: #333; /* Texto escuro para contraste */
+            font-size: 1.1em;
+            font-weight: bold;
+            border-radius: 0; /* Quadrado */
+            z-index: 1000;
+            animation: border-pulse-animation 2s infinite;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+    # Iniciar a string HTML com o contêiner principal
     html_ficha_completa = "<div class='ficha-familia-container' style='width:100%; max-width:100%; margin-right:0; margin-left:0;'>"
+    
+    # Adicionar o banner se a flag estiver ativa
+    if str(mapa_inicial_flag).strip().upper() == 'SIM':
+        html_ficha_completa += "<div class='mapa-inicial-banner'>MAPA INICIAL</div>"
     
     # Título principal da ficha
     html_ficha_completa += "<div style='background-color:#0070F2; color:white; text-align:center; padding:10px; margin-bottom:15px; font-size:1.3em; font-weight:bold; border-radius:5px;'>ACOMPANHAMENTO FAMÍLIA</div>"
@@ -255,6 +290,8 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
             
             # Pipeline 92 e 94 (Cartórios Casa Verde e Tatuapé)
             if category_id_str in ['92', '94']:
+                if status_upper == 'AGUARDANDO DECISÃO CLIENTE':
+                    return 'Aguardando Decisão Cliente'
                 if status_upper in ["AGUARDANDO CERTIDÃO", "BUSCA - CRC", "DEVOLUTIVA BUSCA - CRC", 
                                   "APENAS ASS. REQ CLIENTE P/MONTAGEM", "MONTAGEM REQUERIMENTO CARTÓRIO", 
                                   "SOLICITAR CARTÓRIO DE ORIGEM", "SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE", 
@@ -486,6 +523,7 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
         resumo_status_categorias_temp = { # Renomeado para evitar conflito de escopo se existir antes
             # Pipelines 92 e 94 (Cartórios)
             'Brasileiras Pendências': 0,
+            'Aguardando Decisão Cliente': 0,
             'Brasileiras Pesquisas': 0,
             'Brasileiras Solicitadas': 0,
             'Brasileiras Emitida': 0,  # CORRIGIDO: Status direto de emissão

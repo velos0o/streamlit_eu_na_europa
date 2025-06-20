@@ -22,7 +22,7 @@ from views.extracoes.extracoes_main import show_extracoes
 from views.cartorio_new.cartorio_new_main import show_cartorio_new
 from views.ficha_familia import show_ficha_familia
 from views.higienizacoes.higienizacoes_main import show_higienizacoes
-from views.negociacao.negociacao_main import show_negociacao
+from views.funil_cat54.funil_cat54_main import show_negociacao
 from views.protocolado.protocolado_main import show_protocolados
 import views.comune.comune_main
 import views.comune.producao_comune
@@ -42,7 +42,7 @@ ROTAS = {
     "higienizacoes": "Higienizações", 
     "cartorio_new": "Emissões Brasileiras",
     "comune": "Comune",
-    "negociacao": "Negociação",
+    "funil_cat54": "Negociação",
     "protocolados": "Protocolados",
     "extracoes": "Extrações de Dados"
 }
@@ -247,509 +247,212 @@ div.stButton > button#btn_sidebar_refresh_all:hover {
     padding: 0 !important;
     margin-bottom: 2px !important;
 }
-
-/* CSS específico para submenu ADM - caixa azul destacada */
-.adm-submenu-container {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(37, 99, 235, 0.04)) !important;
-    border: 1px solid rgba(59, 130, 246, 0.2) !important;
-    border-radius: 8px !important;
-    padding: 8px 12px 8px 12px !important;
-    margin: 6px 0 6px 20px !important;
-    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1) !important;
-}
-
-.adm-submenu-title {
-    color: #374151 !important;
-    font-weight: 600 !important;
-    font-size: 0.75rem !important;
-    margin-bottom: 6px !important;
-    padding-bottom: 4px !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    border-bottom: 1px solid rgba(59, 130, 246, 0.15) !important;
-}
-
-/* CSS para criar container visual dos botões ADM */
-[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_producao"] {
-    position: relative !important;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(37, 99, 235, 0.04)) !important;
-    border: 1px solid rgba(59, 130, 246, 0.2) !important;
-    border-radius: 8px 8px 0 0 !important;
-    padding: 8px 12px 4px 12px !important;
-    margin: 6px 0 0 20px !important;
-    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1) !important;
-}
-
-[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_producao"]::before {
-    content: "ADM" !important;
-    display: block !important;
-    color: #374151 !important;
-    font-weight: 600 !important;
-    font-size: 0.75rem !important;
-    margin-bottom: 6px !important;
-    padding-bottom: 4px !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    border-bottom: 1px solid rgba(59, 130, 246, 0.15) !important;
-}
-
-[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_pendencias"] {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(37, 99, 235, 0.04)) !important;
-    border: 1px solid rgba(59, 130, 246, 0.2) !important;
-    border-top: none !important;
-    border-radius: 0 0 8px 8px !important;
-    padding: 4px 12px 8px 12px !important;
-    margin: 0 0 6px 20px !important;
-    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1) !important;
-}
-
-/* CSS para botões dentro do container ADM */
-[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_"] [data-testid="stButton"] {
-    margin: 2px 0 !important;
-}
-
-[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]) {
-    background: rgba(248, 250, 252, 0.9) !important;
-    border: 1px solid rgba(59, 130, 246, 0.15) !important;
-    border-radius: 6px !important;
-    padding: 6px 12px !important;
-    font-size: 0.875rem !important;
-    color: #4B5563 !important;
-    font-weight: 500 !important;
-    transition: all 0.2s ease !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-}
-
-[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_"] [data-testid="stButton"] button:not([data-testid="stIconButton"]):hover {
-    background: rgba(59, 130, 246, 0.08) !important;
-    border-color: rgba(59, 130, 246, 0.25) !important;
-    color: #1F2937 !important;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1) !important;
-}
-
-[data-testid="stSidebar"] .stElementContainer[class*="st-key-subbtn_adm_"] [data-testid="stButton"] button[kind="primary"]:not([data-testid="stIconButton"]) {
-    background: rgba(59, 130, 246, 0.12) !important;
-    border-color: rgba(59, 130, 246, 0.3) !important;
-    color: #1E40AF !important;
-    font-weight: 600 !important;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15) !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
-# Adicionar logo no sidebar
-st.sidebar.image("assets/LOGO-EU.NA.EUROPA-MAIO.24-COLORIDO-VERTICAL.svg", width=500)
 
-# Menu de navegação
-st.sidebar.title("Dashboard CRM Bitrix24")
-show_search_box()
-st.sidebar.markdown("---")
-st.sidebar.subheader("Navegação")
-
-# Funções de navegação
+# Funções de navegação e controle de estado
 def reset_submenu():
-    """Reseta todos os submenus para o estado fechado"""
+    """Reseta os estados dos submenus"""
     st.session_state.emissao_submenu_expanded = False
-    st.session_state.adm_submenu_expanded = False
     st.session_state.higienizacao_submenu_expanded = False
     st.session_state.comune_submenu_expanded = False
     st.session_state.protocolado_submenu_expanded = False
 
 def ir_para_ficha_familia():
-    reset_submenu()
+    """Navega para a Ficha da Família e reseta submenus."""
     st.session_state['pagina_atual'] = 'Ficha da Família'
+    reset_submenu()
     st.query_params['page'] = 'ficha_familia'
-    if 'sub' in st.query_params:
-        del st.query_params['sub']
 
 def toggle_emissao_submenu():
     st.session_state.emissao_submenu_expanded = not st.session_state.get('emissao_submenu_expanded', False)
-    st.session_state.higienizacao_submenu_expanded = False
-    st.session_state.adm_submenu_expanded = False
-    
     if st.session_state.emissao_submenu_expanded:
         st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-        current_subpage = st.session_state.get('emissao_subpagina')
-        st.query_params['page'] = 'cartorio_new'
-        if current_subpage not in SUB_ROTAS_EMISSOES.values():
-            st.session_state.emissao_subpagina = 'Funil Certidões'
-            st.query_params['sub'] = 'funil_certidoes'
-        else:
-            sub_route = [k for k, v in SUB_ROTAS_EMISSOES.items() if v == current_subpage][0]
-            st.query_params['sub'] = sub_route
+        # Atualiza a URL para refletir a navegação
+        sub_rota = next((key for key, value in SUB_ROTAS_EMISSOES.items() if value == st.session_state.emissao_subpagina), 'funil_certidoes')
+        st.query_params = {'page': 'cartorio_new', 'sub': sub_rota}
 
 def toggle_higienizacao_submenu():
     st.session_state.higienizacao_submenu_expanded = not st.session_state.get('higienizacao_submenu_expanded', False)
-    st.session_state.emissao_submenu_expanded = False
-    
     if st.session_state.higienizacao_submenu_expanded:
         st.session_state['pagina_atual'] = 'Higienizações'
-        st.query_params['page'] = 'higienizacoes'
-        if st.session_state.get('pagina_atual') != 'Higienizações':
-            st.session_state.higienizacao_subpagina = 'Checklist'
-            st.query_params['sub'] = 'checklist'
-        elif 'sub' in st.query_params:
-            del st.query_params['sub']
+        sub_rota = next((key for key, value in SUB_ROTAS_HIGIENIZACOES.items() if value == st.session_state.higienizacao_subpagina), 'checklist')
+        st.query_params = {'page': 'higienizacoes', 'sub': sub_rota}
 
+
+# --- Funções de Navegação para Sub-páginas ---
 def ir_para_emissao_funil_certidoes():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Funil Certidões'
-    st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'funil_certidoes'
-
+    
 def ir_para_emissao_emissoes_por_familia():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Emissões Por Família'
-    st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'emissoes_por_familia'
 
 def ir_para_emissao_certidoes_pendentes():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Certidões Pendentes por responsável'
-    st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'certidoes_pendentes_responsavel'
 
 def ir_para_emissao_desempenho_conclusao():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Desempenho Conclusão de Pasta'
-    st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'desempenho_conclusao_pasta'
-
+    
 def ir_para_emissao_adm():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'ADM'
-    st.session_state.adm_submenu_expanded = True
-    st.session_state.adm_subpagina = 'Produção ADM'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'adm'
+    st.session_state.adm_submenu_expanded = not st.session_state.get('adm_submenu_expanded', False)
 
 def ir_para_emissao_producao_time_doutora():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Produção Time Doutora'
-    st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'producao_time_doutora'
-
+    
 def ir_para_emissao_pesquisa_br():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
     st.session_state.emissao_subpagina = 'Pesquisa BR'
-    st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'pesquisa_br'
 
 def ir_para_higienizacao_checklist():
-    st.session_state['pagina_atual'] = 'Higienizações'
     st.session_state.higienizacao_subpagina = 'Checklist'
-    st.query_params['page'] = 'higienizacoes'
     st.query_params['sub'] = 'checklist'
 
 def ir_para_adm_producao():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_subpagina = 'ADM'
-    st.session_state.adm_submenu_expanded = True
     st.session_state.adm_subpagina = 'Produção ADM'
-    st.query_params['page'] = 'cartorio_new'
-    st.query_params['sub'] = 'adm'
+    st.query_params['sub'] = 'producao_adm'
 
 def ir_para_adm_pendencias():
-    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
-    st.session_state.emissao_submenu_expanded = True
-    st.session_state.adm_submenu_expanded = True
     st.session_state.adm_subpagina = 'Certidões Pendentes por ADM'
-    st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'certidoes_pendentes_adm'
 
 def ir_para_negociacao():
+    """Navega para a página de Negociação."""
     st.session_state['pagina_atual'] = 'Negociação'
-    st.session_state.emissao_submenu_expanded = False
-    st.session_state.higienizacao_submenu_expanded = False
-    st.session_state.comune_submenu_expanded = False
-    st.query_params['page'] = 'negociacao'
-    
-def ir_para_protocolados():
+    st.query_params['page'] = 'funil_cat54' # Mantém a rota para a nova estrutura
     reset_submenu()
+
+def ir_para_protocolados():
+    """Navega para a página de Protocolados."""
     st.session_state['pagina_atual'] = 'Protocolados'
     st.session_state.protocolado_submenu_expanded = True
-    # Mantém a subpágina atual ou vai para o padrão
     sub_rota = next((key for key, value in SUB_ROTAS_PROTOCOLADOS.items() if value == st.session_state.protocolado_subpagina), 'dados_macros')
     st.query_params = {'page': 'protocolados', 'sub': sub_rota}
 
-# Nova função para toggle do submenu Comune
 def toggle_comune_submenu():
     st.session_state.comune_submenu_expanded = not st.session_state.get('comune_submenu_expanded', False)
-    st.session_state.emissao_submenu_expanded = False
-    st.session_state.higienizacao_submenu_expanded = False
-    st.session_state.adm_submenu_expanded = False
-    
     if st.session_state.comune_submenu_expanded:
         st.session_state['pagina_atual'] = 'Comune'
-        current_subpage = st.session_state.get('comune_subpagina')
-        st.query_params['page'] = 'comune'
-        if current_subpage not in SUB_ROTAS_COMUNE.values():
-            st.session_state.comune_subpagina = 'Produção Comune'
-            st.query_params['sub'] = 'producao_comune'
-        else:
-            sub_route = [k for k, v in SUB_ROTAS_COMUNE.items() if v == current_subpage][0]
-            st.query_params['sub'] = sub_route
-
-# Nova função para navegação da sub-aba Produção Comune
+        sub_rota = next((key for key, value in SUB_ROTAS_COMUNE.items() if value == st.session_state.comune_subpagina), 'producao_comune')
+        st.query_params = {'page': 'comune', 'sub': sub_rota}
+        
 def ir_para_comune_producao():
-    st.session_state['pagina_atual'] = 'Comune'
     st.session_state.comune_subpagina = 'Produção Comune'
-    st.query_params['page'] = 'comune'
     st.query_params['sub'] = 'producao_comune'
 
-# Nova função para navegação da sub-aba Funil Certidões Italianas
 def ir_para_comune_funil_certidoes():
-    st.session_state['pagina_atual'] = 'Comune'
     st.session_state.comune_subpagina = 'Funil Certidões Italianas'
-    st.query_params['page'] = 'comune'
     st.query_params['sub'] = 'funil_certidoes_italianas'
-
-# Nova função para navegação da sub-aba Status Certidão
+    
 def ir_para_comune_status_certidao():
-    reset_submenu()
-    st.session_state['pagina_atual'] = 'Comune'
-    st.session_state.comune_submenu_expanded = True
     st.session_state.comune_subpagina = 'Status Certidão'
-    st.query_params = {'page': 'comune', 'sub': 'status_certidao'}
+    st.query_params['sub'] = 'status_certidao'
 
 def toggle_protocolado_submenu():
-    reset_submenu()
-    st.session_state.pagina_atual = 'Protocolados'
     st.session_state.protocolado_submenu_expanded = not st.session_state.get('protocolado_submenu_expanded', False)
-    sub_rota = next((key for key, value in SUB_ROTAS_PROTOCOLADOS.items() if value == st.session_state.protocolado_subpagina), 'dados_macros')
-    st.query_params = {'page': 'protocolados', 'sub': sub_rota}
 
 def ir_para_protocolado_subpagina(sub_pagina_nome):
     def navigate():
-        reset_submenu()
-        st.session_state.pagina_atual = 'Protocolados'
-        st.session_state.protocolado_submenu_expanded = True
         st.session_state.protocolado_subpagina = sub_pagina_nome
-        sub_rota_key = next((k for k, v in SUB_ROTAS_PROTOCOLADOS.items() if v == sub_pagina_nome), 'dados_macros')
-        st.query_params = {'page': 'protocolados', 'sub': sub_rota_key}
+        st.query_params['sub'] = next(key for key, value in SUB_ROTAS_PROTOCOLADOS.items() if value == sub_pagina_nome)
     return navigate
 
 def ir_para_extracoes():
-    reset_submenu()
+    """Navega para a página de Extrações de Dados."""
     st.session_state['pagina_atual'] = 'Extrações de Dados'
+    reset_submenu()
     st.query_params['page'] = 'extracoes'
-    if 'sub' in st.query_params:
-        del st.query_params['sub']
 
-# Botões de navegação
-st.sidebar.button(
-    "Ficha da Família", 
-    key="btn_ficha_familia",
-    on_click=ir_para_ficha_familia,
-    use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Ficha da Família" else "secondary"
-)
 
-st.sidebar.button(
-    "Higienizações", 
-    key="btn_higienizacoes", 
-    on_click=toggle_higienizacao_submenu, 
-    use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Higienizações" else "secondary",
-    help="Módulo unificado de Higienizações"
-)
-
-# Submenu Higienizações
-if st.session_state.get('higienizacao_submenu_expanded', False):
-    with st.sidebar.container():
-        st.button(
-            "Checklist", 
-            key="subbtn_higienizacao_checklist",
-            on_click=ir_para_higienizacao_checklist,
-            use_container_width=True,
-            type="primary" if st.session_state.get('higienizacao_subpagina') == "Checklist" else "secondary"
-        )
-
-st.sidebar.button(
-    "Emissões Brasileiras", 
-    key="btn_cartorio_new", 
-    on_click=toggle_emissao_submenu, 
-    use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Emissões Brasileiras" else "secondary",
-    help="Módulo de emissões de cartórios brasileiros"
-)
-
-# Submenu Emissões Brasileiras (deve aparecer IMEDIATAMENTE após o botão)
-if st.session_state.get('emissao_submenu_expanded', False):
-    with st.sidebar.container():
-        st.button(
-            "Funil Certidões", 
-            key="subbtn_emissao_funil_certidoes",
-            on_click=ir_para_emissao_funil_certidoes,
-            use_container_width=True,
-            type="primary" if st.session_state.get('emissao_subpagina') == "Funil Certidões" else "secondary"
-        )
-        st.button(
-            "Emissões Por Família", 
-            key="subbtn_emissao_emissoes_por_familia",
-            on_click=ir_para_emissao_emissoes_por_familia,
-            use_container_width=True,
-            type="primary" if st.session_state.get('emissao_subpagina') == "Emissões Por Família" else "secondary"
-        )
-        st.button(
-            "Certidões Pendentes por responsável", 
-            key="subbtn_emissao_certidoes_pendentes",
-            on_click=ir_para_emissao_certidoes_pendentes,
-            use_container_width=True,
-            type="primary" if st.session_state.get('emissao_subpagina') == "Certidões Pendentes por responsável" else "secondary"
-        )
-        st.button(
-            "Desempenho Conclusão de Pasta", 
-            key="subbtn_emissao_desempenho_conclusao",
-            on_click=ir_para_emissao_desempenho_conclusao,
-            use_container_width=True,
-            type="primary" if st.session_state.get('emissao_subpagina') == "Desempenho Conclusão de Pasta" else "secondary"
-        )
-        st.button(
-            "ADM", 
-            key="subbtn_emissao_adm",
-            on_click=ir_para_emissao_adm,
-            use_container_width=True,
-            type="primary" if st.session_state.get('emissao_subpagina') == "ADM" else "secondary"
-        )
+def main():
+    """Função principal que organiza o layout e a navegação."""
+    
+    with st.sidebar:
+        st.image("assets/LOGO-EU.NA.EUROPA-MAIO.24-COLORIDO-VERTICAL.svg", use_column_width=True)
+        st.markdown("---")
         
-        # Submenu ADM aparece imediatamente após o botão ADM
-        if (st.session_state.get('emissao_subpagina') == "ADM" and 
-            st.session_state.get('adm_submenu_expanded', False)):
+        # --- Botões de Navegação ---
+        botoes_principais = {
+            "Ficha da Família": ir_para_ficha_familia,
+            "Emissões Brasileiras": toggle_emissao_submenu,
+            "Higienizações": toggle_higienizacao_submenu,
+            "Comune": toggle_comune_submenu,
+            "Negociação": ir_para_negociacao,
+            "Protocolados": ir_para_protocolados,
+            "Extrações de Dados": ir_para_extracoes
+        }
+
+        for nome, acao in botoes_principais.items():
+            is_active = st.session_state.pagina_atual == nome
+            st.button(nome, on_click=acao, use_container_width=True, type="primary" if is_active else "secondary")
+
+            # Lógica para exibir submenus
+            if nome == "Emissões Brasileiras" and st.session_state.get('emissao_submenu_expanded'):
+                def sub_button(label, key, on_click):
+                    st.button(label, key=f"subbtn_emissao_{key}", on_click=on_click, use_container_width=True,
+                              type="primary" if st.session_state.emissao_subpagina == label else "secondary")
+
+                sub_button("Funil Certidões", "funil", ir_para_emissao_funil_certidoes)
+                sub_button("Emissões Por Família", "familia", ir_para_emissao_emissoes_por_familia)
+                sub_button("Certidões Pendentes por responsável", "pendentes", ir_para_emissao_certidoes_pendentes)
+                sub_button("Desempenho Conclusão de Pasta", "desempenho", ir_para_emissao_desempenho_conclusao)
+                sub_button("Produção Time Doutora", "doutora", ir_para_emissao_producao_time_doutora)
+                sub_button("Pesquisa BR", "pesquisa", ir_para_emissao_pesquisa_br)
+                st.button("ADM", on_click=ir_para_emissao_adm, use_container_width=True,
+                          type="primary" if st.session_state.get('adm_submenu_expanded') else "secondary")
+                if st.session_state.get('adm_submenu_expanded'):
+                    st.button("Produção ADM", key="subbtn_adm_prod", on_click=ir_para_adm_producao, use_container_width=True,
+                              type="primary" if st.session_state.adm_subpagina == "Produção ADM" else "secondary")
+                    st.button("Certidões Pendentes por ADM", key="subbtn_adm_pend", on_click=ir_para_adm_pendencias, use_container_width=True,
+                              type="primary" if st.session_state.adm_subpagina == "Certidões Pendentes por ADM" else "secondary")
+
+            elif nome == "Higienizações" and st.session_state.get('higienizacao_submenu_expanded'):
+                st.button("Checklist", key="subbtn_hig_check", on_click=ir_para_higienizacao_checklist, use_container_width=True,
+                          type="primary" if st.session_state.higienizacao_subpagina == 'Checklist' else "secondary")
             
-            # Botões ADM com estilo visual unificado via CSS
-            st.button(
-                "Produção ADM", 
-                key="subbtn_adm_producao",
-                on_click=ir_para_adm_producao,
-                use_container_width=True,
-                type="primary" if st.session_state.get('adm_subpagina') == "Produção ADM" else "secondary"
-            )
-            st.button(
-                "Certidões Pendentes por ADM", 
-                key="subbtn_adm_pendencias",
-                on_click=ir_para_adm_pendencias,
-                use_container_width=True,
-                type="primary" if st.session_state.get('adm_subpagina') == "Certidões Pendentes por ADM" else "secondary"
-            )
-        
-        st.button(
-            "Produção Time Doutora", 
-            key="subbtn_emissao_producao_time_doutora",
-            on_click=ir_para_emissao_producao_time_doutora,
-            use_container_width=True,
-            type="primary" if st.session_state.get('emissao_subpagina') == "Produção Time Doutora" else "secondary"
-        )
-        st.button(
-            "Pesquisa BR", 
-            key="subbtn_emissao_pesquisa_br",
-            on_click=ir_para_emissao_pesquisa_br,
-            use_container_width=True,
-            type="primary" if st.session_state.get('emissao_subpagina') == "Pesquisa BR" else "secondary"
-        )
+            elif nome == "Comune" and st.session_state.get('comune_submenu_expanded'):
+                st.button("Produção Comune", key="subbtn_comune_prod", on_click=ir_para_comune_producao, use_container_width=True,
+                          type="primary" if st.session_state.comune_subpagina == 'Produção Comune' else "secondary")
+                st.button("Funil Certidões Italianas", key="subbtn_comune_funil", on_click=ir_para_comune_funil_certidoes, use_container_width=True,
+                          type="primary" if st.session_state.comune_subpagina == 'Funil Certidões Italianas' else "secondary")
+                st.button("Status Certidão", key="subbtn_comune_status", on_click=ir_para_comune_status_certidao, use_container_width=True,
+                          type="primary" if st.session_state.comune_subpagina == 'Status Certidão' else "secondary")
 
-# Novo botão para a aba Comune (DEPOIS do submenu de Emissões Brasileiras)
-st.sidebar.button(
-    "Comune",
-    key="btn_comune",
-    on_click=toggle_comune_submenu,
-    use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Comune" else "secondary",
-    help="Dashboard de Métricas do Comune via Planilha Google"
-)
+            elif nome == "Protocolados" and st.session_state.get('protocolado_submenu_expanded'):
+                for sub_nome in SUB_ROTAS_PROTOCOLADOS.values():
+                    st.button(sub_nome, key=f"subbtn_prot_{sub_nome.replace(' ', '_')}", on_click=ir_para_protocolado_subpagina(sub_nome),
+                              use_container_width=True, type="primary" if st.session_state.protocolado_subpagina == sub_nome else "secondary")
 
-# Novo submenu para Comune (IMEDIATAMENTE após o botão Comune)
-if st.session_state.get('comune_submenu_expanded', False):
-    with st.sidebar.container():
-        st.button(
-            "Produção Comune",
-            key="subbtn_comune_producao",
-            on_click=ir_para_comune_producao,
-            use_container_width=True,
-            type="primary" if st.session_state.get('comune_subpagina') == "Produção Comune" else "secondary"
-        )
-        st.button(
-            "Funil Certidões Italianas",
-            key="subbtn_comune_funil_certidoes",
-            on_click=ir_para_comune_funil_certidoes,
-            use_container_width=True,
-            type="primary" if st.session_state.get('comune_subpagina') == "Funil Certidões Italianas" else "secondary"
-        )
-        st.button(
-            "Status Certidão",
-            key="subbtn_comune_status_certidao",
-            on_click=ir_para_comune_status_certidao,
-            use_container_width=True,
-            type="primary" if st.session_state.get('comune_subpagina') == "Status Certidão" else "secondary"
-        )
+        st.markdown("---")
+        show_guide_sidebar()
+        render_sidebar_refresh_button()
 
-st.sidebar.button(
-    "Negociação", 
-    key="btn_negociacao",
-    on_click=ir_para_negociacao,
-    use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Negociação" else "secondary",
-    help="Módulo de Negociação"
-)
+    # --- Conteúdo Principal ---
+    main_content = st.container()
+    with main_content:
+        current_page = st.session_state.get('pagina_atual', 'Ficha da Família')
 
-st.sidebar.button(
-    "Protocolados", 
-    key="btn_protocolados",
-    on_click=toggle_protocolado_submenu,
-    use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Protocolados" else "secondary",
-    help="Módulo de Protocolados"
-)
-
-if st.session_state.get('protocolado_submenu_expanded', False):
-    with st.sidebar.container():
-        def sub_button(label, key, is_active, on_click):
-            st.button(label, key=f"subbtn_{key}", on_click=on_click, use_container_width=True, type="primary" if is_active else "secondary")
-
-        for sub_key, sub_value in SUB_ROTAS_PROTOCOLADOS.items():
-            is_active = st.session_state.get('protocolado_subpagina') == sub_value
-            sub_button(sub_value, f"protocolado_{sub_key}", is_active, ir_para_protocolado_subpagina(sub_value))
-
-st.sidebar.button(
-    "Extrações de Dados", 
-    key="btn_extracoes", 
-    on_click=ir_para_extracoes,
-    use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Extrações de Dados" else "secondary",
-    help="Módulo de extrações e relatórios"
-)
-
-# Exibição da página selecionada
-current_page = st.session_state.get('pagina_atual', 'Ficha da Família')
-
-try:
-    if current_page == "Ficha da Família":
-        show_ficha_familia()
-    elif current_page == "Higienizações":
-        if st.session_state.get('higienizacao_subpagina') == "Checklist":
-            show_higienizacoes(sub_page="checklist")
+        if current_page == 'Ficha da Família':
+            show_ficha_familia()
+        elif current_page == 'Higienizações':
+            show_higienizacoes(st.session_state.get('higienizacao_subpagina'))
+        elif current_page == 'Emissões Brasileiras':
+            show_cartorio_new(st.session_state.get('emissao_subpagina'))
+        elif current_page == 'Comune':
+            views.comune.comune_main.show_comune()
+        elif current_page == 'Negociação':
+            show_negociacao()
+        elif current_page == 'Protocolados':
+            show_protocolados()
+        elif current_page == 'Extrações de Dados':
+            show_extracoes()
         else:
-            show_higienizacoes()
-    elif current_page == "Emissões Brasileiras":
-        show_cartorio_new(st.session_state.emissao_subpagina, st.session_state.adm_subpagina)
-    elif current_page == "Comune":
-        if st.session_state.get('comune_subpagina') == "Produção Comune":
-            views.comune.producao_comune.show_producao_comune()
-        elif st.session_state.get('comune_subpagina') == "Funil Certidões Italianas":
-            views.comune.funil_certidoes_italianas.show_funil_certidoes_italianas()
-        elif st.session_state.get('comune_subpagina') == "Status Certidão":
-            views.comune.status_certidao.show_status_certidao()
-        else:
-            views.comune.comune_main.show_comune_main()
-    elif current_page == "Negociação":
-        show_negociacao()
-    elif current_page == "Protocolados":
-        show_protocolados(st.session_state.get('protocolado_subpagina'))
-    elif current_page == "Extrações de Dados":
-        show_extracoes()
-    else:
-        st.error(f"Página '{current_page}' não encontrada!")
-        
-except Exception as e:
-    st.error(f"Erro ao carregar a página: {str(e)}")
-    st.error("Verifique se todos os arquivos necessários estão disponíveis.")
+            show_ficha_familia() # Fallback
+
+if __name__ == "__main__":
+    main() 

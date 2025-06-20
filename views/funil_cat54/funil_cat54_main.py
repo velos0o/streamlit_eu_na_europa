@@ -80,7 +80,7 @@ def show_negociacao():
     df_filtrado = df_negociacao[df_negociacao['ASSIGNED_BY_NAME'].isin(selected_responsaveis)]
 
     # Indicador: Total de Famílias em Negociação Ativa (baseado no filtro de responsável)
-    final_stages = ["C34:WON", "C34:LOSE", "C34:UC_D5LB1N"]
+    final_stages = ["C54:WON", "C54:LOSE"] # Mantem a lógica da Categoria 54
     df_active_negociacao = df_filtrado[~df_filtrado['STAGE_ID'].isin(final_stages)]
     total_active = len(df_active_negociacao)
     st.metric(label="Total de Famílias em Negociação Ativa", value=total_active)
@@ -90,7 +90,7 @@ def show_negociacao():
     # Análise de Reuniões Agendadas
     st.header("Análise de Reuniões Agendadas")
 
-    campo_data_reuniao = 'UF_CRM_1737689240946'
+    campo_data_reuniao = 'UF_CRM_1737689240946' # Manter ou alterar conforme o campo de data de reunião do novo funil
 
     if campo_data_reuniao not in df_filtrado.columns:
         st.warning(f"A coluna '{campo_data_reuniao}' (data da reunião) não foi encontrada nos dados.")
