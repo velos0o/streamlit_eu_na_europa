@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from .styles import tailwind_container, THEME
+from utils.dataframe_utils import ensure_pandas_df
 
 def get_status_badge(status):
     """Retorna um badge HTML estilizado para o status."""

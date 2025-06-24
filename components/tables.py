@@ -12,6 +12,7 @@ sys.path.insert(0, str(utils_path))
 
 # Agora importa diretamente do arquivo data_processor
 from data_processor import format_status_text
+from utils.dataframe_utils import ensure_pandas_df
 
 def render_styled_table(df, height=None):
     """

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from utils.dataframe_utils import ensure_pandas_df
 
 # Este arquivo contém funções de slide simplificadas para suportar a migração
 # Essas funções serão usadas se o arquivo original apresentacao_conclusoes.py 

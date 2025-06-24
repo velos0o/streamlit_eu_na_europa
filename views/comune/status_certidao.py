@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from utils.google_sheets_connector import get_google_sheets_client, fetch_data_from_sheet
+from utils.dataframe_utils import ensure_pandas_df
 
 # Configurações da planilha (mesmas do producao_comune.py)
 SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1pB3HTFsaHyqAt3bhxzWG3RjfAxAzl97ydGqT35uYb-w/edit?gid=0#gid=0'

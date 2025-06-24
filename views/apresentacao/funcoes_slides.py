@@ -7,6 +7,7 @@ import re
 import sys
 import os
 from pathlib import Path
+from utils.dataframe_utils import ensure_pandas_df
 
 # Este arquivo contém funções de slide para suportar a migração
 # Foram copiadas e aprimoradas a partir do arquivo apresentacao_conclusoes.py

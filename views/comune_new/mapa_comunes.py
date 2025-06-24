@@ -9,6 +9,7 @@ from datetime import datetime
 
 # Importar função de simplificação de estágio
 from .visao_geral import simplificar_nome_estagio_comune
+from utils.dataframe_utils import ensure_pandas_df
 
 def exibir_mapa_comune(df_mapa, category_id):
     """

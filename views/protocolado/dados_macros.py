@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from utils.dataframe_utils import ensure_pandas_df
 
 def show_dados_macros(df_filtrado):
     """Exibe as métricas macro e de pendências."""
@@ -66,11 +67,12 @@ def show_dados_macros(df_filtrado):
         crosstab_pendencias = crosstab_pendencias[lista_tags]
         crosstab_pendencias['Total de Pendências'] = crosstab_pendencias.sum(axis=1)
 
-        st.dataframe(crosstab_pendencias.sort_values(by='Total de Pendências', ascending=False), use_container_width=True)
+        st.dataframe(ensure_pandas_df(crosstab_pendencias.sort_values(by='Total de Pendências', ascending=False)), use_container_width=True)
 
         # Gráfico: Detalhamento de pendências por tipo e consultor
         st.write("Gráfico de Detalhamento das Pendências")
-        st.bar_chart(crosstab_pendencias.drop(columns=['Total de Pendências']))
+        chart_data = ensure_pandas_df(crosstab_pendencias.drop(columns=['Total de Pendências']))
+        st.bar_chart(chart_data)
 
     # --- Exibição dos Dados Brutos Filtrados ---
     with st.expander("Ver dados brutos filtrados"):
@@ -80,4 +82,4 @@ def show_dados_macros(df_filtrado):
             'APOSTILA - STATUS', 'DRIVE - STATUS'
         ]
         colunas_existentes = [col for col in colunas_para_exibir if col in df_filtrado.columns]
-        st.dataframe(df_filtrado[colunas_existentes], use_container_width=True) 
+        st.dataframe(ensure_pandas_df(df_filtrado[colunas_existentes]), use_container_width=True) 

@@ -23,6 +23,7 @@ sys.path.insert(0, str(utils_path))
 
 # Agora importa diretamente do arquivo animation_utils
 from animation_utils import update_progress
+from utils.dataframe_utils import ensure_pandas_df
 
 # Carregar variáveis de ambiente
 load_dotenv()

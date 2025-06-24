@@ -19,6 +19,7 @@ sys.path.insert(0, str(utils_path))
 # Importar a função que usa cache da API Bitrix
 from bitrix_connector import load_bitrix_data
 from refresh_utils import handle_refresh_trigger, get_force_reload_status, clear_force_reload_flag
+from utils.dataframe_utils import ensure_pandas_df
 
 def analisar_produtividade(df):
     """

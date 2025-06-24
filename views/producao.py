@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from utils.dataframe_utils import ensure_pandas_df
 from datetime import datetime, timedelta
 import time
 import re
@@ -21,6 +22,7 @@ sys.path.insert(0, str(utils_path))
 # Agora importa diretamente dos arquivos na pasta utils
 from data_processor import calculate_status_counts, filter_dataframe_by_date, create_responsible_status_table
 from animation_utils import display_loading_animation, clear_loading_animation, update_progress
+from utils.dataframe_utils import ensure_pandas_df
 
 def generate_demo_data():
     """
@@ -655,7 +657,7 @@ def show_producao():
                     
                     # 12. Exibir o DataFrame com as configurações de coluna
                     st.dataframe(
-                        display_df,
+                        ensure_pandas_df(display_df),
                         column_config=column_config,
                         use_container_width=True,
                         height=500,
@@ -670,7 +672,7 @@ def show_producao():
                 if not pendencias_df.empty:
                     # Exibir o DataFrame com as configurações de coluna
                     st.dataframe(
-                        pendencias_df,
+                        ensure_pandas_df(pendencias_df),
                         column_config={
                             "Responsável": st.column_config.TextColumn(
                                 "Responsável",
@@ -746,7 +748,7 @@ def show_producao():
                 if not production_df.empty:
                     # Exibir o DataFrame com as configurações de coluna
                     st.dataframe(
-                        production_df,
+                        ensure_pandas_df(production_df),
                         column_config={
                             "Responsável": st.column_config.TextColumn(
                                 "Responsável",
@@ -866,7 +868,7 @@ def show_producao():
                 
                 # Exibir o resumo
                 st.dataframe(
-                    df_resumo,
+                    ensure_pandas_df(df_resumo),
                     column_config=resumo_config,
                     use_container_width=True,
                     hide_index=True
@@ -921,7 +923,7 @@ def show_producao():
                 
                 # Exibir a tabela detalhada com os cruzamentos
                 st.dataframe(
-                    df_cruzado,
+                    ensure_pandas_df(df_cruzado),
                     column_config=cruzamento_config,
                     use_container_width=True,
                     height=500,
@@ -969,7 +971,7 @@ def show_producao():
                     }
                     
                     st.dataframe(
-                        family_id_summary,
+                        ensure_pandas_df(family_id_summary),
                         column_config=summary_config,
                         use_container_width=True,
                         hide_index=True
@@ -1036,7 +1038,7 @@ def show_producao():
                     }
                     
                     st.dataframe(
-                        filtered_details,
+                        ensure_pandas_df(filtered_details),
                         column_config=details_config,
                         use_container_width=True,
                         hide_index=True

@@ -10,6 +10,7 @@ import unicodedata
 import re
 # Importar a função de análise necessária
 from .analysis import calcular_tempo_solicitacao_providencia
+from utils.dataframe_utils import ensure_pandas_df
 
 def visualizar_comune_dados(df_comune):
     """

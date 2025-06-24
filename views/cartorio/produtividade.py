@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import numpy as np
+from utils.dataframe_utils import ensure_pandas_df
 
 def formatar_nome_etapa(campo):
     """

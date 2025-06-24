@@ -122,7 +122,15 @@ def inicializar_estados_sessao():
 # Processar parâmetros da URL
 def processar_parametros_url():
     """Processa parâmetros da URL para navegação direta"""
-    query_params = st.query_params
+    try:
+        # Tenta usar a nova API do Streamlit (>= 1.30.0)
+        query_params = st.query_params
+    except AttributeError:
+        # Fallback para a API experimental (< 1.30.0)
+        query_params = st.experimental_get_query_params()
+        # Converte o formato da API experimental para o novo formato
+        query_params = {k: v[0] if v else '' for k, v in query_params.items()}
+    
     if 'pagina_atual_via_url_processada' not in st.session_state and 'page' in query_params:
         rota = query_params['page'].lower()
         if rota in ROTAS:

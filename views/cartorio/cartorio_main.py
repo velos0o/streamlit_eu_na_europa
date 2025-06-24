@@ -21,6 +21,7 @@ import os
 import sys
 from pathlib import Path
 from components.report_guide import show_contextual_help
+from utils.dataframe_utils import ensure_pandas_df
 
 def show_cartorio():
     """

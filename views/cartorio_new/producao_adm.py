@@ -6,6 +6,7 @@ import os # Importar os para manipulação de caminhos
 
 # Funções que podem ser úteis
 from .utils import simplificar_nome_estagio, fetch_supabase_producao_data, carregar_dados_usuarios_bitrix
+from utils.dataframe_utils import ensure_pandas_df
 
 # Obter o diretório do arquivo atual
 _PRODUCAO_ADM_DIR = os.path.dirname(os.path.abspath(__file__))

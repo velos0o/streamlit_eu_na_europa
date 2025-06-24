@@ -12,6 +12,7 @@ from pathlib import Path
 import unicodedata
 from thefuzz import fuzz, process
 from utils.refresh_utils import load_csv_with_refresh
+from utils.dataframe_utils import ensure_pandas_df
 
 # Tentar importar thefuzz
 try:

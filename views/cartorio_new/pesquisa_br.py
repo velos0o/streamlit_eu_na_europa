@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 from .utils import simplificar_nome_estagio, categorizar_estagio
+from utils.dataframe_utils import ensure_pandas_df
 
 def exibir_pesquisa_br(df_cartorio):
     """

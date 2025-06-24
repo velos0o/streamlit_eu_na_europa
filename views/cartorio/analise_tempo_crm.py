@@ -7,6 +7,7 @@ import numpy as np
 
 # Importar funções necessárias do arquivo original
 from views.cartorio.produtividade import formatar_nome_etapa, obter_mapeamento_campos
+from utils.dataframe_utils import ensure_pandas_df
 
 # --- INÍCIO DA ADIÇÃO: Mapeamento STAGE_ID -> NOME_ESTAGIO ---
 def obter_nomes_estagios_local():

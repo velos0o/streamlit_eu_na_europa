@@ -9,6 +9,7 @@ from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, DataReturnMode
 
 # Importar funções do novo utils
 from .utils import simplificar_nome_estagio, categorizar_estagio
+from utils.dataframe_utils import ensure_pandas_df
 
 # --- Função Auxiliar Copiada de visao_geral.py ---
 # TODO: Considerar mover esta função para um módulo utils compartilhado

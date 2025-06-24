@@ -24,6 +24,7 @@ from .styles import apply_tailwind_styles, THEME
 from .metrics_cards import display_metrics_cards
 from .charts import display_main_charts, display_distribution_charts
 from .details import display_details_section
+from utils.dataframe_utils import ensure_pandas_df
 
 # Importar funções necessárias para refresh global (se existir)
 try:

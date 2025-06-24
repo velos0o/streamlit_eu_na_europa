@@ -5,6 +5,7 @@ from .data_loader import carregar_dados_negociacao
 from datetime import datetime, timedelta
 import re
 import numpy as np
+from utils.dataframe_utils import ensure_pandas_df
 
 def parse_custom_date(date_str):
     """

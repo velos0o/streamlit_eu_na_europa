@@ -8,6 +8,7 @@ import re
 import os
 import json
 from unidecode import unidecode
+from utils.dataframe_utils import ensure_pandas_df
 
 # Try importing thefuzz, provide guidance if not found
 try:

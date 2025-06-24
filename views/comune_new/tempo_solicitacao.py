@@ -8,6 +8,7 @@ import os # Adicionado para verificar existência do arquivo CSV
 from .visao_geral import simplificar_nome_estagio_comune
 # Importar nova função de atualização
 from utils.refresh_utils import load_csv_with_refresh
+from utils.dataframe_utils import ensure_pandas_df
 
 def exibir_tempo_solicitacao(df_comune):
     """

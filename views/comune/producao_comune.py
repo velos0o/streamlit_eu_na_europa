@@ -9,6 +9,7 @@ from pathlib import Path
 api_path = Path(__file__).parents[2] / 'api'
 sys.path.insert(0, str(api_path))
 from bitrix_connector import load_bitrix_data, load_merged_data
+from utils.dataframe_utils import ensure_pandas_df
 
 # Configurações da planilha
 SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1pB3HTFsaHyqAt3bhxzWG3RjfAxAzl97ydGqT35uYb-w/edit?gid=0#gid=0'

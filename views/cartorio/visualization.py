@@ -6,6 +6,7 @@ import plotly.express as px
 from datetime import datetime
 import io
 from .data_loader import carregar_estagios_bitrix
+from utils.dataframe_utils import ensure_pandas_df
 
 def visualizar_cartorio_dados(df):
     """

@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+from utils.dataframe_utils import ensure_pandas_df
 
 def slide_producao_ranking_pendencias(df):
     """

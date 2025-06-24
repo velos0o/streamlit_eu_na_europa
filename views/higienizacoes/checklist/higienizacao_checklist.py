@@ -10,6 +10,7 @@ import traceback
 
 # Importar a função de obter credenciais do helper
 from utils.secrets_helper import get_google_credentials
+from utils.dataframe_utils import ensure_pandas_df
 
 # Função utilitária para garantir que colunas numéricas sejam exibidas corretamente
 def ensure_numeric_display(df):

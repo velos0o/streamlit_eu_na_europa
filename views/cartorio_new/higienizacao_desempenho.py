@@ -5,6 +5,7 @@ from views.cartorio_new.data_loader import carregar_dados_cartorio # Importar da
 from datetime import datetime, timedelta, date
 import re # Para extrair ID da opção do selectbox
 import numpy as np # Para operações numéricas
+from utils.dataframe_utils import ensure_pandas_df
 
 def aplicar_logica_precedencia_pipeline_104_higienizacao(df):
     """

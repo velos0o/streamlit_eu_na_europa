@@ -55,6 +55,7 @@ from views.comune_new.data_loader import load_comune_data # CORRIGIDO
 
 # Importar a função central de carregamento do Bitrix
 from api.bitrix_connector import load_merged_data
+from utils.dataframe_utils import ensure_pandas_df
 
 # Importar função de simplificação de estágio
 # Tratamento de erro caso o arquivo não exista ou a função não seja encontrada

@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+from utils.dataframe_utils import ensure_pandas_df
 
 def _create_section(title, df, end_date_col, start_date_col, status_col, completion_statuses, other_cols=None):
     """

@@ -12,6 +12,7 @@ from pathlib import Path
 import requests
 import json
 from io import StringIO
+from utils.dataframe_utils import ensure_pandas_df
 
 # Carregar variáveis de ambiente
 load_dotenv()

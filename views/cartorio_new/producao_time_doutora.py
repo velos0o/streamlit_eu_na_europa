@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
+from utils.dataframe_utils import ensure_pandas_df
 
 # Funções que podem ser úteis de utils.py (a serem importadas ou adaptadas)
 # from .utils import simplificar_nome_estagio, fetch_supabase_producao_data, carregar_dados_usuarios_bitrix

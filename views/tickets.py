@@ -6,6 +6,7 @@ import mysql.connector
 from datetime import datetime, timedelta
 import calendar
 import time
+from utils.dataframe_utils import ensure_pandas_df
 
 # Verificar e instalar bibliotecas adicionais se necessário
 try:

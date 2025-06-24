@@ -21,6 +21,7 @@ sys.path.insert(0, str(utils_path))
 # Importar funções necessárias
 from bitrix_connector import load_bitrix_data
 from refresh_utils import handle_refresh_trigger, get_force_reload_status, clear_force_reload_flag
+from utils.dataframe_utils import ensure_pandas_df
 
 @st.cache_data(ttl=3600) # Cache de 1 hora
 def cached_load_comune_data(force_reload=False):

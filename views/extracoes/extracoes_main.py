@@ -10,6 +10,7 @@ sys.path.append(str(path_root))
 
 # Importar módulos específicos do projeto
 from api.bitrix_connector import load_merged_data
+from utils.dataframe_utils import ensure_pandas_df
 
 # Definir funções de animação localmente
 def display_loading_animation(message="Carregando..."):

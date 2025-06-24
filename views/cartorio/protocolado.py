@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from api.bitrix_connector import load_bitrix_data, get_credentials
 from datetime import datetime
+from utils.dataframe_utils import ensure_pandas_df
 
 # Dicionários de mapeamento de estágios
 em_andamento = {
