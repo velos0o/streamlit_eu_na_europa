@@ -1,7 +1,25 @@
 import streamlit as st
 import pandas as pd
 import gspread
-from utils.dataframe_utils import ensure_pandas_df
+
+def safe_pandas_df(df):
+    """
+    Função ultra-defensiva para garantir DataFrame pandas nativo.
+    Recria completamente o DataFrame para evitar qualquer vestígio de narwhals.
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    
+    # Converter para dict e recriar - método mais agressivo
+    try:
+        return pd.DataFrame(df.to_dict('records'))
+    except:
+        # Fallback: usar valores e colunas
+        try:
+            return pd.DataFrame(df.values, columns=df.columns)
+        except:
+            # Último fallback: tentar conversão direta
+            return pd.DataFrame(df)
 
 from .dados_macros import show_dados_macros
 from .funil_etapas import show_funil_etapas
@@ -39,7 +57,7 @@ def carregar_dados_protocolados():
         col_names = [chr(ord('A') + i) for i in range(num_cols)]
         df.columns = col_names[:num_cols]
 
-        return ensure_pandas_df(df)
+        return safe_pandas_df(df)
     except gspread.exceptions.SpreadsheetNotFound:
         st.error("Planilha não encontrada. Verifique o ID e se a conta de serviço tem permissão de 'Leitor'.")
         return pd.DataFrame()
@@ -65,13 +83,13 @@ def show_protocolados(subpagina):
         'T': 'DRIVE - DATA DE INICIO', 'U': 'DRIVE - STATUS', 'V': 'DRIVE - DATA DE ENTREGA',
     }
     
-    df = ensure_pandas_df(df_raw.rename(columns=mapeamento_colunas))
+    df = safe_pandas_df(df_raw.rename(columns=mapeamento_colunas))
     if 'PENDENCIAS' in df.columns:
         df['PENDENCIAS'] = df['PENDENCIAS'].fillna('SEM PENDENCIAS').replace('', 'SEM PENDENCIAS')
 
     # A página de Produtividade tem seus próprios filtros internos e não usa a sidebar.
     if subpagina == "Produtividade":
-        show_produtividade(ensure_pandas_df(df))
+        show_produtividade(safe_pandas_df(df))
         return  # Impede a renderização dos filtros da sidebar
 
     # Filtros na sidebar para todas as outras páginas
@@ -87,19 +105,19 @@ def show_protocolados(subpagina):
         "Status Geral", options=status_unicos, default=status_unicos
     )
 
-    df_filtrado = ensure_pandas_df(df[
+    df_filtrado = safe_pandas_df(df[
         df['CONSULTOR RESPONSÁVEL'].isin(consultores_selecionados) &
         df['STATUS GERAL'].isin(status_selecionado)
     ])
 
     if subpagina == "Dados Macros":
-        show_dados_macros(ensure_pandas_df(df_filtrado))
+        show_dados_macros(safe_pandas_df(df_filtrado))
     elif subpagina == "Funil - Etapas":
-        show_funil_etapas(ensure_pandas_df(df_filtrado))
+        show_funil_etapas(safe_pandas_df(df_filtrado))
     elif subpagina == "Pendências Liberadas":
-        show_pendencias_liberadas(ensure_pandas_df(df_filtrado))
+        show_pendencias_liberadas(safe_pandas_df(df_filtrado))
     elif subpagina == "Pendências Futuras":
-        show_pendencias_futuras(ensure_pandas_df(df_filtrado))
+        show_pendencias_futuras(safe_pandas_df(df_filtrado))
     else:
         st.error(f"Sub-página '{subpagina}' não encontrada.")
-        show_dados_macros(ensure_pandas_df(df_filtrado)) 
+        show_dados_macros(safe_pandas_df(df_filtrado)) 
