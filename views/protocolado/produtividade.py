@@ -149,4 +149,4 @@ def show_produtividade(df_protocolados):
         margins_name='Total Geral'
     )
     
-    st.dataframe(tabela_produtividade, use_container_width=True) 
+    st.dataframe(ensure_pandas_df(tabela_produtividade), use_container_width=True) 

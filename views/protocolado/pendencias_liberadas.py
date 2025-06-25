@@ -66,7 +66,7 @@ def _create_section(title, df, end_date_col, start_date_col, status_col, complet
         if not df_status.empty:
             status_counts = df_status[status_col].value_counts().reset_index()
             status_counts.columns = ['Status', 'Total']
-            st.dataframe(status_counts, use_container_width=True, hide_index=True)
+            st.dataframe(ensure_pandas_df(status_counts), use_container_width=True, hide_index=True)
         else:
             st.info("Nenhum status encontrado para esta etapa.")
 
@@ -75,7 +75,7 @@ def _create_section(title, df, end_date_col, start_date_col, status_col, complet
         with st.expander(f"Ver detalhes das tarefas concluídas"):
             cols_to_show = ['ID FAMÍLIA', start_date_col, end_date_col, status_col, 'TEMPO_PROCESSAMENTO'] + other_cols
             cols_existentes = [col for col in cols_to_show if col in df_com_datas.columns]
-            st.dataframe(df_com_datas[cols_existentes].sort_values(by=end_date_col, ascending=False), use_container_width=True)
+            st.dataframe(ensure_pandas_df(df_com_datas[cols_existentes].sort_values(by=end_date_col, ascending=False)), use_container_width=True)
 
 
 def show_pendencias_liberadas(df_filtrado):
@@ -160,7 +160,7 @@ def show_pendencias_liberadas(df_filtrado):
         ordem_etapas = [etapa for etapa in secoes.keys() if etapa in pivot_table.index]
         pivot_table = pivot_table.reindex(ordem_etapas)
 
-        st.dataframe(pivot_table.astype(int), use_container_width=True)
+        st.dataframe(ensure_pandas_df(pivot_table.astype(int)), use_container_width=True)
     else:
         st.info("Não há dados de status de conclusão para exibir na tabela.")
     

@@ -69,7 +69,7 @@ def show_pendencias_futuras(df_filtrado):
             with cols[col_idx % num_cols]:
                 st.metric(f"Pendentes em {etapa}", count)
                 with st.expander(f"Ver {count} famílias"):
-                    st.dataframe(pd.DataFrame(list(set(familias)), columns=['ID FAMÍLIA']), hide_index=True)
+                    st.dataframe(ensure_pandas_df(pd.DataFrame(list(set(familias)), columns=['ID FAMÍLIA'])), hide_index=True)
             col_idx += 1
             
     # Se nenhuma demanda foi exibida (porque todas eram 0)
