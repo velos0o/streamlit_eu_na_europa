@@ -773,7 +773,7 @@ def show_ficha_familia():
                     
                     # Exibir resultados como uma tabela interativa
                     st.dataframe(
-                        df_resultados,
+                        ensure_pandas_df(df_resultados),
                         column_config={
                             "Nome da Família": st.column_config.TextColumn("Nome da Família", width="large"),
                             "ID da Família": st.column_config.TextColumn("ID da Família", width="medium"),

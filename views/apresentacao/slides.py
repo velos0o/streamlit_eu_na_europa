@@ -64,7 +64,7 @@ def slide_analise_diaria(df, date_from, date_to):
     df_diario = df.groupby(df['DATA_CONCLUSAO'].dt.date).size().reset_index(name='Conclusões')
     
     # Mostrar gráfico
-    st.line_chart(df_diario.set_index('DATA_CONCLUSAO'))
+    st.line_chart(ensure_pandas_df(df_diario.set_index('DATA_CONCLUSAO')))
     
     # Informações sobre o período
     st.info(f"Período analisado: {date_from.strftime('%d/%m/%Y')} a {date_to.strftime('%d/%m/%Y')}")
@@ -85,7 +85,7 @@ def slide_analise_semanal(df):
     df_semanal = df_temp.groupby('Semana').size().reset_index(name='Conclusões')
     
     # Mostrar gráfico
-    st.bar_chart(df_semanal.set_index('Semana'))
+    st.bar_chart(ensure_pandas_df(df_semanal.set_index('Semana')))
 
 def slide_analise_dia_semana(df):
     """Versão simplificada da função slide_analise_dia_semana"""
@@ -103,7 +103,7 @@ def slide_analise_dia_semana(df):
     df_dia_semana = df_temp.groupby('Dia da Semana').size().reset_index(name='Conclusões')
     
     # Mostrar gráfico
-    st.bar_chart(df_dia_semana.set_index('Dia da Semana'))
+    st.bar_chart(ensure_pandas_df(df_dia_semana.set_index('Dia da Semana')))
 
 def slide_analise_horario(df):
     """Versão simplificada da função slide_analise_horario"""
@@ -121,7 +121,7 @@ def slide_analise_horario(df):
     df_hora = df_temp.groupby('Hora').size().reset_index(name='Conclusões')
     
     # Mostrar gráfico
-    st.bar_chart(df_hora.set_index('Hora'))
+    st.bar_chart(ensure_pandas_df(df_hora.set_index('Hora')))
 
 def slide_producao_metricas_macro(df):
     """Versão simplificada da função slide_producao_metricas_macro"""

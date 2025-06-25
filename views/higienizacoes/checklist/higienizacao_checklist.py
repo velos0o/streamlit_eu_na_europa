@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from utils.dataframe_utils import ensure_pandas_df
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
@@ -504,7 +505,7 @@ def show_higienizacao_checklist():
                 if not status_resp_counts.empty:
                     # Mostrar agrupamento simplificado sem estilização
                     st.write("Visualização alternativa:")
-                    st.dataframe(status_resp_counts, use_container_width=True)
+                    st.dataframe(ensure_pandas_df(status_resp_counts), use_container_width=True)
             except Exception as inner_e:
                 st.error(f"Não foi possível criar visualização alternativa: {str(inner_e)}")
     
@@ -585,7 +586,7 @@ def show_higienizacao_checklist():
                                 # Aplicar estilo apenas à coluna 'Status' usando .map()
                                 styled_df = df_exibir.style.map(highlight_single_status, subset=[display_status_col_name])
                                 # Exibir a tabela ESTILIZADA
-                                st.dataframe(styled_df, use_container_width=True, height=400)
+                                st.dataframe(ensure_pandas_df(styled_df), use_container_width=True, height=400)
                             except Exception as style_error:
                                 st.warning(f"Não foi possível aplicar estilo: {str(style_error)}. Tentando abordagem alternativa...")
                                 
@@ -627,15 +628,15 @@ def show_higienizacao_checklist():
                         except Exception as e:
                             st.warning(f"Erro ao aplicar estilo à tabela: {str(e)}")
                             # Exibir a tabela sem estilo como fallback final
-                            st.dataframe(df_exibir, use_container_width=True, height=400)
+                            st.dataframe(ensure_pandas_df(df_exibir), use_container_width=True, height=400)
                     else:
                         # Exibir a tabela sem estilo se a coluna 'Status' não existir
-                        st.dataframe(df_exibir, use_container_width=True, height=400)
+                        st.dataframe(ensure_pandas_df(df_exibir), use_container_width=True, height=400)
                         st.warning(f"Coluna '{display_status_col_name}' não encontrada para estilização.")
         except Exception as e:
             st.error(f"Erro ao processar tabela de detalhes: {str(e)}") 
             # Como fallback, mostrar o DataFrame filtrado original sem processamento adicional
-            st.dataframe(df_filtrado, use_container_width=True, height=400)
+            st.dataframe(ensure_pandas_df(df_filtrado), use_container_width=True, height=400)
 
     # Adicionar exportação de dados apenas se houver dados para exportar
     if not df_filtrado.empty:

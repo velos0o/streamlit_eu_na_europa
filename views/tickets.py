@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from utils.dataframe_utils import ensure_pandas_df
 import plotly.express as px
 import plotly.graph_objects as go
 import mysql.connector
@@ -596,7 +597,7 @@ def show_tickets():
             
             # Exibir tabela com classe CSS personalizada
             st.markdown('<div class="dataframe-container">', unsafe_allow_html=True)
-            st.dataframe(df_styled, use_container_width=True, height=400)
+            st.dataframe(ensure_pandas_df(df_styled), use_container_width=True, height=400)
             st.markdown('</div>', unsafe_allow_html=True)
             
             # Linha com estatísticas e botão de exportação

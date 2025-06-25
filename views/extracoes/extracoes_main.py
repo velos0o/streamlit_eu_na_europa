@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from utils.dataframe_utils import ensure_pandas_df
 import os
 import sys
 from pathlib import Path
@@ -128,7 +129,7 @@ def mostrar_visualizacao_dados():
                 st.success(f"Dados carregados com sucesso! Total de registros: {len(df)}")
                 
                 # Exibir dataframe
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(ensure_pandas_df(df), use_container_width=True)
                 
                 # Permitir download dos dados
                 csv = df.to_csv(index=False).encode('utf-8-sig')
@@ -217,7 +218,7 @@ def mostrar_exportar_csv():
                     
                     # Exibir prévia
                     st.subheader("Prévia dos Dados para Exportação")
-                    st.dataframe(df_export.head(10), use_container_width=True)
+                    st.dataframe(ensure_pandas_df(df_export.head(10)), use_container_width=True)
                     
                     # Permitir download dos dados
                     csv = df_export.to_csv(index=False).encode('utf-8-sig')

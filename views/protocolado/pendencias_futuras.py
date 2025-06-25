@@ -29,7 +29,7 @@ def show_pendencias_futuras(df_filtrado):
         if col not in df.columns:
             st.error(f"A coluna de conclusão '{col}' para a etapa '{etapa}' não foi encontrada.")
             return
-        df[col] = pd.to_datetime(df[col], errors='coerce')
+        df[col] = pd.to_datetime(df[col], format='%d/%m/%Y', dayfirst=True, errors='coerce')
 
     # --- Métricas de Resumo ---
     st.markdown("---")

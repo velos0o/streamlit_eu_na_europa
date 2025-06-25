@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from utils.dataframe_utils import ensure_pandas_df
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
@@ -975,7 +976,7 @@ def mostrar_ranking_produtividade(df, df_todos):
         
         # Exibir o ranking usando o st.dataframe com column_config
         st.dataframe(
-            ranking[colunas_exibir],
+            ensure_pandas_df(ranking[colunas_exibir]),
             column_config=colunas,
             use_container_width=True,
             hide_index=True,

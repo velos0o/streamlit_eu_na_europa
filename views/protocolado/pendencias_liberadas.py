@@ -27,8 +27,8 @@ def _create_section(title, df, end_date_col, start_date_col, status_col, complet
         st.info(f"Nenhuma tarefa com status definido para '{title}'.")
         return
 
-    df_section[end_date_col] = pd.to_datetime(df_section[end_date_col], errors='coerce')
-    df_section[start_date_col] = pd.to_datetime(df_section[start_date_col], errors='coerce')
+    df_section[end_date_col] = pd.to_datetime(df_section[end_date_col], format='%d/%m/%Y', dayfirst=True, errors='coerce')
+    df_section[start_date_col] = pd.to_datetime(df_section[start_date_col], format='%d/%m/%Y', dayfirst=True, errors='coerce')
 
     # --- Lógica de Dados ---
     # DataFrame para calcular o resumo de TODOS os status (em andamento e concluídos)

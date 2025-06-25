@@ -35,7 +35,7 @@ def show_produtividade(df_protocolados):
             if df_etapa.empty:
                 continue
 
-            df_etapa[data_col] = pd.to_datetime(df_etapa[data_col], errors='coerce')
+            df_etapa[data_col] = pd.to_datetime(df_etapa[data_col], format='%d/%m/%Y', dayfirst=True, errors='coerce')
             df_etapa.dropna(subset=[data_col], inplace=True)
             
             df_etapa.rename(columns={data_col: 'Data Conclusão'}, inplace=True)
