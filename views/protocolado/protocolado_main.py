@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import gspread
+from utils.dataframe_utils import ensure_pandas_df
 
 from .dados_macros import show_dados_macros
 from .funil_etapas import show_funil_etapas
@@ -69,7 +70,7 @@ def show_protocolados(subpagina):
 
     # A página de Produtividade tem seus próprios filtros internos e não usa a sidebar.
     if subpagina == "Produtividade":
-        show_produtividade(df)  # Passa o DataFrame não filtrado
+        show_produtividade(ensure_pandas_df(df))  # Passa o DataFrame não filtrado
         return  # Impede a renderização dos filtros da sidebar
 
     # Filtros na sidebar para todas as outras páginas
@@ -91,13 +92,13 @@ def show_protocolados(subpagina):
     ]
 
     if subpagina == "Dados Macros":
-        show_dados_macros(df_filtrado)
+        show_dados_macros(ensure_pandas_df(df_filtrado))
     elif subpagina == "Funil - Etapas":
-        show_funil_etapas(df_filtrado)
+        show_funil_etapas(ensure_pandas_df(df_filtrado))
     elif subpagina == "Pendências Liberadas":
-        show_pendencias_liberadas(df_filtrado)
+        show_pendencias_liberadas(ensure_pandas_df(df_filtrado))
     elif subpagina == "Pendências Futuras":
-        show_pendencias_futuras(df_filtrado)
+        show_pendencias_futuras(ensure_pandas_df(df_filtrado))
     else:
         st.error(f"Sub-página '{subpagina}' não encontrada.")
-        show_dados_macros(df_filtrado) 
+        show_dados_macros(ensure_pandas_df(df_filtrado)) 

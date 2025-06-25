@@ -28,7 +28,7 @@ def show_produtividade(df_protocolados):
     lista_tarefas = []
     for etapa, data_col in mapeamento_etapas.items():
         if data_col in df_protocolados.columns:
-            df_etapa = df_protocolados[['ID FAMÍLIA', 'CONSULTOR RESPONSÁVEL', data_col]].copy()
+            df_etapa = ensure_pandas_df(df_protocolados[['ID FAMÍLIA', 'CONSULTOR RESPONSÁVEL', data_col]].copy())
             df_etapa.dropna(subset=[data_col, 'CONSULTOR RESPONSÁVEL'], inplace=True)
             df_etapa = df_etapa[df_etapa['CONSULTOR RESPONSÁVEL'].str.strip() != '']
 
@@ -40,13 +40,13 @@ def show_produtividade(df_protocolados):
             
             df_etapa.rename(columns={data_col: 'Data Conclusão'}, inplace=True)
             df_etapa['Etapa'] = etapa
-            lista_tarefas.append(df_etapa)
+            lista_tarefas.append(ensure_pandas_df(df_etapa))
     
     if not lista_tarefas:
         st.info("Nenhuma tarefa concluída foi encontrada.")
         return
         
-    df_produtividade = pd.concat(lista_tarefas, ignore_index=True)
+    df_produtividade = ensure_pandas_df(pd.concat(lista_tarefas, ignore_index=True))
 
     # --- Filtros ---
     st.subheader("Filtros", divider='blue')
@@ -87,11 +87,11 @@ def show_produtividade(df_protocolados):
     start_date, end_date = pd.to_datetime(data_selecionada[0]), pd.to_datetime(data_selecionada[1])
 
     # --- Aplicação dos Filtros ---
-    df_filtrado_prod = df_produtividade[
+    df_filtrado_prod = ensure_pandas_df(df_produtividade[
         (df_produtividade['CONSULTOR RESPONSÁVEL'].isin(consultores_selecionados)) &
         (df_produtividade['Data Conclusão'] >= start_date) &
         (df_produtividade['Data Conclusão'] <= end_date)
-    ]
+    ])
 
     if df_filtrado_prod.empty:
         st.warning("Nenhuma tarefa concluída encontrada para os filtros selecionados.")
@@ -109,7 +109,7 @@ def show_produtividade(df_protocolados):
     # --- Gráficos ---
     st.subheader("Visualização da Produtividade", divider='blue')
     
-    produtividade_diaria = df_filtrado_prod.groupby(df_filtrado_prod['Data Conclusão'].dt.date).size().reset_index(name='Contagem')
+    produtividade_diaria = ensure_pandas_df(df_filtrado_prod.groupby(df_filtrado_prod['Data Conclusão'].dt.date).size().reset_index(name='Contagem'))
     produtividade_diaria.rename(columns={'Data Conclusão': 'Data'}, inplace=True)
     
     base = alt.Chart(ensure_pandas_df(produtividade_diaria)).encode(
@@ -138,8 +138,8 @@ def show_produtividade(df_protocolados):
     # --- Tabela de Produtividade ---
     st.subheader("Detalhamento por Consultor e Etapa", divider='blue')
     
-    tabela_produtividade = pd.pivot_table(
-        df_filtrado_prod,
+    tabela_produtividade = ensure_pandas_df(pd.pivot_table(
+        ensure_pandas_df(df_filtrado_prod),
         values='ID FAMÍLIA',
         index='CONSULTOR RESPONSÁVEL',
         columns='Etapa',
@@ -147,6 +147,6 @@ def show_produtividade(df_protocolados):
         fill_value=0,
         margins=True,
         margins_name='Total Geral'
-    )
+    ))
     
     st.dataframe(ensure_pandas_df(tabela_produtividade), use_container_width=True) 
