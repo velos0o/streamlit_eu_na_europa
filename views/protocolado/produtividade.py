@@ -194,17 +194,23 @@ def show_produtividade(df_protocolados):
         produtividade_diaria = safe_pandas_df(produtividade_diaria)
         produtividade_diaria = produtividade_diaria.rename(columns={'Data Conclusão': 'Data'})
         
-        # CRIAÇÃO DE DATAFRAME COMPLETAMENTE NOVO PARA ALTAIR
-        # Método mais agressivo possível
-        chart_data = []
-        for _, row in produtividade_diaria.iterrows():
-            chart_data.append({
-                'Data': row['Data'],
-                'Contagem': int(row['Contagem'])
-            })
+        # MÉTODO ULTRA-AGRESSIVO PARA ELIMINAR NARWHALS
+        # Converter para listas puras Python nativas
+        datas_lista = []
+        contagens_lista = []
         
-        # DataFrame completamente novo, sem qualquer vestígio anterior
-        df_chart = pd.DataFrame(chart_data)
+        for i in range(len(produtividade_diaria)):
+            data_valor = produtividade_diaria.iloc[i]['Data']
+            contagem_valor = int(produtividade_diaria.iloc[i]['Contagem'])
+            
+            datas_lista.append(data_valor)
+            contagens_lista.append(contagem_valor)
+        
+        # Criar DataFrame usando apenas tipos Python nativos
+        df_chart = pd.DataFrame({
+            'Data': datas_lista,
+            'Contagem': contagens_lista
+        })
         
         # Verificação final de tipos
         st.write(f"🔍 Tipo do DataFrame para gráfico: {type(df_chart)}")
@@ -247,20 +253,53 @@ def show_produtividade(df_protocolados):
     st.subheader("Detalhamento por Consultor e Etapa", divider='blue')
     
     try:
-        tabela_produtividade = pd.pivot_table(
-            df_filtrado_prod,
-            values='ID FAMÍLIA',
-            index='CONSULTOR RESPONSÁVEL',
-            columns='Etapa',
-            aggfunc='count',
-            fill_value=0,
-            margins=True,
-            margins_name='Total Geral'
-        )
+        # MÉTODO ULTRA-AGRESSIVO PARA PIVOT TABLE
+        # Criar pivot table manualmente para evitar problemas
+        consultores = sorted(df_filtrado_prod['CONSULTOR RESPONSÁVEL'].unique())
+        etapas = sorted(df_filtrado_prod['Etapa'].unique())
         
-        # Conversão defensiva da tabela
-        tabela_produtividade = safe_pandas_df(tabela_produtividade)
+        # Criar dados da tabela manualmente
+        dados_tabela = []
+        
+        for consultor in consultores:
+            linha = {'CONSULTOR RESPONSÁVEL': consultor}
+            total_consultor = 0
+            
+            for etapa in etapas:
+                # Contar tarefas para este consultor e etapa
+                count = len(df_filtrado_prod[
+                    (df_filtrado_prod['CONSULTOR RESPONSÁVEL'] == consultor) & 
+                    (df_filtrado_prod['Etapa'] == etapa)
+                ])
+                linha[etapa] = count
+                total_consultor += count
+            
+            linha['Total'] = total_consultor
+            dados_tabela.append(linha)
+        
+        # Criar linha de totais
+        linha_total = {'CONSULTOR RESPONSÁVEL': 'TOTAL GERAL'}
+        total_geral = 0
+        
+        for etapa in etapas:
+            total_etapa = sum([linha[etapa] for linha in dados_tabela])
+            linha_total[etapa] = total_etapa
+            total_geral += total_etapa
+        
+        linha_total['Total'] = total_geral
+        dados_tabela.append(linha_total)
+        
+        # Criar DataFrame final usando apenas tipos Python nativos
+        tabela_produtividade = pd.DataFrame(dados_tabela)
+        
         st.dataframe(tabela_produtividade, use_container_width=True)
         
     except Exception as e:
-        st.error(f"Erro ao criar tabela de produtividade: {e}") 
+        st.error(f"Erro ao criar tabela de produtividade: {e}")
+        # Fallback: mostrar dados básicos
+        try:
+            st.write("Dados básicos de produtividade:")
+            resumo = df_filtrado_prod.groupby(['CONSULTOR RESPONSÁVEL', 'Etapa']).size().reset_index(name='Quantidade')
+            st.dataframe(resumo, use_container_width=True)
+        except Exception as e2:
+            st.error(f"Erro no fallback: {e2}") 

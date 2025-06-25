@@ -44,8 +44,9 @@ def show_dados_macros(df_filtrado):
 
     # Contagem total de cada tipo de pendência
     try:
-        pendencias_gerais = df_filtrado[df_filtrado['PENDENCIAS'] != 'SEM PENDENCIAS']['PENDENCIAS']
-        pendencias_gerais = safe_pandas_df(pendencias_gerais)
+        # Filtrar pendências e garantir que seja uma Series
+        mask = df_filtrado['PENDENCIAS'] != 'SEM PENDENCIAS'
+        pendencias_gerais = df_filtrado.loc[mask, 'PENDENCIAS']
         
         if not pendencias_gerais.empty:
             lista_tags = [
@@ -54,8 +55,17 @@ def show_dados_macros(df_filtrado):
             ]
             
             try:
+                # Garantir que pendencias_gerais seja uma Series pandas nativa
+                if hasattr(pendencias_gerais, 'to_pandas'):
+                    pendencias_gerais = pendencias_gerais.to_pandas()
+                
+                # Processar as tags
                 contagem_tags = pendencias_gerais.str.split(',').explode().str.strip().value_counts()
-                contagem_tags = safe_pandas_df(contagem_tags)
+                
+                # Converter para Series nativa se necessário
+                if hasattr(contagem_tags, 'to_pandas'):
+                    contagem_tags = contagem_tags.to_pandas()
+                    
             except Exception as e:
                 st.warning(f"Erro ao processar contagem de tags: {e}")
                 contagem_tags = pd.Series(dtype=int)
@@ -130,33 +140,51 @@ def show_dados_macros(df_filtrado):
                     
                     try:
                         chart_data = crosstab_pendencias.drop(columns=['Total de Pendências'])
-                        chart_data = safe_pandas_df(chart_data)
                         
-                        # MÉTODO ULTRA-DEFENSIVO PARA O GRÁFICO
-                        # Criar dados completamente novos
-                        chart_dict = chart_data.to_dict('index')
-                        clean_chart_data = {}
+                        # MÉTODO ULTRA-AGRESSIVO PARA ELIMINAR NARWHALS
+                        # Converter para listas puras e recriar tudo do zero
+                        consultores = list(chart_data.index)
+                        colunas = list(chart_data.columns)
                         
-                        for consultor, valores in chart_dict.items():
-                            clean_chart_data[consultor] = {}
-                            for pendencia, valor in valores.items():
-                                clean_chart_data[consultor][pendencia] = int(valor)
+                        # Criar dados como lista de listas
+                        dados_limpos = []
+                        for i, consultor in enumerate(consultores):
+                            linha = []
+                            for coluna in colunas:
+                                valor = int(chart_data.iloc[i][coluna])
+                                linha.append(valor)
+                            dados_limpos.append(linha)
                         
-                        # Recriar DataFrame completamente novo
-                        final_chart_data = pd.DataFrame.from_dict(clean_chart_data, orient='index')
+                        # Criar DataFrame completamente novo usando apenas tipos Python nativos
+                        final_chart_data = pd.DataFrame(
+                            data=dados_limpos,
+                            index=consultores,
+                            columns=colunas
+                        )
                         
                         st.write(f"🔍 Tipo do DataFrame do gráfico: {type(final_chart_data)}")
                         st.write(f"🔍 Shape: {final_chart_data.shape}")
+                        st.write(f"🔍 É pandas nativo: {type(final_chart_data).__module__ == 'pandas.core.frame'}")
                         
+                        # Tentar o gráfico com dados completamente limpos
                         st.bar_chart(final_chart_data)
                         
                     except Exception as e:
                         st.error(f"❌ Erro ao criar gráfico de barras: {e}")
                         st.write("Exibindo dados em formato tabular:")
                         try:
-                            st.dataframe(chart_data)
-                        except:
-                            st.write("Não foi possível exibir os dados do gráfico.")
+                            # Criar tabela simples com dados básicos
+                            dados_tabela = []
+                            for consultor in consultores:
+                                linha_dict = {'Consultor': consultor}
+                                for coluna in colunas:
+                                    linha_dict[coluna] = int(chart_data.loc[consultor, coluna])
+                                dados_tabela.append(linha_dict)
+                            
+                            df_tabela = pd.DataFrame(dados_tabela)
+                            st.dataframe(df_tabela)
+                        except Exception as e2:
+                            st.write(f"Não foi possível exibir os dados: {e2}")
                     
                 except Exception as e:
                     st.error(f"Erro ao criar crosstab: {e}")
