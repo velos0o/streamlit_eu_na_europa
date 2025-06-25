@@ -38,7 +38,7 @@ def carregar_dados_protocolados():
         col_names = [chr(ord('A') + i) for i in range(num_cols)]
         df.columns = col_names[:num_cols]
 
-        return df
+        return ensure_pandas_df(df)
     except gspread.exceptions.SpreadsheetNotFound:
         st.error("Planilha não encontrada. Verifique o ID e se a conta de serviço tem permissão de 'Leitor'.")
         return pd.DataFrame()
@@ -64,7 +64,7 @@ def show_protocolados(subpagina):
         'T': 'DRIVE - DATA DE INICIO', 'U': 'DRIVE - STATUS', 'V': 'DRIVE - DATA DE ENTREGA',
     }
     
-    df = df_raw.rename(columns=mapeamento_colunas)
+    df = ensure_pandas_df(df_raw.rename(columns=mapeamento_colunas))
     if 'PENDENCIAS' in df.columns:
         df['PENDENCIAS'] = df['PENDENCIAS'].fillna('SEM PENDENCIAS').replace('', 'SEM PENDENCIAS')
 
@@ -86,10 +86,10 @@ def show_protocolados(subpagina):
         "Status Geral", options=status_unicos, default=status_unicos
     )
 
-    df_filtrado = df[
+    df_filtrado = ensure_pandas_df(df[
         df['CONSULTOR RESPONSÁVEL'].isin(consultores_selecionados) &
         df['STATUS GERAL'].isin(status_selecionado)
-    ]
+    ])
 
     if subpagina == "Dados Macros":
         show_dados_macros(ensure_pandas_df(df_filtrado))

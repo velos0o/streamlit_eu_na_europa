@@ -36,23 +36,23 @@ def show_dados_macros(df_filtrado):
     # --- Análise 2: Pendências por Responsável ---
     st.subheader("Pendências por Responsável", divider='blue')
 
-    pendencias_df = df_filtrado[['CONSULTOR RESPONSÁVEL', 'PENDENCIAS']].copy()
-    pendencias_df = pendencias_df[pendencias_df['PENDENCIAS'] != 'SEM PENDENCIAS']
+    pendencias_df = ensure_pandas_df(df_filtrado[['CONSULTOR RESPONSÁVEL', 'PENDENCIAS']].copy())
+    pendencias_df = ensure_pandas_df(pendencias_df[pendencias_df['PENDENCIAS'] != 'SEM PENDENCIAS'])
 
     if pendencias_df.empty:
         st.info("Nenhuma pendência encontrada para os filtros selecionados.")
     else:
         # Processar as pendências
         pendencias_df['PENDENCIAS_LIST'] = pendencias_df['PENDENCIAS'].str.split(',')
-        pendencias_exploded = pendencias_df.explode('PENDENCIAS_LIST')
+        pendencias_exploded = ensure_pandas_df(pendencias_df.explode('PENDENCIAS_LIST'))
         pendencias_exploded['PENDENCIA_TIPO'] = pendencias_exploded['PENDENCIAS_LIST'].str.strip()
 
         # Tabela: Detalhamento de pendências por consultor e tipo
         st.write("Contagem de Pendências por Tipo e Consultor")
-        crosstab_pendencias = pd.crosstab(
+        crosstab_pendencias = ensure_pandas_df(pd.crosstab(
             index=pendencias_exploded['CONSULTOR RESPONSÁVEL'],
             columns=pendencias_exploded['PENDENCIA_TIPO']
-        )
+        ))
         
         # Garantir que todas as colunas de pendências possíveis existam
         lista_tags = [
@@ -64,7 +64,7 @@ def show_dados_macros(df_filtrado):
                 crosstab_pendencias[tag] = 0
         
         # Reordenar colunas e adicionar total
-        crosstab_pendencias = crosstab_pendencias[lista_tags]
+        crosstab_pendencias = ensure_pandas_df(crosstab_pendencias[lista_tags])
         crosstab_pendencias['Total de Pendências'] = crosstab_pendencias.sum(axis=1)
 
         st.dataframe(ensure_pandas_df(crosstab_pendencias.sort_values(by='Total de Pendências', ascending=False)), use_container_width=True)
