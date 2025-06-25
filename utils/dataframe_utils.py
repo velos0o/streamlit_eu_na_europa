@@ -33,6 +33,27 @@ def ensure_pandas_df(df):
         # Já é pandas ou outro tipo compatível
         return df
 
+def force_pandas_for_altair(df):
+    """
+    Força a conversão de DataFrame para pandas nativo especificamente para uso com Altair.
+    
+    Esta função é uma versão mais agressiva do ensure_pandas_df, criando um DataFrame
+    completamente novo a partir dos valores e colunas para evitar qualquer vestígio
+    de objetos narwhals que possam interferir com o Altair.
+    
+    Args:
+        df: DataFrame de qualquer tipo
+        
+    Returns:
+        pandas.DataFrame: DataFrame completamente novo e nativo do pandas
+    """
+    # Primeiro, garantir que temos um DataFrame pandas
+    df_pandas = ensure_pandas_df(df)
+    
+    # Criar um DataFrame completamente novo a partir dos valores
+    # Isso remove qualquer metadata ou wrapper que possa estar presente
+    return pd.DataFrame(df_pandas.values, columns=df_pandas.columns)
+
 def ensure_pandas_series(series):
     """
     Converte qualquer Series para pandas nativo.

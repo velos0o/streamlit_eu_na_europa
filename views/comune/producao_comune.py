@@ -641,8 +641,12 @@ def renderizar_grafico_temporal(df):
             # Converter Data para string formatada para evitar problemas com o tipo temporal
             df_agg['Data Formatada'] = pd.to_datetime(df_agg['Data']).dt.strftime('%d/%m/%Y')
 
+            # Conversão forçada para evitar problemas com narwhals interno do Altair
+            from utils import force_pandas_for_altair
+            df_agg_safe = force_pandas_for_altair(df_agg)
+            
             # Criar gráfico de barras com estilo do producao_adm.py
-            barras = alt.Chart(df_agg).mark_bar(
+            barras = alt.Chart(df_agg_safe).mark_bar(
                 color='#4CAF50',  # Verde igual ao producao_adm.py
                 size=60  # Barras largas
             ).encode(
@@ -652,7 +656,7 @@ def renderizar_grafico_temporal(df):
             )
             
             # Adicionar números em cima das barras
-            texto = alt.Chart(df_agg).mark_text(
+            texto = alt.Chart(df_agg_safe).mark_text(
                 align='center',
                 baseline='bottom',
                 dy=-5,  # Deslocamento vertical (acima da barra)
@@ -778,8 +782,12 @@ def renderizar_grafico_emissoes_por_data(df):
             # Ordenar por data
             df_agg = df_agg.sort_values('Data')
 
+            # Conversão forçada para evitar problemas com narwhals interno do Altair
+            from utils import force_pandas_for_altair
+            df_agg_safe = force_pandas_for_altair(df_agg)
+            
             # Criar gráfico de barras
-            barras = alt.Chart(df_agg).mark_bar(
+            barras = alt.Chart(df_agg_safe).mark_bar(
                 color='#4CAF50',  # Verde igual ao gráfico de higienizações
                 size=60  # Barras largas
             ).encode(
@@ -791,7 +799,7 @@ def renderizar_grafico_emissoes_por_data(df):
             )
             
             # Adicionar números em cima das barras
-            texto = alt.Chart(df_agg).mark_text(
+            texto = alt.Chart(df_agg_safe).mark_text(
                 align='center',
                 baseline='bottom',
                 dy=-5,  # Deslocamento vertical (acima da barra)

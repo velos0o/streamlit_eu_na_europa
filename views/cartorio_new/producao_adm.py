@@ -634,8 +634,12 @@ def exibir_producao_adm(df_cartorio_original):
         # Importar Altair para gráficos
         import altair as alt
         
+        # Conversão forçada para evitar problemas com narwhals interno do Altair
+        from utils import force_pandas_for_altair
+        df_resol_safe = force_pandas_for_altair(df_resol_por_dia)
+        
         # Criar gráfico de barras com linha de tendência
-        barras = alt.Chart(df_resol_por_dia).mark_bar(
+        barras = alt.Chart(df_resol_safe).mark_bar(
             color='#4CAF50',
             size=60  # Barras ainda mais largas
         ).encode(
@@ -645,7 +649,7 @@ def exibir_producao_adm(df_cartorio_original):
         )
         
         # Adicionar números em cima das barras
-        texto = alt.Chart(df_resol_por_dia).mark_text(
+        texto = alt.Chart(df_resol_safe).mark_text(
             align='center',
             baseline='bottom',
             dy=-5,  # Deslocamento vertical (acima da barra)

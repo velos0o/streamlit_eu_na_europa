@@ -8,7 +8,7 @@ from .funil_etapas import show_funil_etapas
 from .pendencias_liberadas import show_pendencias_liberadas
 from .pendencias_futuras import show_pendencias_futuras
 from .produtividade import show_produtividade
-from .produtividade_debug import show_produtividade_debug
+# from .produtividade_debug import show_produtividade_debug
 
 @st.cache_data(ttl=300)
 def carregar_dados_protocolados():
@@ -71,7 +71,7 @@ def show_protocolados(subpagina):
 
     # A página de Produtividade tem seus próprios filtros internos e não usa a sidebar.
     if subpagina == "Produtividade":
-        show_produtividade_debug(ensure_pandas_df(df))  # Versão DEBUG
+        show_produtividade(ensure_pandas_df(df))
         return  # Impede a renderização dos filtros da sidebar
 
     # Filtros na sidebar para todas as outras páginas

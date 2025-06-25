@@ -112,7 +112,11 @@ def show_produtividade(df_protocolados):
     produtividade_diaria = ensure_pandas_df(df_filtrado_prod.groupby(df_filtrado_prod['Data Conclusão'].dt.date).size().reset_index(name='Contagem'))
     produtividade_diaria.rename(columns={'Data Conclusão': 'Data'}, inplace=True)
     
-    base = alt.Chart(ensure_pandas_df(produtividade_diaria)).encode(
+    # Conversão forçada para evitar problemas com narwhals interno do Altair
+    from utils import force_pandas_for_altair
+    df_for_altair = force_pandas_for_altair(produtividade_diaria)
+    
+    base = alt.Chart(df_for_altair).encode(
         x=alt.X('Data:T', title='Data da Conclusão'),
         y=alt.Y('Contagem:Q', title='Nº de Tarefas Concluídas'),
         tooltip=['Data:T', 'Contagem:Q']

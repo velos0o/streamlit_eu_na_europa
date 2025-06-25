@@ -169,7 +169,13 @@ def show_produtividade_debug(df_protocolados):
         
         # Criação do gráfico Altair - MOMENTO CRÍTICO
         st.write("🎨 Criando gráfico Altair...")
-        base = alt.Chart(ensure_pandas_df(produtividade_diaria)).encode(
+        
+        # Conversão forçada para evitar problemas com narwhals interno do Altair
+        from utils import force_pandas_for_altair
+        df_for_altair = force_pandas_for_altair(produtividade_diaria)
+        df_for_altair = debug_dataframe_type(df_for_altair, "df_for_altair (forçado)")
+        
+        base = alt.Chart(df_for_altair).encode(
             x=alt.X('Data:T', title='Data da Conclusão'),
             y=alt.Y('Contagem:Q', title='Nº de Tarefas Concluídas'),
             tooltip=['Data:T', 'Contagem:Q']
