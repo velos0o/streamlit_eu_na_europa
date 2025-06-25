@@ -72,7 +72,7 @@ def show_dados_macros(df_filtrado):
         # Gráfico: Detalhamento de pendências por tipo e consultor
         st.write("Gráfico de Detalhamento das Pendências")
         chart_data = ensure_pandas_df(crosstab_pendencias.drop(columns=['Total de Pendências']))
-        st.bar_chart(chart_data)
+        st.bar_chart(ensure_pandas_df(chart_data))
 
     # --- Exibição dos Dados Brutos Filtrados ---
     with st.expander("Ver dados brutos filtrados"):

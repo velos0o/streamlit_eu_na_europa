@@ -112,7 +112,7 @@ def show_produtividade(df_protocolados):
     produtividade_diaria = df_filtrado_prod.groupby(df_filtrado_prod['Data Conclusão'].dt.date).size().reset_index(name='Contagem')
     produtividade_diaria.rename(columns={'Data Conclusão': 'Data'}, inplace=True)
     
-    base = alt.Chart(produtividade_diaria).encode(
+    base = alt.Chart(ensure_pandas_df(produtividade_diaria)).encode(
         x=alt.X('Data:T', title='Data da Conclusão'),
         y=alt.Y('Contagem:Q', title='Nº de Tarefas Concluídas'),
         tooltip=['Data:T', 'Contagem:Q']
