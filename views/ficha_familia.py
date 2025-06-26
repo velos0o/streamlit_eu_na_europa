@@ -111,6 +111,49 @@ def load_page_specific_css(file_path):
 # Função removida - agora usamos load_data_all_pipelines() do views.cartorio_new.data_loader
 
 def exibir_ficha_familia(familia_serie, emissoes_df):
+    # EXIBIR AVISO "MAPA INICIAL" SE CAMPO ESPECÍFICO FOR "SIM"
+    if str(familia_serie.get('UF_CRM_1750454794052', '')).strip().upper() == 'SIM':
+        mapa_inicial_css = """
+        <style>
+        @keyframes pulse-border {
+          0% {
+            box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.8);
+          }
+          70% {
+            box-shadow: 0 0 0 12px rgba(255, 193, 7, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(255, 193, 7, 0);
+          }
+        }
+
+        .mapa-inicial-notification {
+          position: fixed;
+          top: 65px;
+          right: 0;
+          width: 150px;
+          height: 150px;
+          background-color: #FFC107; /* Amarelo Âmbar */
+          color: #1c1c1c;
+          border-radius: 8px 0 0 8px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          font-weight: bold;
+          font-size: 1.1em;
+          text-align: center;
+          z-index: 9999;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+          animation: pulse-border 2s infinite;
+          padding: 10px;
+          border: 2px solid #FFA000;
+          border-right: none;
+        }
+        </style>
+        """
+        mapa_inicial_html = "<div class='mapa-inicial-notification'>MAPA INICIAL</div>"
+        st.markdown(mapa_inicial_html + mapa_inicial_css, unsafe_allow_html=True)
+
     # Iniciar a string HTML com o contêiner principal e adicionar título
     html_ficha_completa = "<div class='ficha-familia-container' style='width:100%; max-width:100%; margin-right:0; margin-left:0;'>"
     
@@ -181,6 +224,10 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
         adm_responsavel = 'N/D'
         print("[DEBUG] Nenhum valor encontrado para ADM Responsável")
     
+    # Link do Contrato
+    link_contrato_raw = familia_serie.get('UF_CRM_1750453631850', 'N/D')
+    link_contrato_display = f"<a href='{link_contrato_raw}' target='_blank' class='ficha-link'>Acessar Contrato</a>" if str(link_contrato_raw).startswith('http') else str(link_contrato_raw)
+
     # Tentar múltiplas alternativas para Procuração
     procuracao_detalhes = None
     # Campos mais prováveis para PROCURAÇÃO
@@ -256,6 +303,8 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
             
             # Pipeline 92 e 94 (Cartórios Casa Verde e Tatuapé)
             if category_id_str in ['92', '94']:
+                if status_upper == "AGUARDANDO DECISÃO CLIENTE":
+                    return "AGUARDANDO DECISÃO CLIENTE"
                 if status_upper in ["AGUARDANDO CERTIDÃO", "BUSCA - CRC", "DEVOLUTIVA BUSCA - CRC", 
                                   "APENAS ASS. REQ CLIENTE P/MONTAGEM", "MONTAGEM REQUERIMENTO CARTÓRIO", 
                                   "SOLICITAR CARTÓRIO DE ORIGEM", "SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE", 
@@ -417,6 +466,7 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
     
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Nome da Família:</td><td style='{td_data_style}'>{nome_familia}</td><td style='{td_label_style}'>ID da Família:</td><td style='{td_data_style}'>{id_familia}</td></tr>"
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Data de Venda:</td><td style='{td_data_style}'>{data_venda}</td><td style='{td_label_style}'>ADM Responsável:</td><td style='{td_data_style}'>{adm_responsavel}</td></tr>"
+    html_ficha_completa += f"<tr><td style='{td_label_style}'>Link do Contrato:</td><td style='{td_data_style}'>{link_contrato_display}</td><td style='{td_label_style}'></td><td style='{td_data_style}'></td></tr>"
 
     html_ficha_completa += f"<tr><td colspan='4' class='td-titulo-secao' style='background-color:#e0e0e0; border:1px solid #ddd; padding:8px;'><h4 class='ficha-sub-titulo titulo-secao-ficha' style='color:#0070F2; text-align:center; margin:5px 0;'>PROCURAÇÃO</h4></td></tr>"
     html_ficha_completa += f"<tr><td style='{td_label_style}'>Detalhes Procuração:</td><td colspan='3' style='{td_style}'>{procuracao_detalhes}</td></tr>" 
@@ -490,6 +540,7 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
             'Brasileiras Pesquisas': 0,
             'Brasileiras Solicitadas': 0,
             'Brasileiras Emitida': 0,  # CORRIGIDO: Status direto de emissão
+            'AGUARDANDO DECISÃO CLIENTE': 0,
             # Pipeline 102 (Paróquia)
             'Paróquia Pendências': 0,
             'Paróquia Solicitadas': 0,
@@ -561,7 +612,8 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
             total_ativas = (resumo_status_categorias_temp['Brasileiras Pendências'] + 
                            resumo_status_categorias_temp['Brasileiras Pesquisas'] + 
                            resumo_status_categorias_temp['Brasileiras Solicitadas'] + 
-                           resumo_status_categorias_temp['Brasileiras Emitida'])
+                           resumo_status_categorias_temp['Brasileiras Emitida'] +
+                           resumo_status_categorias_temp.get('AGUARDANDO DECISÃO CLIENTE', 0))
             
             if total_ativas > 0 and total_ativas == resumo_status_categorias_temp['Brasileiras Emitida']:
                 resumo_status_categorias_temp['Pasta C/Emissão Concluída'] = 1

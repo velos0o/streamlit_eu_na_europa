@@ -50,6 +50,7 @@ def simplificar_nome_estagio(nome):
         'DT1098_94:SUCCESS': 'CERTIDÃO ENTREGUE',
         'DT1098_92:UC_U10R0R': 'CERTIDÃO DISPENSADA',
         'DT1098_94:UC_L3JFKO': 'CERTIDÃO DISPENSADA',
+        'DT1098_92:UC_I61XLW': 'AGUARDANDO DECISÃO CLIENTE',
         
         # === Pipeline 102 (Paróquia) ===
         'DT1098_102:NEW': 'SOLICITAR PARÓQUIA DE ORIGEM',
