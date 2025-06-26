@@ -106,26 +106,37 @@ def show_dados_macros(df_filtrado):
                     st.write("Gráfico de Detalhamento das Pendências")
                     
                     try:
-                        # CORREÇÃO: Garantir que chart_data seja um pandas DataFrame nativo
-                        chart_data = crosstab_pendencias.drop(columns=['Total de Pendências'])
+                        # CORREÇÃO: Criar um novo DataFrame completamente independente
+                        # Usar apenas as colunas de tags (sem a coluna Total)
+                        chart_data = crosstab_pendencias[lista_tags].copy()
                         
-                        # Converter explicitamente para pandas DataFrame nativo
-                        if hasattr(chart_data, 'to_native'):
-                            chart_data = chart_data.to_native()
-                        elif not isinstance(chart_data, pd.DataFrame):
-                            chart_data = pd.DataFrame(chart_data)
+                        # Converter para dicionário e depois para DataFrame para garantir tipo correto
+                        chart_dict = chart_data.to_dict()
+                        chart_data_clean = pd.DataFrame(chart_dict)
                         
-                        # Alternativa: usar o método nativo do pandas para garantir o tipo correto
-                        chart_data = pd.DataFrame(chart_data.values, 
-                                                index=chart_data.index, 
-                                                columns=chart_data.columns)
-                        
-                        st.bar_chart(chart_data)
+                        # Alternativa 1: Usar st.bar_chart com dados convertidos
+                        st.bar_chart(chart_data_clean)
                         
                     except Exception as e:
-                        st.error(f"❌ Erro ao criar gráfico de barras: {e}")
-                        # Adicionar debug para entender melhor o erro
-                        st.write(f"Tipo do chart_data: {type(chart_data)}")
+                        # Se ainda houver erro, tentar com plotly ou altair
+                        try:
+                            st.warning("Tentando método alternativo de visualização...")
+                            
+                            # Alternativa 2: Usar st.dataframe com style
+                            chart_data_styled = chart_data.style.background_gradient(cmap='Blues')
+                            st.dataframe(chart_data_styled, use_container_width=True)
+                            
+                        except:
+                            # Alternativa 3: Usar st.columns com métricas
+                            st.error(f"❌ Erro ao criar gráfico de barras: {e}")
+                            st.info("Exibindo dados em formato alternativo:")
+                            
+                            for consultor in chart_data.index:
+                                st.write(f"**{consultor}**")
+                                cols = st.columns(len(lista_tags))
+                                for i, tag in enumerate(lista_tags):
+                                    with cols[i]:
+                                        st.metric(tag, chart_data.loc[consultor, tag])
                     
                 except Exception as e:
                     st.error(f"Erro ao criar crosstab: {e}")
