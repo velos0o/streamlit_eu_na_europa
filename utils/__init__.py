@@ -8,9 +8,6 @@ dos diversos módulos de utilitários.
 # Importações das funções utilitárias para DataFrames
 from .dataframe_utils import ensure_pandas_df, ensure_pandas_series, safe_dataframe, safe_bar_chart, safe_line_chart, safe_scatter_chart, safe_area_chart
 
-# Importação da função de compilação de SASS
-from .sass_compiler import compile_sass
-
 # Importação da função de atualização de dados
 from .refresh_utils import clear_cache_and_rerun
 
