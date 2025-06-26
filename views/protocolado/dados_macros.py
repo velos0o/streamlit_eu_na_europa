@@ -106,11 +106,26 @@ def show_dados_macros(df_filtrado):
                     st.write("Gráfico de Detalhamento das Pendências")
                     
                     try:
+                        # CORREÇÃO: Garantir que chart_data seja um pandas DataFrame nativo
                         chart_data = crosstab_pendencias.drop(columns=['Total de Pendências'])
-                        st.bar_chart(ensure_pandas_df(chart_data))
+                        
+                        # Converter explicitamente para pandas DataFrame nativo
+                        if hasattr(chart_data, 'to_native'):
+                            chart_data = chart_data.to_native()
+                        elif not isinstance(chart_data, pd.DataFrame):
+                            chart_data = pd.DataFrame(chart_data)
+                        
+                        # Alternativa: usar o método nativo do pandas para garantir o tipo correto
+                        chart_data = pd.DataFrame(chart_data.values, 
+                                                index=chart_data.index, 
+                                                columns=chart_data.columns)
+                        
+                        st.bar_chart(chart_data)
                         
                     except Exception as e:
                         st.error(f"❌ Erro ao criar gráfico de barras: {e}")
+                        # Adicionar debug para entender melhor o erro
+                        st.write(f"Tipo do chart_data: {type(chart_data)}")
                     
                 except Exception as e:
                     st.error(f"Erro ao criar crosstab: {e}")
@@ -136,4 +151,4 @@ def show_dados_macros(df_filtrado):
             st.dataframe(ensure_pandas_df(dados_brutos), use_container_width=True)
             
     except Exception as e:
-        st.error(f"Erro ao exibir dados brutos: {e}") 
+        st.error(f"Erro ao exibir dados brutos: {e}")
