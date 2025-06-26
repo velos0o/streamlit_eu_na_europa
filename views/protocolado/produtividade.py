@@ -7,10 +7,24 @@ def safe_pandas_df(df):
     Função ultra-defensiva para garantir DataFrame pandas nativo.
     Recria completamente o DataFrame para evitar qualquer vestígio de narwhals.
     """
-    if df is None or df.empty:
+    if df is None:
         return pd.DataFrame()
     
-    # Converter para dict e recriar - método mais agressivo
+    # Se tiver to_native, é a forma preferencial
+    if hasattr(df, 'to_native'):
+        try:
+            native_df = df.to_native()
+            # Certificar-se de que é realmente um DataFrame do pandas
+            if isinstance(native_df, pd.DataFrame):
+                return native_df
+        except Exception:
+            pass # Tentar outros métodos
+    
+    # Se for um DataFrame do pandas, retornar
+    if isinstance(df, pd.DataFrame) and not hasattr(df, '__narwhals_df__'):
+         return df
+
+    # Converter para dict e recriar - método agressivo
     try:
         return pd.DataFrame(df.to_dict('records'))
     except:
@@ -18,7 +32,7 @@ def safe_pandas_df(df):
         try:
             return pd.DataFrame(df.values, columns=df.columns)
         except:
-            # Último fallback: tentar conversão direta
+            # Último fallback: tentar conversão direta, que pode falhar
             return pd.DataFrame(df)
 
 def show_produtividade(df_protocolados):
@@ -194,23 +208,8 @@ def show_produtividade(df_protocolados):
         produtividade_diaria = safe_pandas_df(produtividade_diaria)
         produtividade_diaria = produtividade_diaria.rename(columns={'Data Conclusão': 'Data'})
         
-        # MÉTODO ULTRA-AGRESSIVO PARA ELIMINAR NARWHALS
-        # Converter para listas puras Python nativas
-        datas_lista = []
-        contagens_lista = []
-        
-        for i in range(len(produtividade_diaria)):
-            data_valor = produtividade_diaria.iloc[i]['Data']
-            contagem_valor = int(produtividade_diaria.iloc[i]['Contagem'])
-            
-            datas_lista.append(data_valor)
-            contagens_lista.append(contagem_valor)
-        
-        # Criar DataFrame usando apenas tipos Python nativos
-        df_chart = pd.DataFrame({
-            'Data': datas_lista,
-            'Contagem': contagens_lista
-        })
+        # Garante que os dados para o gráfico são um dataframe pandas nativo
+        df_chart = safe_pandas_df(produtividade_diaria)
         
         # Verificação final de tipos
         st.write(f"🔍 Tipo do DataFrame para gráfico: {type(df_chart)}")
@@ -292,7 +291,7 @@ def show_produtividade(df_protocolados):
         # Criar DataFrame final usando apenas tipos Python nativos
         tabela_produtividade = pd.DataFrame(dados_tabela)
         
-        st.dataframe(tabela_produtividade, use_container_width=True)
+        st.dataframe(safe_pandas_df(tabela_produtividade), use_container_width=True)
         
     except Exception as e:
         st.error(f"Erro ao criar tabela de produtividade: {e}")

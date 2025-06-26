@@ -6,10 +6,24 @@ def safe_pandas_df(df):
     Função ultra-defensiva para garantir DataFrame pandas nativo.
     Recria completamente o DataFrame para evitar qualquer vestígio de narwhals.
     """
-    if df is None or df.empty:
+    if df is None:
         return pd.DataFrame()
     
-    # Converter para dict e recriar - método mais agressivo
+    # Se tiver to_native, é a forma preferencial
+    if hasattr(df, 'to_native'):
+        try:
+            native_df = df.to_native()
+            # Certificar-se de que é realmente um DataFrame do pandas
+            if isinstance(native_df, pd.DataFrame):
+                return native_df
+        except Exception:
+            pass # Tentar outros métodos
+    
+    # Se for um DataFrame do pandas, retornar
+    if isinstance(df, pd.DataFrame) and not hasattr(df, '__narwhals_df__'):
+         return df
+
+    # Converter para dict e recriar - método agressivo
     try:
         return pd.DataFrame(df.to_dict('records'))
     except:
@@ -17,7 +31,7 @@ def safe_pandas_df(df):
         try:
             return pd.DataFrame(df.values, columns=df.columns)
         except:
-            # Último fallback: tentar conversão direta
+            # Último fallback: tentar conversão direta, que pode falhar
             return pd.DataFrame(df)
 
 def show_dados_macros(df_filtrado):
@@ -140,33 +154,8 @@ def show_dados_macros(df_filtrado):
                     
                     try:
                         chart_data = crosstab_pendencias.drop(columns=['Total de Pendências'])
+                        final_chart_data = safe_pandas_df(chart_data)
                         
-                        # MÉTODO ULTRA-AGRESSIVO PARA ELIMINAR NARWHALS
-                        # Converter para listas puras e recriar tudo do zero
-                        consultores = list(chart_data.index)
-                        colunas = list(chart_data.columns)
-                        
-                        # Criar dados como lista de listas
-                        dados_limpos = []
-                        for i, consultor in enumerate(consultores):
-                            linha = []
-                            for coluna in colunas:
-                                valor = int(chart_data.iloc[i][coluna])
-                                linha.append(valor)
-                            dados_limpos.append(linha)
-                        
-                        # Criar DataFrame completamente novo usando apenas tipos Python nativos
-                        final_chart_data = pd.DataFrame(
-                            data=dados_limpos,
-                            index=consultores,
-                            columns=colunas
-                        )
-                        
-                        st.write(f"🔍 Tipo do DataFrame do gráfico: {type(final_chart_data)}")
-                        st.write(f"🔍 Shape: {final_chart_data.shape}")
-                        st.write(f"🔍 É pandas nativo: {type(final_chart_data).__module__ == 'pandas.core.frame'}")
-                        
-                        # Tentar o gráfico com dados completamente limpos
                         st.bar_chart(final_chart_data)
                         
                     except Exception as e:
@@ -174,11 +163,12 @@ def show_dados_macros(df_filtrado):
                         st.write("Exibindo dados em formato tabular:")
                         try:
                             # Criar tabela simples com dados básicos
+                            chart_data_fallback = safe_pandas_df(chart_data)
                             dados_tabela = []
-                            for consultor in consultores:
+                            for consultor in chart_data_fallback.index:
                                 linha_dict = {'Consultor': consultor}
-                                for coluna in colunas:
-                                    linha_dict[coluna] = int(chart_data.loc[consultor, coluna])
+                                for coluna in chart_data_fallback.columns:
+                                    linha_dict[coluna] = int(chart_data_fallback.loc[consultor, coluna])
                                 dados_tabela.append(linha_dict)
                             
                             df_tabela = pd.DataFrame(dados_tabela)
