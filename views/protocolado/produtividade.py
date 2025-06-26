@@ -1,50 +1,17 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-
-def safe_pandas_df(df):
-    """
-    Função ultra-defensiva para garantir DataFrame pandas nativo.
-    Recria completamente o DataFrame para evitar qualquer vestígio de narwhals.
-    """
-    if df is None:
-        return pd.DataFrame()
-    
-    # Se tiver to_native, é a forma preferencial
-    if hasattr(df, 'to_native'):
-        try:
-            native_df = df.to_native()
-            # Certificar-se de que é realmente um DataFrame do pandas
-            if isinstance(native_df, pd.DataFrame):
-                return native_df
-        except Exception:
-            pass # Tentar outros métodos
-    
-    # Se for um DataFrame do pandas, retornar
-    if isinstance(df, pd.DataFrame) and not hasattr(df, '__narwhals_df__'):
-         return df
-
-    # Converter para dict e recriar - método agressivo
-    try:
-        return pd.DataFrame(df.to_dict('records'))
-    except:
-        # Fallback: usar valores e colunas
-        try:
-            return pd.DataFrame(df.values, columns=df.columns)
-        except:
-            # Último fallback: tentar conversão direta, que pode falhar
-            return pd.DataFrame(df)
+from utils.dataframe_utils import ensure_pandas_df
 
 def show_produtividade(df_protocolados):
     """
     Exibe a análise de produtividade, mostrando tarefas concluídas por responsável e por data.
-    VERSÃO RECONSTRUÍDA para evitar problemas com narwhals.
     """
     st.header("Análise de Produtividade", divider='rainbow')
     st.write("Acompanhe o número de tarefas concluídas pelos consultores ao longo do tempo.")
 
-    # Conversão defensiva inicial
-    df_protocolados = safe_pandas_df(df_protocolados)
+    # Garante que o dataframe de entrada seja pandas nativo
+    df_protocolados = ensure_pandas_df(df_protocolados)
     
     if df_protocolados.empty:
         st.warning("Não há dados de protocolados para exibir.")
@@ -59,17 +26,15 @@ def show_produtividade(df_protocolados):
         'Drive': 'DRIVE - DATA DE ENTREGA'
     }
 
-    # --- Preparação dos Dados (RECONSTRUÍDA) ---
+    # --- Preparação dos Dados ---
     lista_tarefas = []
     
     for etapa, data_col in mapeamento_etapas.items():
         if data_col not in df_protocolados.columns:
             continue
             
-        # Seleção de colunas com conversão defensiva
         try:
             df_etapa = df_protocolados[['ID FAMÍLIA', 'CONSULTOR RESPONSÁVEL', data_col]].copy()
-            df_etapa = safe_pandas_df(df_etapa)
             
             # Limpeza de dados
             df_etapa = df_etapa.dropna(subset=[data_col, 'CONSULTOR RESPONSÁVEL'])
@@ -79,17 +44,13 @@ def show_produtividade(df_protocolados):
                 continue
 
             # Conversão de datas com tratamento de erro
-            try:
-                df_etapa[data_col] = pd.to_datetime(
-                    df_etapa[data_col], 
-                    format='%d/%m/%Y', 
-                    dayfirst=True, 
-                    errors='coerce'
-                )
-                df_etapa = df_etapa.dropna(subset=[data_col])
-            except Exception as e:
-                st.warning(f"Erro ao processar datas para {etapa}: {e}")
-                continue
+            df_etapa[data_col] = pd.to_datetime(
+                df_etapa[data_col], 
+                format='%d/%m/%Y', 
+                dayfirst=True, 
+                errors='coerce'
+            )
+            df_etapa = df_etapa.dropna(subset=[data_col])
             
             if df_etapa.empty:
                 continue
@@ -98,8 +59,6 @@ def show_produtividade(df_protocolados):
             df_etapa = df_etapa.rename(columns={data_col: 'Data Conclusão'})
             df_etapa['Etapa'] = etapa
             
-            # Conversão defensiva final
-            df_etapa = safe_pandas_df(df_etapa)
             lista_tarefas.append(df_etapa)
             
         except Exception as e:
@@ -110,10 +69,8 @@ def show_produtividade(df_protocolados):
         st.info("Nenhuma tarefa concluída foi encontrada.")
         return
     
-    # Concatenação com conversão defensiva
     try:
         df_produtividade = pd.concat(lista_tarefas, ignore_index=True)
-        df_produtividade = safe_pandas_df(df_produtividade)
     except Exception as e:
         st.error(f"Erro ao consolidar dados de produtividade: {e}")
         return
@@ -136,11 +93,9 @@ def show_produtividade(df_protocolados):
     
     with col2:
         try:
-            # Filtrar para obter intervalo de datas
             df_para_datas = df_produtividade[
                 df_produtividade['CONSULTOR RESPONSÁVEL'].isin(consultores_selecionados)
             ]
-            df_para_datas = safe_pandas_df(df_para_datas)
             
             if not df_para_datas.empty:
                 min_date = df_para_datas['Data Conclusão'].min().date()
@@ -160,7 +115,6 @@ def show_produtividade(df_protocolados):
             st.error(f"Erro ao configurar filtro de data: {e}")
             return
 
-    # Validação do filtro de data
     if len(data_selecionada) != 2:
         st.warning("Por favor, selecione um período de início e fim no filtro de data para continuar.")
         st.stop()
@@ -174,7 +128,6 @@ def show_produtividade(df_protocolados):
             (df_produtividade['Data Conclusão'] >= start_date) &
             (df_produtividade['Data Conclusão'] <= end_date)
         ]
-        df_filtrado_prod = safe_pandas_df(df_filtrado_prod)
     except Exception as e:
         st.error(f"Erro ao aplicar filtros: {e}")
         return
@@ -195,26 +148,19 @@ def show_produtividade(df_protocolados):
     except Exception as e:
         st.error(f"Erro ao calcular métricas: {e}")
 
-    # --- Gráficos (RECONSTRUÍDO COM MÁXIMA PROTEÇÃO) ---
+    # --- Gráficos ---
     st.subheader("Visualização da Produtividade", divider='blue')
     
     try:
-        # Agrupamento com conversão defensiva
+        # Agrupamento
         produtividade_diaria = df_filtrado_prod.groupby(
             df_filtrado_prod['Data Conclusão'].dt.date
         ).size().reset_index(name='Contagem')
         
-        # Conversão ultra-defensiva para o DataFrame
-        produtividade_diaria = safe_pandas_df(produtividade_diaria)
         produtividade_diaria = produtividade_diaria.rename(columns={'Data Conclusão': 'Data'})
         
         # Garante que os dados para o gráfico são um dataframe pandas nativo
-        df_chart = safe_pandas_df(produtividade_diaria)
-        
-        # Verificação final de tipos
-        st.write(f"🔍 Tipo do DataFrame para gráfico: {type(df_chart)}")
-        st.write(f"🔍 Colunas: {list(df_chart.columns)}")
-        st.write(f"🔍 Shape: {df_chart.shape}")
+        df_chart = ensure_pandas_df(produtividade_diaria)
         
         # Criação do gráfico Altair
         base = alt.Chart(df_chart).encode(
@@ -244,7 +190,7 @@ def show_produtividade(df_protocolados):
         st.error(f"❌ Erro ao criar gráfico: {e}")
         st.write("Tentando exibir dados em formato tabular...")
         try:
-            st.dataframe(produtividade_diaria)
+            st.dataframe(ensure_pandas_df(produtividade_diaria))
         except:
             st.write("Não foi possível exibir os dados.")
 
@@ -252,46 +198,19 @@ def show_produtividade(df_protocolados):
     st.subheader("Detalhamento por Consultor e Etapa", divider='blue')
     
     try:
-        # MÉTODO ULTRA-AGRESSIVO PARA PIVOT TABLE
-        # Criar pivot table manualmente para evitar problemas
-        consultores = sorted(df_filtrado_prod['CONSULTOR RESPONSÁVEL'].unique())
-        etapas = sorted(df_filtrado_prod['Etapa'].unique())
+        # Criar pivot table
+        tabela_produtividade = pd.pivot_table(
+            df_filtrado_prod,
+            values='ID FAMÍLIA',
+            index='CONSULTOR RESPONSÁVEL',
+            columns='Etapa',
+            aggfunc='count',
+            fill_value=0,
+            margins=True,
+            margins_name='Total'
+        )
         
-        # Criar dados da tabela manualmente
-        dados_tabela = []
-        
-        for consultor in consultores:
-            linha = {'CONSULTOR RESPONSÁVEL': consultor}
-            total_consultor = 0
-            
-            for etapa in etapas:
-                # Contar tarefas para este consultor e etapa
-                count = len(df_filtrado_prod[
-                    (df_filtrado_prod['CONSULTOR RESPONSÁVEL'] == consultor) & 
-                    (df_filtrado_prod['Etapa'] == etapa)
-                ])
-                linha[etapa] = count
-                total_consultor += count
-            
-            linha['Total'] = total_consultor
-            dados_tabela.append(linha)
-        
-        # Criar linha de totais
-        linha_total = {'CONSULTOR RESPONSÁVEL': 'TOTAL GERAL'}
-        total_geral = 0
-        
-        for etapa in etapas:
-            total_etapa = sum([linha[etapa] for linha in dados_tabela])
-            linha_total[etapa] = total_etapa
-            total_geral += total_etapa
-        
-        linha_total['Total'] = total_geral
-        dados_tabela.append(linha_total)
-        
-        # Criar DataFrame final usando apenas tipos Python nativos
-        tabela_produtividade = pd.DataFrame(dados_tabela)
-        
-        st.dataframe(safe_pandas_df(tabela_produtividade), use_container_width=True)
+        st.dataframe(ensure_pandas_df(tabela_produtividade), use_container_width=True)
         
     except Exception as e:
         st.error(f"Erro ao criar tabela de produtividade: {e}")
@@ -299,6 +218,6 @@ def show_produtividade(df_protocolados):
         try:
             st.write("Dados básicos de produtividade:")
             resumo = df_filtrado_prod.groupby(['CONSULTOR RESPONSÁVEL', 'Etapa']).size().reset_index(name='Quantidade')
-            st.dataframe(resumo, use_container_width=True)
+            st.dataframe(ensure_pandas_df(resumo), use_container_width=True)
         except Exception as e2:
             st.error(f"Erro no fallback: {e2}") 
