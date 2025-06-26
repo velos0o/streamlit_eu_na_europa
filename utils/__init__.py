@@ -15,4 +15,4 @@ from .refresh_utils import handle_refresh_trigger, clear_file_cache
 from .secrets_helper import get_google_credentials
 
 # Importação de funções de animação
-from .animation_utils import load_lottie_animation, update_progress 
+from .animation_utils import display_loading_animation, update_progress 
