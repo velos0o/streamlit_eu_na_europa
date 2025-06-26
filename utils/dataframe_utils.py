@@ -2,57 +2,46 @@ import pandas as pd
 
 def ensure_pandas_df(df):
     """
-    Converte qualquer DataFrame para pandas nativo.
+    Converte qualquer DataFrame para pandas nativo de forma robusta.
     
-    Solução para o erro: "You passed a narwhals DataFrame to is_pandas_dataframe"
-    que ocorre quando DataFrames narwhals são passados para componentes Streamlit
-    como st.dataframe(), st.bar_chart(), etc.
+    Solução para o erro: "You passed a narwhals DataFrame to is_pandas_dataframe".
+    Esta versão é mais agressiva e recria o DataFrame para garantir a remoção
+    de qualquer wrapper (como o narwhals) que possa causar incompatibilidade.
     
     Args:
         df: DataFrame de qualquer tipo (pandas, narwhals, etc.)
         
     Returns:
-        pandas.DataFrame: DataFrame convertido para pandas nativo
+        pandas.DataFrame: DataFrame convertido para pandas nativo.
     """
     if df is None:
         return pd.DataFrame()
-    
-    # Verifica se é um DataFrame narwhals e tenta converter
-    if hasattr(df, 'to_pandas'):
-        return df.to_pandas()
-    elif hasattr(df, 'to_native'):
-        return df.to_native()
-    elif str(type(df)).find('narwhals') != -1:
-        # Para casos onde o DataFrame é narwhals mas não tem os métodos acima
-        try:
-            return pd.DataFrame(df)
-        except Exception:
-            # Se falhar, tenta converter os dados manualmente
-            return pd.DataFrame(data=df.values if hasattr(df, 'values') else df)
-    else:
-        # Já é pandas ou outro tipo compatível
+        
+    # Se já for um DataFrame pandas puro, retorna ele mesmo para evitar processamento desnecessário.
+    if isinstance(df, pd.DataFrame) and not hasattr(df, '__narwhals_df__'):
         return df
 
-def force_pandas_for_altair(df):
-    """
-    Força a conversão de DataFrame para pandas nativo especificamente para uso com Altair.
-    
-    Esta função é uma versão mais agressiva do ensure_pandas_df, criando um DataFrame
-    completamente novo a partir dos valores e colunas para evitar qualquer vestígio
-    de objetos narwhals que possam interferir com o Altair.
-    
-    Args:
-        df: DataFrame de qualquer tipo
-        
-    Returns:
-        pandas.DataFrame: DataFrame completamente novo e nativo do pandas
-    """
-    # Primeiro, garantir que temos um DataFrame pandas
-    df_pandas = ensure_pandas_df(df)
-    
-    # Criar um DataFrame completamente novo a partir dos valores
-    # Isso remove qualquer metadata ou wrapper que possa estar presente
-    return pd.DataFrame(df_pandas.values, columns=df_pandas.columns)
+    # Tenta usar os métodos de conversão oficiais primeiro, pois são os mais seguros.
+    if hasattr(df, 'to_pandas'):
+        try:
+            return df.to_pandas()
+        except Exception:
+            pass  # Se falhar, tenta o próximo método
+            
+    if hasattr(df, 'to_native'):
+        try:
+            return df.to_native()
+        except Exception:
+            pass  # Se falhar, tenta o próximo método
+
+    # Se os métodos acima falharem ou não existirem, recria o DF a partir do seu conteúdo.
+    # Este é um método "brute-force" que funciona na maioria dos casos de incompatibilidade.
+    try:
+        # to_dict('records') é uma forma confiável de extrair os dados puros.
+        return pd.DataFrame(df.to_dict('records'))
+    except Exception:
+        # Como último recurso, tenta a conversão direta.
+        return pd.DataFrame(df)
 
 def ensure_pandas_series(series):
     """
