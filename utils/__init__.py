@@ -9,7 +9,7 @@ dos diversos módulos de utilitários.
 from .dataframe_utils import ensure_pandas_df, ensure_pandas_series, safe_dataframe, safe_bar_chart, safe_line_chart, safe_scatter_chart, safe_area_chart
 
 # Importação da função de atualização de dados
-from .refresh_utils import clear_cache_and_rerun
+from .refresh_utils import handle_refresh_trigger, clear_file_cache
 
 # Importação das funções de ajuda para credenciais
 from .secrets_helper import get_google_credentials
