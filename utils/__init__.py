@@ -1,6 +1,21 @@
 """
-Arquivo __init__.py para transformar o diretório utils em um pacote Python.
+Módulo de utilitários para o dashboard.
+
+Este arquivo __init__.py serve para facilitar a importação de funções
+dos diversos módulos de utilitários.
 """
 
 # Importações das funções utilitárias para DataFrames
-from .dataframe_utils import ensure_pandas_df, ensure_pandas_series, force_pandas_for_altair, safe_dataframe, safe_bar_chart, safe_line_chart, safe_scatter_chart, safe_area_chart 
+from .dataframe_utils import ensure_pandas_df, ensure_pandas_series, safe_dataframe, safe_bar_chart, safe_line_chart, safe_scatter_chart, safe_area_chart
+
+# Importação da função de compilação de SASS
+from .sass_compiler import compile_sass
+
+# Importação da função de atualização de dados
+from .refresh_utils import clear_cache_and_rerun
+
+# Importação das funções de ajuda para credenciais
+from .secrets_helper import get_google_credentials
+
+# Importação de funções de animação
+from .animation_utils import load_lottie_animation, update_progress 
