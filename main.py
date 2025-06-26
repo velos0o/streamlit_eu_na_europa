@@ -47,6 +47,9 @@ ROTAS = {
     "extracoes": "Extrações de Dados"
 }
 
+# Mapeamento reverso para facilitar a busca de chaves
+ROTAS_INVERSO = {v: k for k, v in ROTAS.items()}
+
 # Mapeamento de sub-rotas para Emissões Brasileiras
 SUB_ROTAS_EMISSOES = {
     "funil_certidoes": "Funil Certidões",
@@ -120,55 +123,58 @@ def inicializar_estados_sessao():
         st.session_state.protocolado_subpagina = 'Dados Macros'
 
 # Processar parâmetros da URL
-def processar_parametros_url():
-    """Processa parâmetros da URL para navegação direta"""
+def sincronizar_estado_e_url():
+    """
+    Sincroniza o estado da sessão com os parâmetros da URL para garantir consistência.
+    Se a URL tiver um parâmetro 'page' válido, o estado da sessão será atualizado
+    para refletir a página solicitada. Isso garante que os links diretos funcionem.
+    """
     try:
-        # Tenta usar a nova API do Streamlit (>= 1.30.0)
         query_params = st.query_params
     except AttributeError:
         # Fallback para a API experimental (< 1.30.0)
-        query_params = st.experimental_get_query_params()
-        # Converte o formato da API experimental para o novo formato
-        query_params = {k: v[0] if v else '' for k, v in query_params.items()}
-    
-    if 'pagina_atual_via_url_processada' not in st.session_state and 'page' in query_params:
-        rota = query_params['page'].lower()
-        if rota in ROTAS:
-            st.session_state['pagina_atual'] = ROTAS[rota]
-            st.session_state['pagina_atual_via_url_processada'] = True
+        query_params_experimental = st.experimental_get_query_params()
+        query_params = {k: v[0] if v else '' for k, v in query_params_experimental.items()}
 
-            if rota == 'cartorio_new':
+    pagina_na_url = query_params.get("page")
+
+    if pagina_na_url and pagina_na_url in ROTAS:
+        pagina_desejada_pela_url = ROTAS[pagina_na_url]
+        
+        # Apenas atualiza o estado se for diferente, para evitar reruns desnecessários
+        if st.session_state.get('pagina_atual') != pagina_desejada_pela_url:
+            st.session_state['pagina_atual'] = pagina_desejada_pela_url
+            
+            # Lógica para restaurar o estado dos submenus com base na URL
+            if pagina_na_url == 'cartorio_new':
                 st.session_state.emissao_submenu_expanded = True
-                if 'sub' in query_params and query_params['sub'] in SUB_ROTAS_EMISSOES:
-                    st.session_state.emissao_subpagina = SUB_ROTAS_EMISSOES[query_params['sub']]
-                else:
-                    st.session_state.emissao_subpagina = "Funil Certidões"
-            elif rota == 'higienizacoes':
+                sub_rota = query_params.get('sub')
+                if sub_rota and sub_rota in SUB_ROTAS_EMISSOES:
+                    st.session_state.emissao_subpagina = SUB_ROTAS_EMISSOES[sub_rota]
+            elif pagina_na_url == 'higienizacoes':
                 st.session_state.higienizacao_submenu_expanded = True
-                if 'sub' in query_params and query_params['sub'] in SUB_ROTAS_HIGIENIZACOES:
-                    st.session_state.higienizacao_subpagina = SUB_ROTAS_HIGIENIZACOES[query_params['sub']]
-                else:
-                    st.session_state.higienizacao_subpagina = "Checklist"
-            elif rota == 'comune':
+                sub_rota = query_params.get('sub')
+                if sub_rota and sub_rota in SUB_ROTAS_HIGIENIZACOES:
+                    st.session_state.higienizacao_subpagina = SUB_ROTAS_HIGIENIZACOES[sub_rota]
+            elif pagina_na_url == 'comune':
                 st.session_state.comune_submenu_expanded = True
-                if 'sub' in query_params and query_params['sub'] in SUB_ROTAS_COMUNE:
-                    st.session_state.comune_subpagina = SUB_ROTAS_COMUNE[query_params['sub']]
-                else:
-                    st.session_state.comune_subpagina = "Produção Comune"
-            elif rota == 'protocolados':
+                sub_rota = query_params.get('sub')
+                if sub_rota and sub_rota in SUB_ROTAS_COMUNE:
+                    st.session_state.comune_subpagina = SUB_ROTAS_COMUNE[sub_rota]
+            elif pagina_na_url == 'protocolados':
                 st.session_state.protocolado_submenu_expanded = True
-                if 'sub' in query_params and query_params['sub'] in SUB_ROTAS_PROTOCOLADOS:
-                    st.session_state.protocolado_subpagina = SUB_ROTAS_PROTOCOLADOS[query_params['sub']]
-                else:
-                    st.session_state.protocolado_subpagina = "Dados Macros"
-    elif 'pagina_atual_via_url_processada' not in st.session_state:
-        st.session_state['pagina_atual_via_url_processada'] = True
+                sub_rota = query_params.get('sub')
+                if sub_rota and sub_rota in SUB_ROTAS_PROTOCOLADOS:
+                    st.session_state.protocolado_subpagina = SUB_ROTAS_PROTOCOLADOS[sub_rota]
+            
+            # Força um rerun para garantir que a página correta seja exibida imediatamente
+            st.rerun()
 
 # Inicializar estados da sessão PRIMEIRO
 inicializar_estados_sessao()
 
-# Processar parâmetros da URL DEPOIS da inicialização
-processar_parametros_url()
+# Sincronizar com a URL DEPOIS da inicialização
+sincronizar_estado_e_url()
 
 # Carregando CSS
 with open('assets/styles.css') as f:
