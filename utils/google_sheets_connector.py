@@ -20,41 +20,60 @@ def get_google_sheets_client():
         return None
 
 @st.cache_data(ttl=300)
-def fetch_data_from_sheet(_client, spreadsheet_url, sheet_name):
-    """Busca dados de uma planilha específica, tentando pelo GID 0 primeiro."""
+def fetch_data_from_sheet(_client, spreadsheet_url, sheet_name=None, gid=None):
+    """Busca dados de uma planilha específica, com prioridade para o GID."""
     if not _client:
         print("[WARN] fetch_data_from_sheet chamado sem um cliente gspread válido.")
         return None
     try:
         spreadsheet = _client.open_by_url(spreadsheet_url)
-        # Tentar abrir pela GID 0 (primeira aba)
-        try:
-            print(f"[INFO] Tentando abrir a planilha '{spreadsheet_url}' pela GID 0 (índice 0).")
-            sheet = spreadsheet.get_worksheet(0) # 0 para a primeira aba (gid=0)
-            print(f"[INFO] Aba com índice 0 aberta com sucesso. Nome real da aba: '{sheet.title}'")
-        except Exception as e_gid:
-            print(f"[WARN] Falha ao abrir planilha pelo índice 0 (GID 0): {e_gid}. Tentando pelo nome '{sheet_name}'.")
-            # Fallback: tentar abrir pelo nome fornecido se pelo GID falhar
-            sheet = spreadsheet.worksheet(sheet_name)
-            print(f"[INFO] Aba '{sheet_name}' aberta com sucesso pelo nome.")
-            
-        data = sheet.get_all_records() # Retorna uma lista de dicionários
+        sheet = None
+
+        if gid is not None:
+            try:
+                gid = int(gid)
+                print(f"[INFO] Tentando abrir a planilha '{spreadsheet_url}' pelo GID {gid}.")
+                sheet = spreadsheet.get_worksheet_by_id(gid)
+                print(f"[INFO] Aba com GID {gid} aberta com sucesso. Nome da aba: '{sheet.title}'")
+            except Exception as e_gid:
+                print(f"[WARN] Falha ao abrir planilha pelo GID {gid}: {e_gid}. Tentando outras opções.")
+        
+        if sheet is None and sheet_name is not None:
+            try:
+                print(f"[INFO] Tentando abrir a aba pelo nome '{sheet_name}'.")
+                sheet = spreadsheet.worksheet(sheet_name)
+                print(f"[INFO] Aba '{sheet_name}' aberta com sucesso pelo nome.")
+            except gspread.exceptions.WorksheetNotFound:
+                print(f"[WARN] Aba com nome '{sheet_name}' não encontrada. Tentando a primeira aba.")
+                pass # Continua para tentar a primeira aba
+
+        if sheet is None:
+            try:
+                print("[INFO] Tentando abrir a primeira aba (índice 0).")
+                sheet = spreadsheet.get_worksheet(0)
+                print(f"[INFO] Primeira aba aberta com sucesso. Nome: '{sheet.title}'")
+            except Exception as e_first:
+                st.error(f"Não foi possível abrir a aba pelo GID, nome ou como primeira aba. Erro: {e_first}")
+                print(f"[ERROR] Falha total ao tentar abrir uma aba em '{spreadsheet_url}': {e_first}")
+                return None
+
+        data = sheet.get_all_records()
         return data
     except gspread.exceptions.SpreadsheetNotFound:
         st.error(f"Planilha não encontrada: {spreadsheet_url}")
         print(f"[ERROR] SpreadsheetNotFound: {spreadsheet_url}")
         return None
     except gspread.exceptions.WorksheetNotFound:
-        st.error(f"Aba '{sheet_name}' não encontrada na planilha.")
-        print(f"[ERROR] WorksheetNotFound: Aba '{sheet_name}' não encontrada em {spreadsheet_url}")
+        st.error(f"Aba '{sheet_name or 'especificada'}' não encontrada na planilha.")
+        print(f"[ERROR] WorksheetNotFound: Aba '{sheet_name or 'especificada'}' não encontrada em {spreadsheet_url}")
         return None
     except gspread.exceptions.APIError as api_e:
-        st.error(f"Erro na API do Google Sheets ao acessar '{sheet_name}': {api_e}")
-        print(f"[ERROR] APIError: {type(api_e).__name__} - {api_e} ao acessar '{sheet_name}' em {spreadsheet_url}")
+        st.error(f"Erro na API do Google Sheets ao acessar a planilha: {api_e}")
+        print(f"[ERROR] APIError: {type(api_e).__name__} - {api_e} ao acessar '{spreadsheet_url}'")
         return None
     except Exception as e:
-        st.error(f"Erro ao buscar dados da planilha '{sheet_name}' ({type(e).__name__}): {e}")
-        print(f"[ERROR] Falha em fetch_data_from_sheet: {type(e).__name__} - {e} para aba '{sheet_name}' em {spreadsheet_url}")
+        st.error(f"Erro ao buscar dados da planilha ({type(e).__name__}): {e}")
+        print(f"[ERROR] Falha em fetch_data_from_sheet: {type(e).__name__} - {e} para '{spreadsheet_url}'")
         return None
 
 # Exemplo de como usar (remover ou comentar em produção)
@@ -63,10 +82,10 @@ def fetch_data_from_sheet(_client, spreadsheet_url, sheet_name):
 #     client = get_google_sheets_client()
 #     if client:
 #         st.success("Cliente Google Sheets obtido com sucesso!")
-#         SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1pB3HTFsaHyqAt3bhxzWG3RjfAxAzl97ydGqT35uYb-w/edit?gid=0#gid=0'
-#         SHEET_NAME = 'Página1' # Substitua pelo nome correto da sua aba
-#         st.write(f"Buscando dados da aba: {SHEET_NAME}")
-#         data = fetch_data_from_sheet(client, SPREADSHEET_URL, SHEET_NAME)
+#         SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/15L7SdGgbF3nhiE3ptk7WFmuTwbxSY3rA1hfCnYmMFMM/edit#gid=170972868'
+#         GID = 170972868 # GID da aba de produtividade
+#         st.write(f"Buscando dados da planilha com GID: {GID}")
+#         data = fetch_data_from_sheet(client, SPREADSHEET_URL, gid=GID)
 #         if data:
 #             st.dataframe(data)
 #         else:

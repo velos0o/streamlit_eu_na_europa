@@ -89,7 +89,7 @@ def show_protocolados(subpagina):
 
     # A página de Produtividade tem seus próprios filtros internos e não usa a sidebar.
     if subpagina == "Produtividade":
-        show_produtividade(safe_pandas_df(df))
+        show_produtividade()
         return  # Impede a renderização dos filtros da sidebar
 
     # Filtros na sidebar para todas as outras páginas
