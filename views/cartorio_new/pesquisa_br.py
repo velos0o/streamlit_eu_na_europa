@@ -284,18 +284,21 @@ def exibir_pesquisa_br(df_cartorio):
     if filtro_estagio != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['ESTAGIO_LEGIVEL'] == filtro_estagio]
 
-    # Aplicar filtro de Protocolizado
+    # Aplicar filtro de Protocolizado (Lógica Corrigida com Valores Exatos)
     if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
         if coluna_protocolizado in df_filtrado.columns:
-            # Converter para string e normalizar valores
-            df_filtrado[coluna_protocolizado] = df_filtrado[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+            # Normalizar coluna para uma avaliação consistente (maiúsculas, sem espaços)
+            df_filtrado['PROTO_NORMALIZADO'] = df_filtrado[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
             
             if filtro_protocolizado == "Protocolizado":
-                # Consideramos como protocolizado: "Y", "YES", "1", "TRUE", "SIM"
-                df_filtrado = df_filtrado[df_filtrado[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM'])]
+                # Filtra exatamente pelo valor "PROTOCOLIZADO"
+                df_filtrado = df_filtrado[df_filtrado['PROTO_NORMALIZADO'] == 'PROTOCOLIZADO']
             elif filtro_protocolizado == "Não Protocolizado":
-                # Consideramos como não protocolizado: "N", "NO", "0", "FALSE", "NÃO", valores vazios
-                df_filtrado = df_filtrado[~df_filtrado[coluna_protocolizado].isin(['Y', 'YES', '1', 'TRUE', 'SIM']) | (df_filtrado[coluna_protocolizado] == '')]
+                # Filtra exatamente pelo valor "NÃO SELECIONADA" (que é a forma normalizada de "não selecionada")
+                df_filtrado = df_filtrado[df_filtrado['PROTO_NORMALIZADO'] == 'NÃO SELECIONADA']
+            
+            # Remover coluna temporária para não afetar o restante do código
+            df_filtrado = df_filtrado.drop(columns=['PROTO_NORMALIZADO'])
         else:
             st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
 

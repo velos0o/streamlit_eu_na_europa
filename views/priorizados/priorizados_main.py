@@ -29,7 +29,7 @@ from .produtividade import show_produtividade
 # from .produtividade_debug import show_produtividade_debug
 
 @st.cache_data(ttl=300)
-def carregar_dados_protocolados():
+def carregar_dados_priorizados():
     """
     Carrega dados da planilha Google Sheets de forma segura usando uma Conta de Serviço.
     """
@@ -65,10 +65,10 @@ def carregar_dados_protocolados():
         st.error(f"Erro ao carregar dados da planilha: {e}")
         return pd.DataFrame()
 
-def show_protocolados(subpagina):
-    st.header("Relatório de Protocolados", divider='rainbow')
+def show_priorizados(subpagina):
+    st.header("Relatório de Priorizados", divider='rainbow')
     
-    df_raw = carregar_dados_protocolados()
+    df_raw = carregar_dados_priorizados()
     
     if df_raw.empty:
         st.warning("Não foi possível carregar os dados ou a planilha está vazia.")

@@ -23,7 +23,7 @@ from views.cartorio_new.cartorio_new_main import show_cartorio_new
 from views.ficha_familia import show_ficha_familia
 from views.higienizacoes.higienizacoes_main import show_higienizacoes
 from views.negociacao.negociacao_main import show_negociacao
-from views.protocolado.protocolado_main import show_protocolados
+from views.priorizados.priorizados_main import show_priorizados
 import views.comune.comune_main
 import views.comune.producao_comune
 import views.comune.funil_certidoes_italianas
@@ -43,7 +43,7 @@ ROTAS = {
     "cartorio_new": "Emissões Brasileiras",
     "comune": "Comune",
     "negociacao": "Negociação",
-    "protocolados": "Protocolados",
+    "priorizados": "Priorizados",
     "extracoes": "Extrações de Dados"
 }
 
@@ -80,8 +80,8 @@ SUB_ROTAS_COMUNE = {
     "status_certidao": "Status Certidão"
 }
 
-# Mapeamento de sub-rotas para Protocolados
-SUB_ROTAS_PROTOCOLADOS = {
+# Mapeamento de sub-rotas para Priorizados
+SUB_ROTAS_PRIORIZADOS = {
     "dados_macros": "Dados Macros",
     "funil_etapas": "Funil - Etapas",
     "pendencias_liberadas": "Pendências Liberadas",
@@ -116,11 +116,11 @@ def inicializar_estados_sessao():
     if 'comune_subpagina' not in st.session_state:
         st.session_state.comune_subpagina = 'Produção Comune'
 
-    # Novos estados para o submenu Protocolados
-    if 'protocolado_submenu_expanded' not in st.session_state:
-        st.session_state.protocolado_submenu_expanded = False
-    if 'protocolado_subpagina' not in st.session_state:
-        st.session_state.protocolado_subpagina = 'Dados Macros'
+    # Novos estados para o submenu Priorizados
+    if 'priorizado_submenu_expanded' not in st.session_state:
+        st.session_state.priorizado_submenu_expanded = False
+    if 'priorizado_subpagina' not in st.session_state:
+        st.session_state.priorizado_subpagina = 'Dados Macros'
 
 # Processar parâmetros da URL
 def sincronizar_estado_e_url():
@@ -161,11 +161,11 @@ def sincronizar_estado_e_url():
                 sub_rota = query_params.get('sub')
                 if sub_rota and sub_rota in SUB_ROTAS_COMUNE:
                     st.session_state.comune_subpagina = SUB_ROTAS_COMUNE[sub_rota]
-            elif pagina_na_url == 'protocolados':
-                st.session_state.protocolado_submenu_expanded = True
+            elif pagina_na_url == 'priorizados':
+                st.session_state.priorizado_submenu_expanded = True
                 sub_rota = query_params.get('sub')
-                if sub_rota and sub_rota in SUB_ROTAS_PROTOCOLADOS:
-                    st.session_state.protocolado_subpagina = SUB_ROTAS_PROTOCOLADOS[sub_rota]
+                if sub_rota and sub_rota in SUB_ROTAS_PRIORIZADOS:
+                    st.session_state.priorizado_subpagina = SUB_ROTAS_PRIORIZADOS[sub_rota]
             
             # Força um rerun para garantir que a página correta seja exibida imediatamente
             st.rerun()
@@ -367,7 +367,7 @@ def reset_submenu():
     st.session_state.adm_submenu_expanded = False
     st.session_state.higienizacao_submenu_expanded = False
     st.session_state.comune_submenu_expanded = False
-    st.session_state.protocolado_submenu_expanded = False
+    st.session_state.priorizado_submenu_expanded = False
 
 def ir_para_ficha_familia():
     reset_submenu()
@@ -478,13 +478,13 @@ def ir_para_negociacao():
     st.session_state.comune_submenu_expanded = False
     st.query_params['page'] = 'negociacao'
     
-def ir_para_protocolados():
+def ir_para_priorizados():
     reset_submenu()
-    st.session_state['pagina_atual'] = 'Protocolados'
-    st.session_state.protocolado_submenu_expanded = True
+    st.session_state['pagina_atual'] = 'Priorizados'
+    st.session_state.priorizado_submenu_expanded = True
     # Mantém a subpágina atual ou vai para o padrão
-    sub_rota = next((key for key, value in SUB_ROTAS_PROTOCOLADOS.items() if value == st.session_state.protocolado_subpagina), 'dados_macros')
-    st.query_params = {'page': 'protocolados', 'sub': sub_rota}
+    sub_rota = next((key for key, value in SUB_ROTAS_PRIORIZADOS.items() if value == st.session_state.priorizado_subpagina), 'dados_macros')
+    st.query_params = {'page': 'priorizados', 'sub': sub_rota}
 
 # Nova função para toggle do submenu Comune
 def toggle_comune_submenu():
@@ -526,21 +526,21 @@ def ir_para_comune_status_certidao():
     st.session_state.comune_subpagina = 'Status Certidão'
     st.query_params = {'page': 'comune', 'sub': 'status_certidao'}
 
-def toggle_protocolado_submenu():
+def toggle_priorizado_submenu():
     reset_submenu()
-    st.session_state.pagina_atual = 'Protocolados'
-    st.session_state.protocolado_submenu_expanded = not st.session_state.get('protocolado_submenu_expanded', False)
-    sub_rota = next((key for key, value in SUB_ROTAS_PROTOCOLADOS.items() if value == st.session_state.protocolado_subpagina), 'dados_macros')
-    st.query_params = {'page': 'protocolados', 'sub': sub_rota}
+    st.session_state.pagina_atual = 'Priorizados'
+    st.session_state.priorizado_submenu_expanded = not st.session_state.get('priorizado_submenu_expanded', False)
+    sub_rota = next((key for key, value in SUB_ROTAS_PRIORIZADOS.items() if value == st.session_state.priorizado_subpagina), 'dados_macros')
+    st.query_params = {'page': 'priorizados', 'sub': sub_rota}
 
-def ir_para_protocolado_subpagina(sub_pagina_nome):
+def ir_para_priorizado_subpagina(sub_pagina_nome):
     def navigate():
         reset_submenu()
-        st.session_state.pagina_atual = 'Protocolados'
-        st.session_state.protocolado_submenu_expanded = True
-        st.session_state.protocolado_subpagina = sub_pagina_nome
-        sub_rota_key = next((k for k, v in SUB_ROTAS_PROTOCOLADOS.items() if v == sub_pagina_nome), 'dados_macros')
-        st.query_params = {'page': 'protocolados', 'sub': sub_rota_key}
+        st.session_state.pagina_atual = 'Priorizados'
+        st.session_state.priorizado_submenu_expanded = True
+        st.session_state.priorizado_subpagina = sub_pagina_nome
+        sub_rota_key = next((k for k, v in SUB_ROTAS_PRIORIZADOS.items() if v == sub_pagina_nome), 'dados_macros')
+        st.query_params = {'page': 'priorizados', 'sub': sub_rota_key}
     return navigate
 
 def ir_para_extracoes():
@@ -707,22 +707,22 @@ st.sidebar.button(
 )
 
 st.sidebar.button(
-    "Protocolados", 
-    key="btn_protocolados",
-    on_click=toggle_protocolado_submenu,
+    "Priorizados", 
+    key="btn_priorizados",
+    on_click=toggle_priorizado_submenu,
     use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Protocolados" else "secondary",
-    help="Módulo de Protocolados"
+    type="primary" if st.session_state['pagina_atual'] == "Priorizados" else "secondary",
+    help="Módulo de Priorizados"
 )
 
-if st.session_state.get('protocolado_submenu_expanded', False):
+if st.session_state.get('priorizado_submenu_expanded', False):
     with st.sidebar.container():
         def sub_button(label, key, is_active, on_click):
             st.button(label, key=f"subbtn_{key}", on_click=on_click, use_container_width=True, type="primary" if is_active else "secondary")
 
-        for sub_key, sub_value in SUB_ROTAS_PROTOCOLADOS.items():
-            is_active = st.session_state.get('protocolado_subpagina') == sub_value
-            sub_button(sub_value, f"protocolado_{sub_key}", is_active, ir_para_protocolado_subpagina(sub_value))
+        for sub_key, sub_value in SUB_ROTAS_PRIORIZADOS.items():
+            is_active = st.session_state.get('priorizado_subpagina') == sub_value
+            sub_button(sub_value, f"priorizado_{sub_key}", is_active, ir_para_priorizado_subpagina(sub_value))
 
 st.sidebar.button(
     "Extrações de Dados", 
@@ -757,8 +757,8 @@ try:
             views.comune.comune_main.show_comune_main()
     elif current_page == "Negociação":
         show_negociacao()
-    elif current_page == "Protocolados":
-        show_protocolados(st.session_state.get('protocolado_subpagina'))
+    elif current_page == "Priorizados":
+        show_priorizados(st.session_state.get('priorizado_subpagina'))
     elif current_page == "Extrações de Dados":
         show_extracoes()
     else:
