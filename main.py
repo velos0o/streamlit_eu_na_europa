@@ -88,6 +88,7 @@ SUB_ROTAS_PRIORIZADOS = {
     "funil_etapas": "Funil - Etapas",
     "pendencias_liberadas": "Pendências Liberadas",
     "pendencias_futuras": "Pendências Futuras",
+    "tempo_por_etapa": "Tempo por Etapa",
     "produtividade": "Produtividade"
 }
 

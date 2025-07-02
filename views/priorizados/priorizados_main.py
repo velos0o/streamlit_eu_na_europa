@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import gspread
+from ..cartorio_new.data_loader import carregar_dados_cartorio
 
 def safe_pandas_df(df):
     """
@@ -26,6 +27,7 @@ from .funil_etapas import show_funil_etapas
 from .pendencias_liberadas import show_pendencias_liberadas
 from .pendencias_futuras import show_pendencias_futuras
 from .produtividade import show_produtividade
+from .tempo_etapas import show_tempo_etapas
 # from .produtividade_debug import show_produtividade_debug
 
 @st.cache_data(ttl=300)
@@ -66,12 +68,17 @@ def carregar_dados_priorizados():
         return pd.DataFrame()
 
 def show_priorizados(subpagina):
-    st.header("Relatório de Priorizados", divider='rainbow')
+    st.title(f"Priorizados: {subpagina}")
     
-    df_raw = carregar_dados_priorizados()
+    # Carregar dados das duas fontes
+    with st.spinner("Carregando dados de Priorizados..."):
+        df_raw = carregar_dados_priorizados()
     
+    with st.spinner("Carregando dados de Emissões Brasileiras..."):
+        df_cartorio = carregar_dados_cartorio()
+
     if df_raw.empty:
-        st.warning("Não foi possível carregar os dados ou a planilha está vazia.")
+        st.warning("Não foi possível carregar os dados de priorizados ou a planilha está vazia.")
         return
 
     mapeamento_colunas = {
@@ -118,6 +125,8 @@ def show_priorizados(subpagina):
         show_pendencias_liberadas(safe_pandas_df(df_filtrado))
     elif subpagina == "Pendências Futuras":
         show_pendencias_futuras(safe_pandas_df(df_filtrado))
+    elif subpagina == "Tempo por Etapa":
+        show_tempo_etapas(safe_pandas_df(df_filtrado), safe_pandas_df(df_cartorio))
     else:
         st.error(f"Sub-página '{subpagina}' não encontrada.")
         show_dados_macros(safe_pandas_df(df_filtrado)) 
