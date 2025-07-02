@@ -17,7 +17,7 @@ def exibir_pesquisa_br(df_cartorio):
         st.warning("Arquivo CSS principal (main.css) não encontrado.")
     # --- Fim Carregar CSS ---
 
-    st.subheader("🔍 Pesquisa BR - Pipeline 104")
+    st.subheader("🔍 Pesquisa BR")
 
     if df_cartorio is None or df_cartorio.empty:
         st.warning("Dados de cartório não disponíveis para o relatório de Pesquisa BR.")

@@ -24,6 +24,7 @@ from views.ficha_familia import show_ficha_familia
 from views.higienizacoes.higienizacoes_main import show_higienizacoes
 from views.negociacao.negociacao_main import show_negociacao
 from views.priorizados.priorizados_main import show_priorizados
+from views.insumos.insumo_main import show_insumos
 import views.comune.comune_main
 import views.comune.producao_comune
 import views.comune.funil_certidoes_italianas
@@ -44,6 +45,7 @@ ROTAS = {
     "comune": "Comune",
     "negociacao": "Negociação",
     "priorizados": "Priorizados",
+    "insumos": "Insumos",
     "extracoes": "Extrações de Dados"
 }
 
@@ -89,6 +91,15 @@ SUB_ROTAS_PRIORIZADOS = {
     "produtividade": "Produtividade"
 }
 
+# Mapeamento de sub-rotas para Insumos
+SUB_ROTAS_INSUMOS = {
+    "consulta_familia": "CONSULTA DE FAMÍLIAS",
+    "mapa_inicial": "MAPA INICIAL",
+    "fluxo_financeiro": "FLUXO FINANCEIRO",
+    "ia": "IA",
+    "criacao_adendo": "CRIAÇÃO DE ADENDO"
+}
+
 # Função para inicializar todos os estados da sessão
 def inicializar_estados_sessao():
     """Inicializa todos os estados da sessão necessários"""
@@ -121,6 +132,12 @@ def inicializar_estados_sessao():
         st.session_state.priorizado_submenu_expanded = False
     if 'priorizado_subpagina' not in st.session_state:
         st.session_state.priorizado_subpagina = 'Dados Macros'
+
+    # Novos estados para o submenu Insumos
+    if 'insumo_submenu_expanded' not in st.session_state:
+        st.session_state.insumo_submenu_expanded = False
+    if 'insumo_subpagina' not in st.session_state:
+        st.session_state.insumo_subpagina = 'CONSULTA DE FAMÍLIAS'
 
 # Processar parâmetros da URL
 def sincronizar_estado_e_url():
@@ -166,6 +183,11 @@ def sincronizar_estado_e_url():
                 sub_rota = query_params.get('sub')
                 if sub_rota and sub_rota in SUB_ROTAS_PRIORIZADOS:
                     st.session_state.priorizado_subpagina = SUB_ROTAS_PRIORIZADOS[sub_rota]
+            elif pagina_na_url == 'insumos':
+                st.session_state.insumo_submenu_expanded = True
+                sub_rota = query_params.get('sub')
+                if sub_rota and sub_rota in SUB_ROTAS_INSUMOS:
+                    st.session_state.insumo_subpagina = SUB_ROTAS_INSUMOS[sub_rota]
             
             # Força um rerun para garantir que a página correta seja exibida imediatamente
             st.rerun()
@@ -368,6 +390,7 @@ def reset_submenu():
     st.session_state.higienizacao_submenu_expanded = False
     st.session_state.comune_submenu_expanded = False
     st.session_state.priorizado_submenu_expanded = False
+    st.session_state.insumo_submenu_expanded = False
 
 def ir_para_ficha_familia():
     reset_submenu()
@@ -550,6 +573,25 @@ def ir_para_extracoes():
     if 'sub' in st.query_params:
         del st.query_params['sub']
 
+# Funções para o novo menu Insumos
+def toggle_insumo_submenu():
+    reset_submenu()
+    st.session_state.pagina_atual = 'Insumos'
+    st.session_state.insumo_submenu_expanded = not st.session_state.get('insumo_submenu_expanded', False)
+    # Define a subpágina atual ou padrão e atualiza a URL
+    sub_rota = next((key for key, value in SUB_ROTAS_INSUMOS.items() if value == st.session_state.insumo_subpagina), 'consulta_familia')
+    st.query_params = {'page': 'insumos', 'sub': sub_rota}
+
+def ir_para_insumo_subpagina(sub_pagina_nome):
+    def navigate():
+        reset_submenu()
+        st.session_state.pagina_atual = 'Insumos'
+        st.session_state.insumo_submenu_expanded = True
+        st.session_state.insumo_subpagina = sub_pagina_nome
+        sub_rota_key = next((k for k, v in SUB_ROTAS_INSUMOS.items() if v == sub_pagina_nome), 'consulta_familia')
+        st.query_params = {'page': 'insumos', 'sub': sub_rota_key}
+    return navigate
+
 # Botões de navegação
 st.sidebar.button(
     "Ficha da Família", 
@@ -724,6 +766,26 @@ if st.session_state.get('priorizado_submenu_expanded', False):
             is_active = st.session_state.get('priorizado_subpagina') == sub_value
             sub_button(sub_value, f"priorizado_{sub_key}", is_active, ir_para_priorizado_subpagina(sub_value))
 
+# Botão para Insumos
+st.sidebar.button(
+    "Insumos",
+    key="btn_insumos",
+    on_click=toggle_insumo_submenu,
+    use_container_width=True,
+    type="primary" if st.session_state['pagina_atual'] == "Insumos" else "secondary",
+    help="Relatórios de Insumos"
+)
+
+# Submenu Insumos
+if st.session_state.get('insumo_submenu_expanded', False):
+    with st.sidebar.container():
+        def sub_button_insumo(label, key, is_active, on_click):
+            st.button(label, key=f"subbtn_{key}", on_click=on_click, use_container_width=True, type="primary" if is_active else "secondary")
+
+        for sub_key, sub_value in SUB_ROTAS_INSUMOS.items():
+            is_active = st.session_state.get('insumo_subpagina') == sub_value
+            sub_button_insumo(sub_value, f"insumo_{sub_key}", is_active, ir_para_insumo_subpagina(sub_value))
+
 st.sidebar.button(
     "Extrações de Dados", 
     key="btn_extracoes", 
@@ -761,6 +823,8 @@ try:
         show_priorizados(st.session_state.get('priorizado_subpagina'))
     elif current_page == "Extrações de Dados":
         show_extracoes()
+    elif current_page == "Insumos":
+        show_insumos(st.session_state.get('insumo_subpagina'))
     else:
         st.error(f"Página '{current_page}' não encontrada!")
         
