@@ -101,6 +101,14 @@ SUB_ROTAS_INSUMOS = {
     "criacao_adendo": "CRIAÇÃO DE ADENDO"
 }
 
+# Mapeamento para o novo submenu de Adendo
+SUB_ROTAS_ADENDO = {
+    "visao_geral": "Visão Geral",
+    "tipo_contrato": "Tipo de Contrato",
+    "analise_adendos_distratos": "Análise Adendos e Distratos",
+    "acompanhamento": "Acompanhamento Operacional"
+}
+
 # Função para inicializar todos os estados da sessão
 def inicializar_estados_sessao():
     """Inicializa todos os estados da sessão necessários"""
@@ -139,6 +147,12 @@ def inicializar_estados_sessao():
         st.session_state.insumo_submenu_expanded = False
     if 'insumo_subpagina' not in st.session_state:
         st.session_state.insumo_subpagina = 'CONSULTA DE FAMÍLIAS'
+
+    # Novos estados para o submenu de Adendo
+    if 'adendo_submenu_expanded' not in st.session_state:
+        st.session_state.adendo_submenu_expanded = False
+    if 'adendo_subpagina' not in st.session_state:
+        st.session_state.adendo_subpagina = "Visão Geral" # Padrão
 
 # Processar parâmetros da URL
 def sincronizar_estado_e_url():
@@ -189,6 +203,13 @@ def sincronizar_estado_e_url():
                 sub_rota = query_params.get('sub')
                 if sub_rota and sub_rota in SUB_ROTAS_INSUMOS:
                     st.session_state.insumo_subpagina = SUB_ROTAS_INSUMOS[sub_rota]
+
+                    # Sincronizar sub-submenu de Adendo
+                    if st.session_state.insumo_subpagina == 'CRIAÇÃO DE ADENDO':
+                        st.session_state.adendo_submenu_expanded = True
+                        sub2_rota = query_params.get("sub2")
+                        if sub2_rota and sub2_rota in SUB_ROTAS_ADENDO:
+                            st.session_state.adendo_subpagina = SUB_ROTAS_ADENDO[sub2_rota]
             
             # Força um rerun para garantir que a página correta seja exibida imediatamente
             st.rerun()
@@ -584,14 +605,43 @@ def toggle_insumo_submenu():
     st.query_params = {'page': 'insumos', 'sub': sub_rota}
 
 def ir_para_insumo_subpagina(sub_pagina_nome):
+    """Função de fábrica para criar callbacks de navegação para Insumos."""
     def navigate():
-        reset_submenu()
         st.session_state.pagina_atual = 'Insumos'
         st.session_state.insumo_submenu_expanded = True
         st.session_state.insumo_subpagina = sub_pagina_nome
-        sub_rota_key = next((k for k, v in SUB_ROTAS_INSUMOS.items() if v == sub_pagina_nome), 'consulta_familia')
-        st.query_params = {'page': 'insumos', 'sub': sub_rota_key}
+        
+        query_params = {'page': 'insumos', 'sub': next((k for k, v in SUB_ROTAS_INSUMOS.items() if v == sub_pagina_nome), 'consulta_familia')}
+
+        # Gerencia o estado do submenu aninhado
+        if sub_pagina_nome == "CRIAÇÃO DE ADENDO":
+            st.session_state.adendo_submenu_expanded = True # Abre
+            # Garante que a sub-página de adendo seja incluída na URL
+            sub2_rota_key = next((k for k, v in SUB_ROTAS_ADENDO.items() if v == st.session_state.adendo_subpagina), 'visao_geral')
+            query_params['sub2'] = sub2_rota_key
+        else:
+            st.session_state.adendo_submenu_expanded = False # Fecha
+        
+        st.query_params = query_params
     return navigate
+
+def ir_para_adendo_subpagina(sub_pagina_nome):
+    """Função de fábrica para criar callbacks para o submenu Adendo."""
+    def navigate():
+        st.session_state.adendo_subpagina = sub_pagina_nome
+        st.query_params['sub2'] = next((k for k, v in SUB_ROTAS_ADENDO.items() if v == sub_pagina_nome), 'visao_geral')
+    return navigate
+
+# A DEFINIÇÃO DA FUNÇÃO VEM AQUI, ANTES DE SER USADA
+def sub_button(label, key, is_active, on_click):
+    """Cria um botão de submenu estilizado."""
+    st.button(
+        label, 
+        key=f"subbtn_{key}", 
+        on_click=on_click, 
+        use_container_width=True, 
+        type="primary" if is_active else "secondary"
+    )
 
 # Botões de navegação
 st.sidebar.button(
@@ -760,9 +810,6 @@ st.sidebar.button(
 
 if st.session_state.get('priorizado_submenu_expanded', False):
     with st.sidebar.container():
-        def sub_button(label, key, is_active, on_click):
-            st.button(label, key=f"subbtn_{key}", on_click=on_click, use_container_width=True, type="primary" if is_active else "secondary")
-
         for sub_key, sub_value in SUB_ROTAS_PRIORIZADOS.items():
             is_active = st.session_state.get('priorizado_subpagina') == sub_value
             sub_button(sub_value, f"priorizado_{sub_key}", is_active, ir_para_priorizado_subpagina(sub_value))
@@ -780,12 +827,19 @@ st.sidebar.button(
 # Submenu Insumos
 if st.session_state.get('insumo_submenu_expanded', False):
     with st.sidebar.container():
-        def sub_button_insumo(label, key, is_active, on_click):
-            st.button(label, key=f"subbtn_{key}", on_click=on_click, use_container_width=True, type="primary" if is_active else "secondary")
-
-        for sub_key, sub_value in SUB_ROTAS_INSUMOS.items():
-            is_active = st.session_state.get('insumo_subpagina') == sub_value
-            sub_button_insumo(sub_value, f"insumo_{sub_key}", is_active, ir_para_insumo_subpagina(sub_value))
+        for key, nome_subpagina in SUB_ROTAS_INSUMOS.items():
+            is_active = st.session_state.get('insumo_subpagina') == nome_subpagina
+            sub_button(nome_subpagina, key, is_active, ir_para_insumo_subpagina(nome_subpagina))
+            
+            # Lógica para o submenu de Adendo
+            if nome_subpagina == "CRIAÇÃO DE ADENDO" and is_active:
+                if st.session_state.get('adendo_submenu_expanded', False):
+                    with st.container():
+                        st.markdown("<div class='sub-button-container-level2'>", unsafe_allow_html=True)
+                        for key_adendo, nome_adendo_sub in SUB_ROTAS_ADENDO.items():
+                            is_active_adendo = st.session_state.get('adendo_subpagina') == nome_adendo_sub
+                            sub_button(nome_adendo_sub, f"adendo_{key_adendo}", is_active_adendo, ir_para_adendo_subpagina(nome_adendo_sub))
+                        st.markdown("</div>", unsafe_allow_html=True)
 
 st.sidebar.button(
     "Extrações de Dados", 
@@ -825,10 +879,18 @@ try:
     elif current_page == "Extrações de Dados":
         show_extracoes()
     elif current_page == "Insumos":
-        show_insumos(st.session_state.get('insumo_subpagina'))
+        show_insumos(st.session_state.get('insumo_subpagina'), st.session_state.get('adendo_subpagina'))
     else:
         st.error(f"Página '{current_page}' não encontrada!")
         
 except Exception as e:
     st.error(f"Erro ao carregar a página: {str(e)}")
     st.error("Verifique se todos os arquivos necessários estão disponíveis.")
+
+# Função principal
+def main():
+    """Função principal que renderiza a aplicação Streamlit."""
+    # ... código existente ...
+
+if __name__ == "__main__":
+    main()
