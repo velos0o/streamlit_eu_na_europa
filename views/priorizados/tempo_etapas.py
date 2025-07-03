@@ -115,20 +115,6 @@ def show_tempo_etapas(df_filtrado, df_cartorio):
     df_tempo = df_filtrado[colunas_existentes].copy()
     df_tempo = df_tempo.rename(columns={'A': 'Nome da Família'})
 
-    with st.expander("🕵️ **DEPURAÇÃO: Verifique os dados de entrada da planilha**"):
-        st.info("Aqui estão os dados brutos das colunas de data antes de qualquer conversão. Procure pela 'Familia di flora' e verifique se as datas estão no formato esperado (dd/mm/aaaa).")
-        colunas_debug_entrada = ['Nome da Família', col_inicio_processo, col_fim_processo]
-        
-        # Filtrar apenas colunas que realmente existem para evitar erros
-        colunas_debug_existentes = [col for col in colunas_debug_entrada if col in df_tempo.columns]
-        
-        if colunas_debug_existentes and 'Nome da Família' in colunas_debug_existentes:
-            st.dataframe(df_tempo[colunas_debug_existentes].set_index('Nome da Família'), use_container_width=True)
-        elif colunas_debug_existentes:
-             st.dataframe(df_tempo[colunas_debug_existentes], use_container_width=True)
-        else:
-            st.warning("Não foi possível mostrar os dados de depuração pois as colunas de data não foram encontradas.")
-
     def parse_flexible_date(series):
         """Tenta converter uma data no formato dd/mm/aaaa, e se falhar, tenta dd/mm assumindo o ano atual."""
         # Primeiro tenta o formato completo
@@ -230,7 +216,6 @@ def show_tempo_etapas(df_filtrado, df_cartorio):
             
             st.dataframe(df_styled, use_container_width=True)
         
-        with st.expander("⚙️ **DEPURAÇÃO: Verifique o resultado do cálculo**"):
-            st.info("Aqui estão os dados após os cálculos. Se 'Tempo de Processo Total' estiver em branco (NaN) para a 'Familia di flora', significa que uma das datas de entrada estava em formato incorreto e não pôde ser processada.")
-            # Exibe o dataframe que contém as datas originais e os tempos calculados
+        with st.expander("Ver dados brutos utilizados no cálculo"):
+            # Exibe o dataframe que contém as datas originais
             st.dataframe(ensure_pandas_df(df_tempo).set_index('Nome da Família'), use_container_width=True) 
