@@ -115,19 +115,47 @@ def show_tempo_etapas(df_filtrado, df_cartorio):
     df_tempo = df_filtrado[colunas_existentes].copy()
     df_tempo = df_tempo.rename(columns={'A': 'Nome da Família'})
 
+    with st.expander("🕵️ **DEPURAÇÃO: Verifique os dados de entrada da planilha**"):
+        st.info("Aqui estão os dados brutos das colunas de data antes de qualquer conversão. Procure pela 'Familia di flora' e verifique se as datas estão no formato esperado (dd/mm/aaaa).")
+        colunas_debug_entrada = ['Nome da Família', col_inicio_processo, col_fim_processo]
+        
+        # Filtrar apenas colunas que realmente existem para evitar erros
+        colunas_debug_existentes = [col for col in colunas_debug_entrada if col in df_tempo.columns]
+        
+        if colunas_debug_existentes and 'Nome da Família' in colunas_debug_existentes:
+            st.dataframe(df_tempo[colunas_debug_existentes].set_index('Nome da Família'), use_container_width=True)
+        elif colunas_debug_existentes:
+             st.dataframe(df_tempo[colunas_debug_existentes], use_container_width=True)
+        else:
+            st.warning("Não foi possível mostrar os dados de depuração pois as colunas de data não foram encontradas.")
+
+    def parse_flexible_date(series):
+        """Tenta converter uma data no formato dd/mm/aaaa, e se falhar, tenta dd/mm assumindo o ano atual."""
+        # Primeiro tenta o formato completo
+        dates = pd.to_datetime(series, format='%d/%m/%Y', errors='coerce', dayfirst=True)
+        # Onde falhou, tenta o formato dd/mm para as datas que falharam
+        failed_mask = dates.isna()
+        if failed_mask.any():
+            # Tenta o formato dd/mm para as datas que falharam
+            dates_short_year = pd.to_datetime(series[failed_mask], format='%d/%m', errors='coerce', dayfirst=True)
+            if not dates_short_year.empty:
+                # Se bem-sucedido, atribui o ano atual
+                current_year = pd.Timestamp.now().year
+                dates.loc[failed_mask] = dates_short_year.apply(lambda dt: dt.replace(year=current_year) if pd.notna(dt) else pd.NaT)
+        return dates
+
     for nome_coluna_tempo, (start_col, end_col) in etapas_config.items():
         if start_col in df_tempo.columns and end_col in df_tempo.columns:
-            start_date = pd.to_datetime(df_tempo[start_col], format='%d/%m/%Y', dayfirst=True, errors='coerce')
-            end_date = pd.to_datetime(df_tempo[end_col], format='%d/%m/%Y', dayfirst=True, errors='coerce')
+            start_date = parse_flexible_date(df_tempo[start_col])
+            end_date = parse_flexible_date(df_tempo[end_col])
             df_tempo[nome_coluna_tempo] = (end_date - start_date).dt.days
         else:
             df_tempo[nome_coluna_tempo] = pd.NA
             
     # Calcular o tempo total do processo
     if col_inicio_processo in df_tempo.columns and col_fim_processo in df_tempo.columns:
-        # Corrigido: Assegurar que ambas as datas sejam lidas com formato completo Dia/Mês/Ano
-        start_date_total = pd.to_datetime(df_tempo[col_inicio_processo], format='%d/%m/%Y', dayfirst=True, errors='coerce')
-        end_date_total = pd.to_datetime(df_tempo[col_fim_processo], format='%d/%m/%Y', dayfirst=True, errors='coerce')
+        start_date_total = parse_flexible_date(df_tempo[col_inicio_processo])
+        end_date_total = parse_flexible_date(df_tempo[col_fim_processo])
         df_tempo['Tempo de Processo Total'] = (end_date_total - start_date_total).dt.days
     else:
         df_tempo['Tempo de Processo Total'] = pd.NA
@@ -202,6 +230,7 @@ def show_tempo_etapas(df_filtrado, df_cartorio):
             
             st.dataframe(df_styled, use_container_width=True)
         
-        with st.expander("Ver dados brutos de datas utilizados no cálculo"):
-            # Exibe o dataframe que contém as datas originais
-            st.dataframe(ensure_pandas_df(df_tempo), use_container_width=True) 
+        with st.expander("⚙️ **DEPURAÇÃO: Verifique o resultado do cálculo**"):
+            st.info("Aqui estão os dados após os cálculos. Se 'Tempo de Processo Total' estiver em branco (NaN) para a 'Familia di flora', significa que uma das datas de entrada estava em formato incorreto e não pôde ser processada.")
+            # Exibe o dataframe que contém as datas originais e os tempos calculados
+            st.dataframe(ensure_pandas_df(df_tempo).set_index('Nome da Família'), use_container_width=True) 
