@@ -3,7 +3,7 @@ import gspread
 from utils.secrets_helper import get_google_credentials
 from utils.dataframe_utils import ensure_pandas_df
 
-@st.cache_resource(ttl=3600)
+@st.cache_resource
 def get_google_sheets_client():
     """Retorna um cliente gspread autenticado."""
     try:
@@ -19,7 +19,7 @@ def get_google_sheets_client():
         print(f"[ERROR] Falha em get_google_sheets_client: {type(e).__name__} - {e}")
         return None
 
-@st.cache_data(ttl=300)
+@st.cache_data
 def fetch_data_from_sheet(_client, spreadsheet_url, sheet_name=None, gid=None):
     """Busca dados de uma planilha específica, com prioridade para o GID."""
     if not _client:
