@@ -125,10 +125,8 @@ def show_tempo_etapas(df_filtrado, df_cartorio):
             
     # Calcular o tempo total do processo
     if col_inicio_processo in df_tempo.columns and col_fim_processo in df_tempo.columns:
-        # Para a data de início, se o ano não estiver presente, adicionamos o ano corrente
-        start_date_total = pd.to_datetime(df_tempo[col_inicio_processo], format='%d/%m', errors='coerce').apply(
-            lambda dt: dt.replace(year=pd.Timestamp.now().year) if pd.notna(dt) else pd.NaT
-        )
+        # Corrigido: Assegurar que ambas as datas sejam lidas com formato completo Dia/Mês/Ano
+        start_date_total = pd.to_datetime(df_tempo[col_inicio_processo], format='%d/%m/%Y', dayfirst=True, errors='coerce')
         end_date_total = pd.to_datetime(df_tempo[col_fim_processo], format='%d/%m/%Y', dayfirst=True, errors='coerce')
         df_tempo['Tempo de Processo Total'] = (end_date_total - start_date_total).dt.days
     else:
