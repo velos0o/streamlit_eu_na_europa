@@ -96,9 +96,13 @@ def show_tempo_etapas(df_filtrado, df_cartorio):
         "Tempo de Apostila": ('APOSTILA - DATA DE INICIO', 'APOSTILA - DATA DE ENTREGA'),
         "Tempo de Drive": ('DRIVE - DATA DE INICIO', 'DRIVE - DATA DE ENTREGA')
     }
+    
+    # Colunas para o tempo total do processo
+    col_inicio_processo = 'Data de Inicio das Tratativas'
+    col_fim_processo = 'DATA DE FINALIZAÇÃO DA PASTA'
 
     # Selecionar colunas relevantes e criar uma cópia
-    colunas_necessarias = ['A', 'ID FAMÍLIA'] 
+    colunas_necessarias = ['A', 'ID FAMÍLIA', col_inicio_processo, col_fim_processo] 
     for start_col, end_col in etapas_config.values():
         colunas_necessarias.extend([start_col, end_col])
     
@@ -118,12 +122,27 @@ def show_tempo_etapas(df_filtrado, df_cartorio):
             df_tempo[nome_coluna_tempo] = (end_date - start_date).dt.days
         else:
             df_tempo[nome_coluna_tempo] = pd.NA
+            
+    # Calcular o tempo total do processo
+    if col_inicio_processo in df_tempo.columns and col_fim_processo in df_tempo.columns:
+        # Para a data de início, se o ano não estiver presente, adicionamos o ano corrente
+        start_date_total = pd.to_datetime(df_tempo[col_inicio_processo], format='%d/%m', errors='coerce').apply(
+            lambda dt: dt.replace(year=pd.Timestamp.now().year) if pd.notna(dt) else pd.NaT
+        )
+        end_date_total = pd.to_datetime(df_tempo[col_fim_processo], format='%d/%m/%Y', dayfirst=True, errors='coerce')
+        df_tempo['Tempo de Processo Total'] = (end_date_total - start_date_total).dt.days
+    else:
+        df_tempo['Tempo de Processo Total'] = pd.NA
 
     df_final = pd.merge(df_tempo, df_cert_br, on='ID FAMÍLIA', how='left')
     df_final = df_final.set_index('Nome da Família')
     
-    colunas_para_exibir = list(etapas_config.keys()) + ['Dias Certidões BR', 'Andamento Certidões BR']
-    df_final_display = df_final[colunas_para_exibir].copy()
+    colunas_para_exibir = list(etapas_config.keys()) + ['Dias Certidões BR', 'Andamento Certidões BR', 'Tempo de Processo Total']
+    
+    # Garantir que as colunas existam no dataframe antes de tentar acessá-las
+    colunas_existentes_final = [col for col in colunas_para_exibir if col in df_final.columns]
+    
+    df_final_display = df_final[colunas_existentes_final].copy()
     df_final_display.dropna(how='all', inplace=True)
 
     # --- MÉTRICAS DE MÉDIA ---
@@ -142,7 +161,8 @@ def show_tempo_etapas(df_filtrado, df_cartorio):
     """, unsafe_allow_html=True)
 
     # Calcular médias das etapas da planilha
-    medias = {col: df_final[col].mean() for col in etapas_config.keys() if col in df_final.columns}
+    colunas_media = ['Tempo de Processo Total'] + list(etapas_config.keys())
+    medias = {col: df_final[col].mean() for col in colunas_media if col in df_final.columns}
     
     # Calcular média das certidões brasileiras separadamente
     media_cert_br = df_final['Média Certidões BR'].mean()
@@ -179,6 +199,8 @@ def show_tempo_etapas(df_filtrado, df_cartorio):
                 if col in df_styled.columns:
                     # Aplicar formatação apenas em colunas que são de tempo (numéricas)
                     df_styled[col] = df_styled[col].apply(lambda x: f"{int(x)} dias" if pd.notna(x) and isinstance(x, (int, float)) else x)
+            if 'Tempo de Processo Total' in df_styled.columns:
+                df_styled['Tempo de Processo Total'] = df_styled['Tempo de Processo Total'].apply(lambda x: f"{int(x)} dias" if pd.notna(x) and isinstance(x, (int, float)) else x)
             
             st.dataframe(df_styled, use_container_width=True)
         

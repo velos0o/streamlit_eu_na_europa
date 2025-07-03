@@ -82,12 +82,15 @@ def show_priorizados(subpagina):
         return
 
     mapeamento_colunas = {
-        'B': 'ID FAMÍLIA', 'C': 'CONSULTOR RESPONSÁVEL', 'D': 'STATUS GERAL', 'E': 'PENDENCIAS',
-        'F': 'PROCURAÇÃO - STATUS', 'G': 'PROCURAÇÃO - ADM RESPONSAVEL', 'H': 'PROCURAÇÃO - DATA ENVIO', 'I': 'PROCURAÇÃO - DATA CONCLUSÃO',
-        'J': 'ANALISE - RESPONSÁVEL', 'K': 'ANALISE - DATA DE ENVIO', 'L': 'ANALISE - STATUS', 'M': 'ANALISE - DATA CONCLUSÃO',
-        'N': 'TRADUÇÃO - DATA DE INICIO', 'O': 'TRADUÇÃO - STATUS', 'P': 'TRADUÇÃO - DATA DE ENTREGA',
-        'Q': 'APOSTILA - DATA DE INICIO', 'R': 'APOSTILA - STATUS', 'S': 'APOSTILA - DATA DE ENTREGA',
-        'T': 'DRIVE - DATA DE INICIO', 'U': 'DRIVE - STATUS', 'V': 'DRIVE - DATA DE ENTREGA',
+        'B': 'ID FAMÍLIA', 'C': 'CONSULTOR RESPONSÁVEL', 
+        'D': 'Data de Inicio das Tratativas',
+        'E': 'STATUS GERAL', 'F': 'PENDENCIAS',
+        'G': 'PROCURAÇÃO - STATUS', 'H': 'PROCURAÇÃO - ADM RESPONSAVEL', 'I': 'PROCURAÇÃO - DATA ENVIO', 'J': 'PROCURAÇÃO - DATA CONCLUSÃO',
+        'K': 'ANALISE - RESPONSÁVEL', 'L': 'ANALISE - DATA DE ENVIO', 'M': 'ANALISE - STATUS', 'N': 'ANALISE - DATA CONCLUSÃO',
+        'O': 'TRADUÇÃO - DATA DE INICIO', 'P': 'TRADUÇÃO - STATUS', 'Q': 'TRADUÇÃO - DATA DE ENTREGA',
+        'R': 'APOSTILA - DATA DE INICIO', 'S': 'APOSTILA - STATUS', 'T': 'APOSTILA - DATA DE ENTREGA',
+        'U': 'DRIVE - DATA DE INICIO', 'V': 'DRIVE - STATUS', 'W': 'DRIVE - DATA DE ENTREGA',
+        'X': 'DATA DE FINALIZAÇÃO DA PASTA',
     }
     
     df = safe_pandas_df(df_raw.rename(columns=mapeamento_colunas))
