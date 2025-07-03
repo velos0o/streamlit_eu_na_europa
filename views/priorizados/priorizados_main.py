@@ -30,7 +30,7 @@ from .produtividade import show_produtividade
 from .tempo_etapas import show_tempo_etapas
 # from .produtividade_debug import show_produtividade_debug
 
-@st.cache_data(ttl=300)
+@st.cache_data
 def carregar_dados_priorizados():
     """
     Carrega dados da planilha Google Sheets de forma segura usando uma Conta de Serviço.

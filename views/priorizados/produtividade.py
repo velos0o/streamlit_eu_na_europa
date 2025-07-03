@@ -10,7 +10,7 @@ import numpy as np
 SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/15L7SdGgbF3nhiE3ptk7WFmuTwbxSY3rA1hfCnYmMFMM/edit"
 GID = 170972868
 
-@st.cache_data(ttl=300)
+@st.cache_data
 def load_producao_data():
     """Carrega os dados de produtividade da planilha do Google."""
     try:
