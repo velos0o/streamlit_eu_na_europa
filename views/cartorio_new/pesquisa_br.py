@@ -48,16 +48,60 @@ def exibir_pesquisa_br(df_cartorio):
     df_pesquisa['UF_CRM_34_NOME_FAMILIA'] = df_pesquisa['UF_CRM_34_NOME_FAMILIA'].fillna('Família Desconhecida').astype(str)
     df_pesquisa['ASSIGNED_BY_NAME'] = df_pesquisa['ASSIGNED_BY_NAME'].fillna('Responsável Desconhecido').astype(str)
 
-    # --- Métricas Gerais ---
-    total_pesquisas = len(df_pesquisa)
-    total_requerentes = df_pesquisa[df_pesquisa['UF_CRM_34_ID_REQUERENTE'] != 'Req. Desconhecido']['UF_CRM_34_ID_REQUERENTE'].nunique()
-    total_familias = df_pesquisa[df_pesquisa['UF_CRM_34_NOME_FAMILIA'] != 'Família Desconhecida']['UF_CRM_34_NOME_FAMILIA'].nunique()
+    # --- Filtros ---
+    with st.expander("🔍 Filtros", expanded=True):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Filtro de Estágio
+            estagios_unicos = sorted(df_pesquisa['ESTAGIO_LEGIVEL'].unique().tolist())
+            filtro_estagio = st.selectbox(
+                "Filtrar por Estágio",
+                options=['Todos'] + estagios_unicos,
+                index=0,
+                key="filtro_estagio_pesquisa_br"
+            )
+
+        with col2:
+            # Filtro de Protocolizado
+            coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
+            filtro_protocolizado_habilitado = coluna_protocolizado in df_pesquisa.columns
+            if filtro_protocolizado_habilitado:
+                filtro_protocolizado = st.selectbox(
+                    "Protocolizado:",
+                    options=["Todos", "Protocolizado", "Não Protocolizado"],
+                    index=0,
+                    key="filtro_protocolizado_pesquisa_br"
+                )
+            else:
+                st.caption(f":warning: Campo protocolizado não encontrado.")
+                filtro_protocolizado = "Todos"
+
+    # --- Aplicar filtro de protocolizado ANTES de calcular as métricas ---
+    df_metricas = df_pesquisa.copy()
+    if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
+        if coluna_protocolizado in df_metricas.columns:
+            df_metricas['PROTO_NORMALIZADO'] = df_metricas[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
+            
+            if filtro_protocolizado == "Protocolizado":
+                df_metricas = df_metricas[df_metricas['PROTO_NORMALIZADO'] == 'PROTOCOLIZADO']
+            elif filtro_protocolizado == "Não Protocolizado":
+                df_metricas = df_metricas[df_metricas['PROTO_NORMALIZADO'] == 'NÃO SELECIONADA']
+            
+            df_metricas = df_metricas.drop(columns=['PROTO_NORMALIZADO'])
+        else:
+            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro.")
+
+    # --- Métricas Gerais (com base no filtro de protocolizado) ---
+    total_pesquisas = len(df_metricas)
+    total_requerentes = df_metricas[df_metricas['UF_CRM_34_ID_REQUERENTE'] != 'Req. Desconhecido']['UF_CRM_34_ID_REQUERENTE'].nunique()
+    total_familias = df_metricas[df_metricas['UF_CRM_34_NOME_FAMILIA'] != 'Família Desconhecida']['UF_CRM_34_NOME_FAMILIA'].nunique()
     
-    # Contar por estágio
-    aguardando_pesquisador = len(df_pesquisa[df_pesquisa['ESTAGIO_LEGIVEL'] == 'AGUARDANDO PESQUISADOR'])
-    pesquisa_andamento = len(df_pesquisa[df_pesquisa['ESTAGIO_LEGIVEL'] == 'PESQUISA EM ANDAMENTO'])
-    pesquisa_pronta = len(df_pesquisa[df_pesquisa['ESTAGIO_LEGIVEL'] == 'PESQUISA PRONTA PARA EMISSÃO'])
-    pesquisa_nao_encontrada = len(df_pesquisa[df_pesquisa['ESTAGIO_LEGIVEL'] == 'PESQUISA NÃO ENCONTRADA'])
+    # Contar por estágio (com base no filtro de protocolizado)
+    aguardando_pesquisador = len(df_metricas[df_metricas['ESTAGIO_LEGIVEL'] == 'AGUARDANDO PESQUISADOR'])
+    pesquisa_andamento = len(df_metricas[df_metricas['ESTAGIO_LEGIVEL'] == 'PESQUISA EM ANDAMENTO'])
+    pesquisa_pronta = len(df_metricas[df_metricas['ESTAGIO_LEGIVEL'] == 'PESQUISA PRONTA PARA EMISSÃO'])
+    pesquisa_nao_encontrada = len(df_metricas[df_metricas['ESTAGIO_LEGIVEL'] == 'PESQUISA NÃO ENCONTRADA'])
     
     # Calcular taxa de conclusão
     pesquisas_finalizadas = pesquisa_pronta + pesquisa_nao_encontrada
@@ -248,59 +292,12 @@ def exibir_pesquisa_br(df_cartorio):
 
     st.markdown("---")
 
-    # Filtros
-    with st.expander("🔍 Filtros", expanded=True):
-        col1, col2 = st.columns(2)
+    # --- Aplicar filtros para a tabela ---
+    df_filtrado = df_metricas.copy()
 
-        with col1:
-            # Filtro de Estágio
-            estagios_unicos = sorted(df_pesquisa['ESTAGIO_LEGIVEL'].unique().tolist())
-            filtro_estagio = st.selectbox(
-                "Filtrar por Estágio",
-                options=['Todos'] + estagios_unicos,
-                index=0,
-                key="filtro_estagio_pesquisa_br"
-            )
-
-        with col2:
-            # Filtro de Protocolizado
-            coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
-            filtro_protocolizado_habilitado = coluna_protocolizado in df_pesquisa.columns
-            if filtro_protocolizado_habilitado:
-                filtro_protocolizado = st.selectbox(
-                    "Protocolizado:",
-                    options=["Todos", "Protocolizado", "Não Protocolizado"],
-                    index=0,
-                    key="filtro_protocolizado_pesquisa_br"
-                )
-            else:
-                st.caption(f":warning: Campo protocolizado não encontrado.")
-                filtro_protocolizado = "Todos"
-
-    # Aplicar filtros
-    df_filtrado = df_pesquisa.copy()
-
-    # Filtro de Estágio
+    # Filtro de Estágio (aplicado sobre o df que já foi filtrado por protocolizado)
     if filtro_estagio != 'Todos':
         df_filtrado = df_filtrado[df_filtrado['ESTAGIO_LEGIVEL'] == filtro_estagio]
-
-    # Aplicar filtro de Protocolizado (Lógica Corrigida com Valores Exatos)
-    if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
-        if coluna_protocolizado in df_filtrado.columns:
-            # Normalizar coluna para uma avaliação consistente (maiúsculas, sem espaços)
-            df_filtrado['PROTO_NORMALIZADO'] = df_filtrado[coluna_protocolizado].fillna('').astype(str).str.strip().str.upper()
-            
-            if filtro_protocolizado == "Protocolizado":
-                # Filtra exatamente pelo valor "PROTOCOLIZADO"
-                df_filtrado = df_filtrado[df_filtrado['PROTO_NORMALIZADO'] == 'PROTOCOLIZADO']
-            elif filtro_protocolizado == "Não Protocolizado":
-                # Filtra exatamente pelo valor "NÃO SELECIONADA" (que é a forma normalizada de "não selecionada")
-                df_filtrado = df_filtrado[df_filtrado['PROTO_NORMALIZADO'] == 'NÃO SELECIONADA']
-            
-            # Remover coluna temporária para não afetar o restante do código
-            df_filtrado = df_filtrado.drop(columns=['PROTO_NORMALIZADO'])
-        else:
-            st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro de protocolizado.")
 
     if df_filtrado.empty:
         st.warning("Nenhum registro encontrado para os filtros selecionados.")
