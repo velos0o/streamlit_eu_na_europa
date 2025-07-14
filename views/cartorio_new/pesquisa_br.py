@@ -48,6 +48,12 @@ def exibir_pesquisa_br(df_cartorio):
     df_pesquisa['UF_CRM_34_NOME_FAMILIA'] = df_pesquisa['UF_CRM_34_NOME_FAMILIA'].fillna('Família Desconhecida').astype(str)
     df_pesquisa['ASSIGNED_BY_NAME'] = df_pesquisa['ASSIGNED_BY_NAME'].fillna('Responsável Desconhecido').astype(str)
 
+    # Converter colunas de data para datetime, tratando erros
+    if 'CREATED_TIME' in df_pesquisa.columns:
+        df_pesquisa['CREATED_TIME'] = pd.to_datetime(df_pesquisa['CREATED_TIME'], errors='coerce')
+    if 'CLOSEDATE' in df_pesquisa.columns:
+        df_pesquisa['CLOSEDATE'] = pd.to_datetime(df_pesquisa['CLOSEDATE'], errors='coerce')
+
     # --- Filtros ---
     with st.expander("🔍 Filtros", expanded=True):
         col1, col2 = st.columns(2)
@@ -77,6 +83,34 @@ def exibir_pesquisa_br(df_cartorio):
                 st.caption(f":warning: Campo protocolizado não encontrado.")
                 filtro_protocolizado = "Todos"
 
+        st.markdown("---") 
+
+        col_data_tipo, col_data_inicio, col_data_fim = st.columns(3)
+
+        with col_data_tipo:
+            filtro_tipo_data = st.selectbox(
+                "Filtrar por data:",
+                options=["Nenhum", "Data de Criação", "Data de Fechamento"],
+                index=0,
+                key="filtro_tipo_data_pesquisa"
+            )
+
+        with col_data_inicio:
+            filtro_data_inicio = st.date_input(
+                "De:", 
+                value=None, 
+                key="filtro_data_inicio_pesquisa",
+                disabled=(filtro_tipo_data == "Nenhum")
+            )
+
+        with col_data_fim:
+            filtro_data_fim = st.date_input(
+                "Até:", 
+                value=None, 
+                key="filtro_data_fim_pesquisa",
+                disabled=(filtro_tipo_data == "Nenhum")
+            )
+
     # --- Aplicar filtro de protocolizado ANTES de calcular as métricas ---
     df_metricas = df_pesquisa.copy()
     if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
@@ -92,7 +126,40 @@ def exibir_pesquisa_br(df_cartorio):
         else:
             st.warning(f"Coluna {coluna_protocolizado} não encontrada ao aplicar filtro.")
 
-    # --- Métricas Gerais (com base no filtro de protocolizado) ---
+    # --- Aplicar filtro de data ---
+    if filtro_tipo_data != "Nenhum" and (filtro_data_inicio or filtro_data_fim):
+        if filtro_tipo_data == "Data de Criação":
+            coluna_data = 'CREATED_TIME'
+            if coluna_data in df_metricas.columns:
+                df_metricas_filtrado = df_metricas.dropna(subset=[coluna_data])
+                if filtro_data_inicio:
+                    df_metricas_filtrado = df_metricas_filtrado[df_metricas_filtrado[coluna_data].dt.date >= filtro_data_inicio]
+                if filtro_data_fim:
+                    df_metricas_filtrado = df_metricas_filtrado[df_metricas_filtrado[coluna_data].dt.date <= filtro_data_fim]
+                df_metricas = df_metricas_filtrado
+            else:
+                st.warning(f"A coluna de data '{coluna_data}' não foi encontrada.")
+
+        elif filtro_tipo_data == "Data de Fechamento":
+            coluna_data = 'CLOSEDATE'
+            if coluna_data in df_metricas.columns:
+                # LÓGICA CORRIGIDA:
+                # 1. Primeiro, filtrar o dataframe para conter APENAS os registros de sucesso.
+                df_metricas = df_metricas[df_metricas['STAGE_ID'] == 'DT1098_104:SUCCESS'].copy()
+
+                # 2. Em seguida, aplicar o filtro de data sobre este subconjunto.
+                df_metricas_filtrado = df_metricas.dropna(subset=[coluna_data])
+                if filtro_data_inicio:
+                    df_metricas_filtrado = df_metricas_filtrado[df_metricas_filtrado[coluna_data].dt.date >= filtro_data_inicio]
+                if filtro_data_fim:
+                    df_metricas_filtrado = df_metricas_filtrado[df_metricas_filtrado[coluna_data].dt.date <= filtro_data_fim]
+                
+                # O dataframe final contém apenas os registros de sucesso dentro do período.
+                df_metricas = df_metricas_filtrado
+            else:
+                st.warning(f"A coluna de data '{coluna_data}' não foi encontrada.")
+
+    # --- Métricas Gerais (com base nos filtros aplicados) ---
     total_pesquisas = len(df_metricas)
     total_requerentes = df_metricas[df_metricas['UF_CRM_34_ID_REQUERENTE'] != 'Req. Desconhecido']['UF_CRM_34_ID_REQUERENTE'].nunique()
     total_familias = df_metricas[df_metricas['UF_CRM_34_NOME_FAMILIA'] != 'Família Desconhecida']['UF_CRM_34_NOME_FAMILIA'].nunique()
