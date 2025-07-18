@@ -111,6 +111,17 @@ def exibir_pesquisa_br(df_cartorio):
                 disabled=(filtro_tipo_data == "Nenhum")
             )
 
+        st.markdown("---")
+
+        # Filtro de Pessoa Responsável
+        responsaveis_unicos = sorted(df_pesquisa['ASSIGNED_BY_NAME'].unique().tolist())
+        filtro_responsavel = st.selectbox(
+            "Filtrar por Responsável:",
+            options=['Todos'] + responsaveis_unicos,
+            index=0,
+            key="filtro_responsavel_pesquisa_br"
+        )
+
     # --- Aplicar filtro de protocolizado ANTES de calcular as métricas ---
     df_metricas = df_pesquisa.copy()
     if filtro_protocolizado != "Todos" and filtro_protocolizado_habilitado:
@@ -158,6 +169,10 @@ def exibir_pesquisa_br(df_cartorio):
                 df_metricas = df_metricas_filtrado
             else:
                 st.warning(f"A coluna de data '{coluna_data}' não foi encontrada.")
+
+    # --- Aplicar filtro de responsável ---
+    if filtro_responsavel != "Todos":
+        df_metricas = df_metricas[df_metricas['ASSIGNED_BY_NAME'] == filtro_responsavel]
 
     # --- Métricas Gerais (com base nos filtros aplicados) ---
     total_pesquisas = len(df_metricas)
