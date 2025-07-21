@@ -95,7 +95,10 @@ def show_priorizados(subpagina):
     
     df = safe_pandas_df(df_raw.rename(columns=mapeamento_colunas))
     if 'PENDENCIAS' in df.columns:
-        df['PENDENCIAS'] = df['PENDENCIAS'].fillna('SEM PENDENCIAS').replace('', 'SEM PENDENCIAS')
+        # Garante que nulos e strings vazias sejam tratados como tal, evitando conversão para 'SEM PENDENCIAS'
+        df['PENDENCIAS'] = df['PENDENCIAS'].fillna('').astype(str).str.strip()
+        # A linha que convertia '' para 'SEM PENDENCIAS' foi removida para garantir contagem precisa.
+
 
     # A página de Produtividade tem seus próprios filtros internos e não usa a sidebar.
     if subpagina == "Produtividade":

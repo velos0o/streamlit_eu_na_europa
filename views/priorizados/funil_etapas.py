@@ -110,9 +110,28 @@ def show_funil_etapas(df_filtrado):
     cols = st.columns(num_cols)
     col_idx = 0
 
+    # Mapeamento de etapas para suas colunas e valores de conclusão
+    mapeamento_conclusao = {
+        'Procuração': ('PROCURAÇÃO - STATUS', 'Concluida'),
+        'Analise Documental': ('ANALISE - STATUS', 'Positiva'),
+        'Tradução': ('TRADUÇÃO - STATUS', 'Concluido'),
+        'Apostilamento': ('APOSTILA - STATUS', 'Concluido'),
+        'Drive': ('DRIVE - STATUS', 'Concluido')
+    }
+
     for etapa in ordem_etapas:
-        # CONTRÁRIO: Conta famílias que NÃO têm a pendência
-        count = (~df_filtrado['PENDENCIAS'].str.contains(etapa, case=False, na=False)).sum()
+        count = 0
+        if etapa in mapeamento_conclusao:
+            # Nova lógica baseada em colunas de status específicas
+            coluna, valor_sucesso = mapeamento_conclusao[etapa]
+            if coluna in df_filtrado.columns:
+                # Conta famílias únicas onde o status é o de sucesso (ignorando case)
+                count = df_filtrado[df_filtrado[coluna].str.strip().str.lower() == valor_sucesso.lower()]['ID FAMÍLIA'].nunique()
+        else:
+            # Lógica antiga para etapas não mapeadas (Emissão, Comune)
+            # CONTRÁRIO: Conta famílias que NÃO têm a pendência
+            count = df_filtrado.loc[~df_filtrado['PENDENCIAS'].str.contains(etapa, case=False, na=False), 'ID FAMÍLIA'].nunique()
+        
         html = get_funil_html(etapa, count, tipo='andamento')
         with cols[col_idx]:
             st.markdown(html, unsafe_allow_html=True)
@@ -121,5 +140,5 @@ def show_funil_etapas(df_filtrado):
     st.markdown("---") 
 
     # 3. Contagem de famílias que concluíram TUDO
-    sem_pendencias_count = df_filtrado[df_filtrado['PENDENCIAS'] == 'SEM PENDENCIAS']['ID FAMÍLIA'].nunique()
+    sem_pendencias_count = df_filtrado[df_filtrado['PENDENCIAS'].str.strip().str.lower() == 'sem pendencias']['ID FAMÍLIA'].nunique()
     st.markdown(get_funil_html("Processo Finalizado", sem_pendencias_count, tipo='sucesso'), unsafe_allow_html=True) 
