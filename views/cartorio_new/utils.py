@@ -135,6 +135,7 @@ def categorizar_estagio(estagio_legivel):
         return 'EM ANDAMENTO' if estagio_legivel != "Desconhecido" else "DESCONHECIDO"
 
 # --- Função para buscar dados do Supabase (movida de producao.py) ---
+@st.cache_data(ttl=600) # Cache de 10 minutos
 def fetch_supabase_producao_data(data_inicio_str, data_fim_str):
     """Busca dados da função RPC get_producao_time_doutora_periodo no Supabase."""
     try:
