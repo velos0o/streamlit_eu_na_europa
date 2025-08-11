@@ -25,6 +25,7 @@ from views.higienizacoes.higienizacoes_main import show_higienizacoes
 from views.negociacao.negociacao_main import show_negociacao
 from views.priorizados.priorizados_main import show_priorizados
 from views.insumos.insumo_main import show_insumos
+from views.scaner.scaner_main import show_scaner
 import views.comune.comune_main
 import views.comune.producao_comune
 import views.comune.funil_certidoes_italianas
@@ -46,7 +47,8 @@ ROTAS = {
     "negociacao": "Negociação",
     "priorizados": "Priorizados",
     "insumos": "Insumos",
-    "extracoes": "Extrações de Dados"
+    "extracoes": "Extrações de Dados",
+    "scaner": "Scaner"
 }
 
 # Mapeamento reverso para facilitar a busca de chaves
@@ -595,6 +597,13 @@ def ir_para_extracoes():
     if 'sub' in st.query_params:
         del st.query_params['sub']
 
+def ir_para_scaner():
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Scaner'
+    st.query_params['page'] = 'scaner'
+    if 'sub' in st.query_params:
+        del st.query_params['sub']
+
 # Funções para o novo menu Insumos
 def toggle_insumo_submenu():
     reset_submenu()
@@ -842,6 +851,15 @@ if st.session_state.get('insumo_submenu_expanded', False):
                         st.markdown("</div>", unsafe_allow_html=True)
 
 st.sidebar.button(
+    "Scaner", 
+    key="btn_scaner", 
+    on_click=ir_para_scaner,
+    use_container_width=True,
+    type="primary" if st.session_state.get('pagina_atual') == "SCANER" else "secondary",
+    help="Módulo de scaner de documentos"
+)
+
+st.sidebar.button(
     "Extrações de Dados", 
     key="btn_extracoes", 
     on_click=ir_para_extracoes,
@@ -880,6 +898,8 @@ try:
         show_extracoes()
     elif current_page == "Insumos":
         show_insumos(st.session_state.get('insumo_subpagina'), st.session_state.get('adendo_subpagina'))
+    elif current_page == "Scaner":
+        show_scaner()
     else:
         st.error(f"Página '{current_page}' não encontrada!")
         

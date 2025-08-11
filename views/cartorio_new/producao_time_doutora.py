@@ -178,6 +178,17 @@ except ImportError:
 
 
 def exibir_producao_time_doutora(df_cartorio_original):
+    # --- LÓGICA DE ATUALIZAÇÃO DIÁRIA ---
+    today_str = datetime.now().date().isoformat()
+    if 'last_fetch_date_doutora' not in st.session_state:
+        st.session_state['last_fetch_date_doutora'] = today_str
+
+    if st.session_state['last_fetch_date_doutora'] != today_str:
+        st.cache_data.clear()
+        st.session_state['last_fetch_date_doutora'] = today_str
+        st.toast("Cache de dados atualizado para o novo dia!", icon="🔄")
+
+
     # --- Carregar CSS Compilado ---
     try:
         with open('assets/styles/css/main.css', 'r', encoding='utf-8') as f:

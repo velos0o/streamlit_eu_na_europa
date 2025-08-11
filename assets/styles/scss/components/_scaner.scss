@@ -1,0 +1,20 @@
+// assets/styles/scss/components/_scaner.scss
+
+@use 'sass:map';
+@use '../variables' as vars;
+@use '../mixins' as mix;
+
+.scaner-table {
+  // Esta classe já envolve o st.dataframe no Python
+  .stDataFrame {
+    td, th {
+      text-align: center;
+    }
+
+    // Alinhar a primeira coluna (Responsável) à esquerda para melhor legibilidade
+    td[data-col='0'], th[data-col='0'] {
+      text-align: left;
+      padding-left: map.get(vars.$spacing, 3);
+    }
+  }
+}
