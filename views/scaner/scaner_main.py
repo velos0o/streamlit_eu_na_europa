@@ -100,7 +100,8 @@ def show_scaner():
             st.stop()
 
         # --- Preparação dos Dados ---
-        df_scaner[TIMESTAMP_COL] = pd.to_datetime(df_scaner[TIMESTAMP_COL], errors='coerce')
+        # Ajustar fuso horário (-6 horas) e converter para datetime
+        df_scaner[TIMESTAMP_COL] = pd.to_datetime(df_scaner[TIMESTAMP_COL], errors='coerce') - pd.Timedelta(hours=6)
         df_scaner.dropna(subset=[TIMESTAMP_COL], inplace=True)
         df_scaner.sort_values(by=TIMESTAMP_COL, inplace=True)
         
