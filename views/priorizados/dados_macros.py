@@ -4,9 +4,9 @@ from utils.dataframe_utils import ensure_pandas_df
 
 def show_dados_macros(df_filtrado):
     """
-    Exibe as métricas macro e de pendências.
+    Exibe as métricas macro de tarefas cumpridas.
     """
-    st.subheader("Visão Geral", divider='blue')
+    st.subheader("Visão Geral - Tarefas Cumpridas", divider='green')
     
     # Garante que o dataframe de entrada seja pandas nativo
     df_filtrado = ensure_pandas_df(df_filtrado)
@@ -23,129 +23,87 @@ def show_dados_macros(df_filtrado):
         except Exception as e:
             st.error(f"Erro ao calcular total de famílias: {e}")
 
-    # Contagem total de cada tipo de pendência
+    # Contagem total de cada tipo de tarefa cumprida
     try:
-        # Filtrar pendências
-        mask = df_filtrado['PENDENCIAS'] != 'SEM PENDENCIAS'
-        pendencias_gerais = df_filtrado.loc[mask, 'PENDENCIAS']
+        lista_tags = [
+            'Emissão', 'Comune', 'Analise Documental', 
+            'Tradução', 'Apostilamento', 'Drive', 'Procuração'
+        ]
+
+        def get_cumpridas_list(pendencias_str):
+            if pd.isna(pendencias_str) or pendencias_str.strip() == 'SEM PENDENCIAS':
+                return lista_tags
+            if not isinstance(pendencias_str, str):
+                 return []
+            pendencias_list = [p.strip() for p in pendencias_str.split(',')]
+            return [tag for tag in lista_tags if tag not in pendencias_list]
+
+        # Aplicar a função para obter listas de tarefas cumpridas
+        cumpridas_gerais_list = df_filtrado['PENDENCIAS'].apply(get_cumpridas_list)
+
+        # Explodir a lista para contar cada tarefa cumprida
+        contagem_tags = cumpridas_gerais_list.explode().value_counts()
         
-        if not pendencias_gerais.empty:
-            lista_tags = [
-                'Emissão', 'Comune', 'Analise Documental', 
-                'Tradução', 'Apostilamento', 'Drive', 'Procuração'
-            ]
-            
-            try:
-                # Processar as tags
-                contagem_tags = pendencias_gerais.str.split(',').explode().str.strip().value_counts()
+        st.write("Totais por Tipo de Tarefa Cumprida:")
+        
+        # Exibir métricas em colunas
+        num_cols = 4 
+        cols = st.columns(num_cols)
+        
+        for i, tag in enumerate(lista_tags):
+            with cols[i % num_cols]:
+                valor = contagem_tags.get(tag, 0)
+                st.metric(label=tag, value=int(valor))
                 
-            except Exception as e:
-                st.warning(f"Erro ao processar contagem de tags: {e}")
-                contagem_tags = pd.Series(dtype=int)
-                
-            st.write("Totais por Tipo de Pendência:")
-            
-            # Exibir métricas em colunas
-            num_cols = 4 
-            cols = st.columns(num_cols)
-            
-            for i, tag in enumerate(lista_tags):
-                with cols[i % num_cols]:
-                    try:
-                        valor = contagem_tags.get(tag, 0)
-                        st.metric(label=tag, value=valor)
-                    except Exception as e:
-                        st.metric(label=tag, value=0)
-                        
     except Exception as e:
-        st.error(f"Erro ao processar pendências gerais: {e}")
+        st.error(f"Erro ao processar tarefas cumpridas: {e}")
 
-    # --- Análise 2: Pendências por Responsável ---
-    st.subheader("Pendências por Responsável", divider='blue')
+    # --- Análise 2: Tarefas Cumpridas por Responsável ---
+    st.subheader("Tarefas Cumpridas por Responsável", divider='green')
 
     try:
-        pendencias_df = df_filtrado[['CONSULTOR RESPONSÁVEL', 'PENDENCIAS']].copy()
-        pendencias_df = pendencias_df[pendencias_df['PENDENCIAS'] != 'SEM PENDENCIAS']
+        cumpridas_df = df_filtrado[['CONSULTOR RESPONSÁVEL', 'PENDENCIAS']].copy()
 
-        if pendencias_df.empty:
-            st.info("Nenhuma pendência encontrada para os filtros selecionados.")
+        if cumpridas_df.empty:
+            st.info("Nenhum dado encontrado para os filtros selecionados.")
         else:
-            # Processar as pendências
+            cumpridas_df['CUMPRIDAS_LIST'] = cumpridas_df['PENDENCIAS'].apply(get_cumpridas_list)
+            cumpridas_exploded = cumpridas_df.explode('CUMPRIDAS_LIST')
+            cumpridas_exploded['CUMPRIDA_TIPO'] = cumpridas_exploded['CUMPRIDAS_LIST']
+
+            # Tabela: Detalhamento de tarefas cumpridas por consultor e tipo
+            st.write("Contagem de Tarefas Cumprridas por Tipo e Consultor")
+            
             try:
-                pendencias_df['PENDENCIAS_LIST'] = pendencias_df['PENDENCIAS'].str.split(',')
-                pendencias_exploded = pendencias_df.explode('PENDENCIAS_LIST')
-                pendencias_exploded['PENDENCIA_TIPO'] = pendencias_exploded['PENDENCIAS_LIST'].str.strip()
-
-                # Tabela: Detalhamento de pendências por consultor e tipo
-                st.write("Contagem de Pendências por Tipo e Consultor")
+                crosstab_cumpridas = pd.crosstab(
+                    index=cumpridas_exploded['CONSULTOR RESPONSÁVEL'],
+                    columns=cumpridas_exploded['CUMPRIDA_TIPO']
+                )
                 
-                try:
-                    crosstab_pendencias = pd.crosstab(
-                        index=pendencias_exploded['CONSULTOR RESPONSÁVEL'],
-                        columns=pendencias_exploded['PENDENCIA_TIPO']
-                    )
-                    
-                    # Garantir que todas as colunas de pendências possíveis existam
-                    lista_tags = [
-                        'Emissão', 'Comune', 'Analise Documental', 
-                        'Tradução', 'Apostilamento', 'Drive', 'Procuração'
-                    ]
-                    for tag in lista_tags:
-                        if tag not in crosstab_pendencias.columns:
-                            crosstab_pendencias[tag] = 0
-                    
-                    # Reordenar colunas e adicionar total
-                    crosstab_pendencias = crosstab_pendencias[lista_tags]
-                    crosstab_pendencias['Total de Pendências'] = crosstab_pendencias.sum(axis=1)
+                # Garantir que todas as colunas de tarefas possíveis existam
+                for tag in lista_tags:
+                    if tag not in crosstab_cumpridas.columns:
+                        crosstab_cumpridas[tag] = 0
+                
+                # Reordenar colunas e adicionar total
+                crosstab_cumpridas = crosstab_cumpridas[lista_tags]
+                crosstab_cumpridas['Total de Tarefas Cumpridas'] = crosstab_cumpridas.sum(axis=1)
 
-                    crosstab_sorted = crosstab_pendencias.sort_values(by='Total de Pendências', ascending=False)
-                    
-                    st.dataframe(ensure_pandas_df(crosstab_sorted), use_container_width=True)
+                crosstab_sorted = crosstab_cumpridas.sort_values(by='Total de Tarefas Cumpridas', ascending=False)
+                
+                st.dataframe(ensure_pandas_df(crosstab_sorted), use_container_width=True)
 
-                    # Gráfico: Detalhamento de pendências por tipo e consultor
-                    st.write("Gráfico de Detalhamento das Pendências")
-                    
-                    try:
-                        # CORREÇÃO: Criar um novo DataFrame completamente independente
-                        # Usar apenas as colunas de tags (sem a coluna Total)
-                        chart_data = crosstab_pendencias[lista_tags].copy()
-                        
-                        # Converter para dicionário e depois para DataFrame para garantir tipo correto
-                        chart_dict = chart_data.to_dict()
-                        chart_data_clean = pd.DataFrame(chart_dict)
-                        
-                        # Alternativa 1: Usar st.bar_chart com dados convertidos
-                        st.bar_chart(chart_data_clean)
-                        
-                    except Exception as e:
-                        # Se ainda houver erro, tentar com plotly ou altair
-                        try:
-                            st.warning("Tentando método alternativo de visualização...")
-                            
-                            # Alternativa 2: Usar st.dataframe com style
-                            chart_data_styled = chart_data.style.background_gradient(cmap='Blues')
-                            st.dataframe(chart_data_styled, use_container_width=True)
-                            
-                        except:
-                            # Alternativa 3: Usar st.columns com métricas
-                            st.error(f"❌ Erro ao criar gráfico de barras: {e}")
-                            st.info("Exibindo dados em formato alternativo:")
-                            
-                            for consultor in chart_data.index:
-                                st.write(f"**{consultor}**")
-                                cols = st.columns(len(lista_tags))
-                                for i, tag in enumerate(lista_tags):
-                                    with cols[i]:
-                                        st.metric(tag, chart_data.loc[consultor, tag])
-                    
-                except Exception as e:
-                    st.error(f"Erro ao criar crosstab: {e}")
-                    
+                # Gráfico: Detalhamento de tarefas cumpridas por tipo e consultor
+                st.write("Gráfico de Detalhamento das Tarefas Cumpridas")
+                
+                chart_data = crosstab_cumpridas[lista_tags].copy()
+                st.bar_chart(chart_data)
+                
             except Exception as e:
-                st.error(f"Erro ao processar pendências explodidas: {e}")
+                st.error(f"Erro ao criar a tabela de tarefas cumpridas: {e}")
                 
     except Exception as e:
-        st.error(f"Erro ao processar pendências por responsável: {e}")
+        st.error(f"Erro ao processar tarefas cumpridas por responsável: {e}")
 
     # --- Exibição dos Dados Brutos Filtrados ---
     try:
