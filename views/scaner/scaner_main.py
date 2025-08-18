@@ -90,6 +90,9 @@ def show_scaner():
             df_usuarios['ID'] = df_usuarios['ID'].astype(str)
             mapa_usuarios = pd.Series(df_usuarios.FULL_NAME.values, index=df_usuarios.ID).to_dict()
 
+        # Garantir que a coluna de ID de usuário seja sempre string
+        df_scaner[USER_ID_COL] = df_scaner[USER_ID_COL].astype(str)
+
         # Verificação de colunas
         cols_necessarias = [TIMESTAMP_COL, FAMILY_ID_COL, USER_ID_COL]
         cols_faltantes = [col for col in cols_necessarias if col not in df_scaner.columns]
@@ -177,6 +180,51 @@ def show_scaner():
 
         # --- Métricas Macro ---
         st.subheader("Métricas Gerais")
+
+        # --- NOVO DESIGN DAS MÉTRICAS GERAIS (aplicado do Tradução) ---
+        st.markdown("""
+        <style>
+            .metric-card {
+                background-color: #F8F9FA;
+                border: 2px solid #007BFF;
+                border-radius: .25rem;
+                padding: 1.5rem;
+                margin-bottom: 1rem;
+                box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075);
+                display: flex;
+                align-items: center;
+            }
+            .metric-card .icon {
+                font-size: 3rem;
+                margin-right: 1.5rem;
+                color: #007BFF;
+            }
+            .metric-card .metric-content {
+                flex-grow: 1;
+            }
+            .metric-card .metric-value {
+                font-size: 2rem;
+                font-weight: 700;
+                margin: 0;
+            }
+            .metric-card .metric-label {
+                font-size: 1rem;
+                margin: 0;
+                color: #6C757D;
+            }
+            /* Cores alternativas */
+            .metric-card.orange { border-color: #FD7E14; }
+            .metric-card.orange .icon { color: #FD7E14; }
+            .metric-card.red { border-color: #DC3545; }
+            .metric-card.red .icon { color: #DC3545; }
+            .metric-card.blue { border-color: #17A2B8; }
+            .metric-card.blue .icon { color: #17A2B8; }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Carregar a fonte dos ícones (Bootstrap Icons)
+        st.markdown('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">', unsafe_allow_html=True)
+        
         total_envios = len(df_filtrado)
         total_familias = df_filtrado[FAMILY_ID_COL].nunique()
         
@@ -184,13 +232,47 @@ def show_scaner():
         primeiro_envio_familia = df_filtrado.groupby(FAMILY_ID_COL)[TIMESTAMP_COL].min().sort_values()
         tempo_medio_familias = primeiro_envio_familia.diff().mean()
 
-        st.markdown('<div class="producao-comune-metricas producao-comune-metricas--neutral">', unsafe_allow_html=True)
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total de Envios (Filtrado)", f"{total_envios}")
-        col2.metric("Total de Famílias (Filtrado)", f"{total_familias}")
-        col3.metric("Tempo Médio por Card", format_timedelta(tempo_medio_cards))
-        col4.metric("Tempo Médio por Família", format_timedelta(tempo_medio_familias))
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Layout em colunas para os cards
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="icon"><i class="bi bi-box-arrow-in-up"></i></div>
+                <div class="metric-content">
+                    <p class="metric-value">{total_envios}</p>
+                    <p class="metric-label">Total de Envios</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="metric-card blue">
+                <div class="icon"><i class="bi bi-stopwatch"></i></div>
+                <div class="metric-content">
+                    <p class="metric-value">{format_timedelta(tempo_medio_cards)}</p>
+                    <p class="metric-label">Tempo Médio por Card</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            st.markdown(f"""
+            <div class="metric-card orange">
+                <div class="icon"><i class="bi bi-people-fill"></i></div>
+                <div class="metric-content">
+                    <p class="metric-value">{total_familias}</p>
+                    <p class="metric-label">Total de Famílias</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="metric-card red">
+                <div class="icon"><i class="bi bi-speedometer2"></i></div>
+                <div class="metric-content">
+                    <p class="metric-value">{format_timedelta(tempo_medio_familias)}</p>
+                    <p class="metric-label">Tempo Médio por Família</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.markdown("---")
 
@@ -203,8 +285,11 @@ def show_scaner():
             tempo_medio_por_usuario = df_filtrado.groupby(USER_ID_COL)['time_diff'].mean().reset_index(name='Tempo Médio de Envio')
 
             df_desempenho = pd.merge(total_enviado_por_usuario, tempo_medio_por_usuario, on=USER_ID_COL, how='left')
-            df_desempenho[USER_ID_COL] = df_desempenho[USER_ID_COL].astype(str).map(mapa_usuarios).fillna(df_desempenho[USER_ID_COL])
+            
+            # Mapear e garantir que a coluna final seja string
+            df_desempenho[USER_ID_COL] = df_desempenho[USER_ID_COL].map(mapa_usuarios).fillna(df_desempenho[USER_ID_COL])
             df_desempenho.rename(columns={USER_ID_COL: 'Responsável'}, inplace=True)
+            df_desempenho['Responsável'] = df_desempenho['Responsável'].astype(str)
             
             # Adicionar meta e progresso apenas se o filtro de data estiver ativo
             colunas_tabela = ['Responsável', 'Total Enviado', 'Tempo Médio de Envio']
