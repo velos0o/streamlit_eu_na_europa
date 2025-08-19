@@ -207,8 +207,8 @@ def show_traducao():
         
         # Métricas Gerais
         df_filtrado[DATA_EM_ANDAMENTO_COL] = pd.to_datetime(df_filtrado[DATA_EM_ANDAMENTO_COL], errors='coerce')
-        df_filtrado[DATA_CONCLUSAO_TRADUCAO_COL] = pd.to_datetime(df_filtrado[DATA_CONCLUSAO_TRADUCAO_COL], errors='coerce')
-        df_filtrado['tempo_traducao_conclusao'] = df_filtrado[DATA_CONCLUSAO_TRADUCAO_COL] - df_filtrado[DATA_EM_ANDAMENTO_COL]
+        df_filtrado[DATA_REVISAO_TRADUCAO_COL] = pd.to_datetime(df_filtrado[DATA_REVISAO_TRADUCAO_COL], errors='coerce') # Usar data de revisão
+        df_filtrado['tempo_traducao_conclusao'] = df_filtrado[DATA_REVISAO_TRADUCAO_COL] - df_filtrado[DATA_EM_ANDAMENTO_COL]
         tempo_medio_geral = df_filtrado['tempo_traducao_conclusao'].mean()
 
         docs_produzidos_geral = df_filtrado[df_filtrado[STAGE_ID_COL] == STAGE_PRODUZIDO].shape[0]
@@ -218,7 +218,7 @@ def show_traducao():
         # Métricas de Desempenho por Tradutor
         df_tradutores = pd.DataFrame() # Inicializa vazio
         if not df_filtrado.empty and USER_TRADUTOR_COL in df_filtrado.columns:
-            df_filtrado['em_andamento'] = df_filtrado[DATA_EM_ANDAMENTO_COL].notna() & df_filtrado[DATA_CONCLUSAO_TRADUCAO_COL].isna()
+            df_filtrado['em_andamento'] = df_filtrado[DATA_EM_ANDAMENTO_COL].notna() & df_filtrado[DATA_REVISAO_TRADUCAO_COL].isna() # Usar data de revisão
             df_tradutores = df_filtrado.groupby(USER_TRADUTOR_COL).agg(
                 docs_pendentes=(STAGE_ID_COL, lambda x: (x == STAGE_PENDENTE).sum()),
                 docs_em_andamento=('em_andamento', 'sum'),
@@ -354,7 +354,7 @@ def show_traducao():
         if not df_filtrado.empty:
             df_detalhes = df_filtrado[[
                 TITLE_COL, FAMILY_ID_COL, USER_TRADUTOR_COL, 
-                USER_REVISOR_COL, DATA_CONCLUSAO_TRADUCAO_COL, AVALIACAO_TRADUCAO_COL
+                USER_REVISOR_COL, DATA_REVISAO_TRADUCAO_COL, AVALIACAO_TRADUCAO_COL
             ]].copy()
 
             df_detalhes.rename(columns={
@@ -362,7 +362,7 @@ def show_traducao():
                 FAMILY_ID_COL: 'ID Família',
                 USER_TRADUTOR_COL: 'Tradutor',
                 USER_REVISOR_COL: 'Revisor',
-                DATA_CONCLUSAO_TRADUCAO_COL: 'Data Conclusão',
+                DATA_REVISAO_TRADUCAO_COL: 'Data Revisão',
                 AVALIACAO_TRADUCAO_COL: 'Avaliação'
             }, inplace=True)
             
