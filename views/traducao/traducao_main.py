@@ -130,9 +130,9 @@ def show_traducao():
             # Linha 1: Filtros de Usuário
             col1, col2 = st.columns(2)
             with col1:
-                filtro_tradutor = st.selectbox("Filtrar por Tradutor", ["Todos"] + tradutores_disponiveis)
+                filtros_tradutores = st.multiselect("Filtrar por Tradutor", tradutores_disponiveis)
             with col2:
-                filtro_revisor = st.selectbox("Filtrar por Revisor", ["Todos"] + revisores_disponiveis)
+                filtros_revisores = st.multiselect("Filtrar por Revisor", revisores_disponiveis)
 
             # Linha 2: Filtros de Texto
             col3, col4 = st.columns(2)
@@ -169,12 +169,12 @@ def show_traducao():
         # --- APLICAÇÃO DOS FILTROS ---
         df_filtrado = df_traducao.copy()
 
-        # Filtros de usuário (agora filtrando diretamente por nome)
-        if filtro_tradutor != "Todos":
-            df_filtrado = df_filtrado[df_filtrado[USER_TRADUTOR_COL] == filtro_tradutor]
+        # Filtros de usuário (agora filtrando diretamente por nome e com seleção múltipla)
+        if filtros_tradutores:
+            df_filtrado = df_filtrado[df_filtrado[USER_TRADUTOR_COL].isin(filtros_tradutores)]
         
-        if filtro_revisor != "Todos":
-            df_filtrado = df_filtrado[df_filtrado[USER_REVISOR_COL] == filtro_revisor]
+        if filtros_revisores:
+            df_filtrado = df_filtrado[df_filtrado[USER_REVISOR_COL].isin(filtros_revisores)]
 
         # Filtros de texto
         if filtro_titulo:
@@ -336,7 +336,10 @@ def show_traducao():
         st.subheader("Desempenho por Revisor")
         
         if not df_filtrado.empty and USER_REVISOR_COL in df_filtrado.columns:
-            df_revisores = df_filtrado.groupby(USER_REVISOR_COL).agg(
+            # Remover valores nulos da coluna de revisor antes de agrupar para evitar erros
+            df_revisores_filtrado = df_filtrado.dropna(subset=[USER_REVISOR_COL])
+
+            df_revisores = df_revisores_filtrado.groupby(USER_REVISOR_COL).agg(
                 total_documentos=('TITLE', 'count')
             ).reset_index()
 

@@ -14,6 +14,19 @@ def show_dados_macros(df_filtrado):
     if df_filtrado.empty:
         st.warning("Não há dados para exibir.")
         return
+
+    lista_tags = [
+        'Emissão', 'Comune', 'Analise Documental', 
+        'Tradução', 'Apostilamento', 'Drive', 'Procuração'
+    ]
+
+    mapeamento_conclusao = {
+        'Procuração': ('PROCURAÇÃO - STATUS', 'Concluida'),
+        'Analise Documental': ('ANALISE - STATUS', 'Positiva'),
+        'Tradução': ('TRADUÇÃO - STATUS', 'Concluido'),
+        'Apostilamento': ('APOSTILA - STATUS', 'Concluido'),
+        'Drive': ('DRIVE - STATUS', 'Concluido')
+    }
     
     col1, col2 = st.columns(2)
     with col1:
@@ -25,24 +38,19 @@ def show_dados_macros(df_filtrado):
 
     # Contagem total de cada tipo de tarefa cumprida
     try:
-        lista_tags = [
-            'Emissão', 'Comune', 'Analise Documental', 
-            'Tradução', 'Apostilamento', 'Drive', 'Procuração'
-        ]
-
-        def get_cumpridas_list(pendencias_str):
-            if pd.isna(pendencias_str) or pendencias_str.strip() == 'SEM PENDENCIAS':
-                return lista_tags
-            if not isinstance(pendencias_str, str):
-                 return []
-            pendencias_list = [p.strip() for p in pendencias_str.split(',')]
-            return [tag for tag in lista_tags if tag not in pendencias_list]
-
-        # Aplicar a função para obter listas de tarefas cumpridas
-        cumpridas_gerais_list = df_filtrado['PENDENCIAS'].apply(get_cumpridas_list)
-
-        # Explodir a lista para contar cada tarefa cumprida
-        contagem_tags = cumpridas_gerais_list.explode().value_counts()
+        contagem_tags = {}
+        for etapa in lista_tags:
+            count = 0
+            if etapa in mapeamento_conclusao:
+                coluna, valor_sucesso = mapeamento_conclusao[etapa]
+                if coluna in df_filtrado.columns:
+                    # Conta famílias únicas onde o status é o de sucesso (ignorando case e espaços)
+                    condicao = df_filtrado[coluna].str.strip().str.lower() == valor_sucesso.lower()
+                    count = df_filtrado.loc[condicao.fillna(False)]['ID FAMÍLIA'].nunique()
+            else:
+                # Lógica antiga para etapas não mapeadas (Emissão, Comune)
+                count = df_filtrado.loc[~df_filtrado['PENDENCIAS'].str.contains(etapa, case=False, na=False), 'ID FAMÍLIA'].nunique()
+            contagem_tags[etapa] = count
         
         st.write("Totais por Tipo de Tarefa Cumprida:")
         
@@ -62,22 +70,41 @@ def show_dados_macros(df_filtrado):
     st.subheader("Tarefas Cumpridas por Responsável", divider='green')
 
     try:
-        cumpridas_df = df_filtrado[['CONSULTOR RESPONSÁVEL', 'PENDENCIAS']].copy()
+        lista_cumpridas_por_responsavel = []
 
-        if cumpridas_df.empty:
+        # Iterar sobre as etapas para construir a lista de cumpridas
+        for etapa in lista_tags:
+            df_temp = pd.DataFrame()
+            if etapa in mapeamento_conclusao:
+                coluna, valor_sucesso = mapeamento_conclusao[etapa]
+                if coluna in df_filtrado.columns and not df_filtrado[coluna].isnull().all():
+                    condicao = df_filtrado[coluna].str.strip().str.lower() == valor_sucesso.lower()
+                    df_etapa_cumprida = df_filtrado.loc[condicao.fillna(False)]
+                    # Seleciona as colunas necessárias e adiciona o tipo de tarefa
+                    df_temp = df_etapa_cumprida[['CONSULTOR RESPONSÁVEL', 'ID FAMÍLIA']].copy()
+                    df_temp['CUMPRIDA_TIPO'] = etapa
+            else: # Lógica antiga para Emissão e Comune
+                df_etapa_cumprida = df_filtrado.loc[~df_filtrado['PENDENCIAS'].str.contains(etapa, case=False, na=False)]
+                df_temp = df_etapa_cumprida[['CONSULTOR RESPONSÁVEL', 'ID FAMÍLIA']].copy()
+                df_temp['CUMPRIDA_TIPO'] = etapa
+            
+            if not df_temp.empty:
+                lista_cumpridas_por_responsavel.append(df_temp)
+
+        if not lista_cumpridas_por_responsavel:
             st.info("Nenhum dado encontrado para os filtros selecionados.")
         else:
-            cumpridas_df['CUMPRIDAS_LIST'] = cumpridas_df['PENDENCIAS'].apply(get_cumpridas_list)
-            cumpridas_exploded = cumpridas_df.explode('CUMPRIDAS_LIST')
-            cumpridas_exploded['CUMPRIDA_TIPO'] = cumpridas_exploded['CUMPRIDAS_LIST']
+            # Concatena os dataframes e remove duplicatas para não contar a mesma família/tarefa/consultor mais de uma vez
+            cumpridas_df = pd.concat(lista_cumpridas_por_responsavel, ignore_index=True)
+            cumpridas_df.drop_duplicates(inplace=True)
 
             # Tabela: Detalhamento de tarefas cumpridas por consultor e tipo
-            st.write("Contagem de Tarefas Cumprridas por Tipo e Consultor")
+            st.write("Contagem de Tarefas Cumpridas por Tipo e Consultor")
             
             try:
                 crosstab_cumpridas = pd.crosstab(
-                    index=cumpridas_exploded['CONSULTOR RESPONSÁVEL'],
-                    columns=cumpridas_exploded['CUMPRIDA_TIPO']
+                    index=cumpridas_df['CONSULTOR RESPONSÁVEL'],
+                    columns=cumpridas_df['CUMPRIDA_TIPO']
                 )
                 
                 # Garantir que todas as colunas de tarefas possíveis existam
