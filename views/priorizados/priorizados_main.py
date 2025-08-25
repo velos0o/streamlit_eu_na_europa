@@ -94,6 +94,7 @@ def show_priorizados(subpagina):
     }
     
     df = safe_pandas_df(df_raw.rename(columns=mapeamento_colunas))
+
     if 'PENDENCIAS' in df.columns:
         # Garante que nulos e strings vazias sejam tratados como tal, evitando conversão para 'SEM PENDENCIAS'
         df['PENDENCIAS'] = df['PENDENCIAS'].fillna('').astype(str).str.strip()
@@ -124,7 +125,7 @@ def show_priorizados(subpagina):
     ])
 
     if subpagina == "Dados Macros":
-        show_dados_macros(safe_pandas_df(df_filtrado))
+        show_dados_macros(safe_pandas_df(df_filtrado), safe_pandas_df(df), safe_pandas_df(df_cartorio))
     elif subpagina == "Funil - Etapas":
         show_funil_etapas(safe_pandas_df(df_filtrado))
     elif subpagina == "Pendências Liberadas":
@@ -135,4 +136,25 @@ def show_priorizados(subpagina):
         show_tempo_etapas(safe_pandas_df(df_filtrado), safe_pandas_df(df_cartorio))
     else:
         st.error(f"Sub-página '{subpagina}' não encontrada.")
-        show_dados_macros(safe_pandas_df(df_filtrado)) 
+        show_dados_macros(safe_pandas_df(df_filtrado), safe_pandas_df(df), safe_pandas_df(df_cartorio))
+
+    # --- Verificação de IDs Duplicados (movido para o final da página) ---
+    if 'ID FAMÍLIA' in df.columns:
+        # Ignora IDs vazios ou nulos na verificação
+        ids_validos = df['ID FAMÍLIA'].dropna().loc[df['ID FAMÍLIA'] != '']
+        if ids_validos.duplicated().any():
+            st.warning("Atenção: Foram encontrados IDs de família duplicados na planilha. Isso pode afetar a precisão dos cálculos.")
+            
+            # Pega todas as ocorrências de IDs que são duplicados
+            duplicated_series = ids_validos[ids_validos.duplicated(keep=False)]
+            
+            # Conta as ocorrências de cada ID duplicado
+            counts = duplicated_series.value_counts().reset_index()
+            counts.columns = ['ID Família Duplicado', 'Ocorrências']
+            
+            # Exibe os IDs duplicados em uma tabela
+            st.dataframe(counts, use_container_width=True)
+
+            # Exibe o total de linhas duplicadas como uma métrica
+            total_ocorrencias = counts['Ocorrências'].sum()
+            st.metric(label="Total de Linhas com ID Duplicado", value=total_ocorrencias) 
