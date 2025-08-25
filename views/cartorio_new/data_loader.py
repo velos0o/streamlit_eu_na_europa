@@ -332,29 +332,47 @@ def carregar_dados_crm_deal_cat46():
         return pd.DataFrame()
         
     # Selecionar colunas e processar dados básicos
-    colunas_necessarias = ['ID', 'TITLE', 'ASSIGNED_BY_NAME']
+    colunas_necessarias = ['ID', 'TITLE', 'ASSIGNED_BY_NAME', 'STAGE_ID'] # Adicionado STAGE_ID
     colunas_presentes = [col for col in colunas_necessarias if col in df_deal.columns]
     df_deal = df_deal[colunas_presentes].copy()
 
-    # Carregar crm_deal_uf com filtro de ID para obter campos personalizados
+    # Carregar crm_deal_uf em lotes para evitar o limite de 1000 IDs no filtro da API
     table_deal_uf = "crm_deal_uf"
-    deal_ids = df_deal['ID'].astype(str).tolist()
-    if len(deal_ids) > 1000:
-        deal_ids = deal_ids[:1000]
-    deal_filter = {"dimensionsFilters": [[]]}
-    deal_filter["dimensionsFilters"][0].append({
-        "fieldName": "DEAL_ID", 
-        "values": deal_ids, 
-        "type": "INCLUDE", 
-        "operator": "EQUALS"
-    })
-    df_deal_uf = load_data_cached(table_deal_uf, filters=deal_filter)
+    all_deal_ids = df_deal['ID'].astype(str).tolist()
+    df_deal_uf_list = []
+    batch_size = 900  # Usar um tamanho de lote seguro, abaixo de 1000
+
+    print(f"[INFO] Buscando campos UF para {len(all_deal_ids)} deals em lotes de {batch_size}...")
+
+    for i in range(0, len(all_deal_ids), batch_size):
+        batch_ids = all_deal_ids[i:i + batch_size]
+        
+        deal_filter = {
+            "dimensionsFilters": [[{
+                "fieldName": "DEAL_ID", 
+                "values": batch_ids, 
+                "type": "INCLUDE", 
+                "operator": "EQUALS"
+            }]]
+        }
+        
+        df_batch = load_data_cached(table_deal_uf, filters=deal_filter)
+        if not df_batch.empty:
+            df_deal_uf_list.append(df_batch)
+
+    # Concatenar todos os lotes em um único DataFrame
+    if df_deal_uf_list:
+        df_deal_uf = pd.concat(df_deal_uf_list, ignore_index=True)
+        print(f"[INFO] Total de {len(df_deal_uf)} registros UF carregados de {len(all_deal_ids)} deals.")
+    else:
+        df_deal_uf = pd.DataFrame()
+
     if df_deal_uf.empty:
-        print("[WARN] Não foi possível carregar os dados da tabela crm_deal_uf para a categoria 46.")
+        print("[WARN] Nenhum dado da tabela crm_deal_uf foi carregado para a categoria 46.")
         return pd.DataFrame()
 
     # Selecionar campos personalizados necessários
-    colunas_uf_obrigatorias = ['DEAL_ID', 'UF_CRM_1722605592778', 'UF_CRM_1746054586042']
+    colunas_uf_obrigatorias = ['DEAL_ID', 'UF_CRM_1722605592778', 'UF_CRM_1746054586042', 'UF_CRM_1751313454983'] # Adicionado campo de adendo
     colunas_uf_presentes = [col for col in colunas_uf_obrigatorias if col in df_deal_uf.columns]
     
     # Verificar se os campos chave existem
@@ -373,7 +391,7 @@ def carregar_dados_crm_deal_cat46():
         df_deal_uf_filtrado,
         left_on='ID',
         right_on='DEAL_ID',
-        how='inner'
+        how='left' # CORRIGIDO: de 'inner' para 'left' para incluir todos os deals
     )
     
     # Processar data de venda (UF_CRM_1746054586042)
@@ -387,6 +405,10 @@ def carregar_dados_crm_deal_cat46():
 
     # Garantir que UF_CRM_1722605592778 esteja como string para facilitar o merge
     df_mesclado['UF_CRM_1722605592778'] = df_mesclado['UF_CRM_1722605592778'].fillna('N/A').astype(str).str.strip()
+    
+    # --- DEBUG: Exibir dados brutos da Categoria 46 ---
+    st.expander("DEBUG: Dados Brutos da Categoria 46 (Pasta Pronta)").dataframe(df_mesclado)
+    # --- FIM DEBUG ---
     
     return df_mesclado
 
@@ -470,19 +492,26 @@ def carregar_dados_cartorio():
             # NOVA IMPLEMENTAÇÃO - Usar dados da cat 46
             print(f"[INFO] Processando merge com dados de negócio categoria 46 ({len(df_deal_cat46)} registros)")
             
-            # Selecionar colunas relevantes do df_deal_cat46 para o merge
-            col_id_familia_cat46 = 'UF_CRM_1722605592778'  # ID da família
-            col_data_venda = 'DATA_VENDA'  # Já renomeado na função carregar_dados_crm_deal_cat46
+            col_id_familia_cat46 = 'UF_CRM_1722605592778'
             
-            # Preparar dados para merge
-            df_deal_to_merge = df_deal_cat46[[col_id_familia_cat46, col_data_venda]].copy()
-            
-            # Remover registros sem ID ou data
-            df_deal_to_merge = df_deal_to_merge.dropna(subset=[col_id_familia_cat46, col_data_venda])
-            
-            # Ordenar por data (ascendente) e pegar a primeira data para cada ID de família
-            df_deal_to_merge = df_deal_to_merge.sort_values(by=col_data_venda, ascending=True)
-            df_deal_to_merge = df_deal_to_merge.drop_duplicates(subset=[col_id_familia_cat46], keep='first')
+            # Renomear STAGE_ID para DEAL_STAGE_ID para corresponder ao que 'acompanhamento.py' espera
+            if 'STAGE_ID' in df_deal_cat46.columns:
+                df_deal_cat46 = df_deal_cat46.rename(columns={'STAGE_ID': 'DEAL_STAGE_ID'})
+
+            # Selecionar colunas do funil "Pasta Pronta" para o merge
+            # Inclui as colunas de status (DEAL_STAGE_ID) e o campo de adendo
+            colunas_para_merge = [
+                col_id_familia_cat46, 
+                'DATA_VENDA', 
+                'DEAL_STAGE_ID', 
+                'UF_CRM_1751313454983'
+            ]
+            colunas_existentes_para_merge = [col for col in colunas_para_merge if col in df_deal_cat46.columns]
+            df_deal_to_merge = df_deal_cat46[colunas_existentes_para_merge]
+
+            # A lógica de agregação para pegar a data de venda mais antiga e a prioridade de status
+            # é tratada posteriormente ou no próprio 'acompanhamento.py'. 
+            # Portanto, não removemos duplicados aqui para manter toda a informação de status.
             
             # Coluna ID Família no Cartório
             col_id_familia_cartorio = 'UF_CRM_34_ID_FAMILIA'

@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date # Adicionar date
+from ..priorizados.priorizados_main import carregar_dados_priorizados
 
 # Reutilizar as funções de visao_geral para consistência
 # from .visao_geral import simplificar_nome_estagio, categorizar_estagio # Comentado
@@ -40,24 +41,45 @@ def exibir_acompanhamento(df_cartorio):
         st.warning("Dados de cartório não disponíveis para acompanhamento.")
         return
 
+    # --- Carregar dados de Priorizados para obter o responsável correto ---
+    with st.spinner("Carregando dados de responsáveis atualizados..."):
+        df_priorizados_raw = carregar_dados_priorizados()
+
+    df_responsavel_atualizado = pd.DataFrame()
+    if not df_priorizados_raw.empty:
+        # Mapear colunas A (Nome da Família) e C (CONSULTOR RESPONSÁVEL)
+        mapeamento_colunas = {
+            'A': 'NOME_FAMILIA_PLANILHA',
+            'C': 'CONSULTOR RESPONSÁVEL'
+        }
+        df_priorizados = df_priorizados_raw.rename(columns=mapeamento_colunas)
+        
+        if 'NOME_FAMILIA_PLANILHA' in df_priorizados.columns and 'CONSULTOR RESPONSÁVEL' in df_priorizados.columns:
+            df_responsavel_atualizado = df_priorizados[['NOME_FAMILIA_PLANILHA', 'CONSULTOR RESPONSÁVEL']].copy()
+            df_responsavel_atualizado.dropna(subset=['NOME_FAMILIA_PLANILHA', 'CONSULTOR RESPONSÁVEL'], inplace=True)
+            # Remover linhas onde o consultor é uma string vazia
+            df_responsavel_atualizado = df_responsavel_atualizado[df_responsavel_atualizado['CONSULTOR RESPONSÁVEL'].str.strip() != '']
+            # Em caso de duplicatas de família, manter a última entrada da planilha
+            df_responsavel_atualizado.drop_duplicates(subset=['NOME_FAMILIA_PLANILHA'], keep='last', inplace=True)
+
     # Verificar se as colunas necessárias existem
     coluna_nome_familia = 'UF_CRM_34_NOME_FAMILIA'  # ATUALIZADO para o novo campo SPA
     coluna_id_requerente = 'UF_CRM_34_ID_REQUERENTE' # ATUALIZADO para o novo campo SPA
     coluna_data_venda_familia = 'DATA_VENDA_FAMILIA' # Vem da categoria 46 - UF_CRM_1746054586042
-    coluna_responsavel = 'ASSIGNED_BY_NAME' # Coluna do responsável (ASSUMIDO)
-    colunas_requeridas = ['ID', 'STAGE_ID', coluna_nome_familia, coluna_id_requerente, coluna_data_venda_familia, coluna_responsavel]
+    coluna_responsavel_bitrix = 'ASSIGNED_BY_NAME' # Coluna do responsável original do Bitrix
+    colunas_requeridas = ['ID', 'STAGE_ID', coluna_nome_familia, coluna_id_requerente, coluna_data_venda_familia, coluna_responsavel_bitrix]
     colunas_faltantes = [col for col in colunas_requeridas if col not in df_cartorio.columns]
 
     if colunas_faltantes:
         # Ajustar a mensagem de erro para a nova coluna de data
-        cols_necessarias_origem = [c for c in colunas_faltantes if c not in [coluna_data_venda_familia, coluna_responsavel]]
+        cols_necessarias_origem = [c for c in colunas_faltantes if c not in [coluna_data_venda_familia, coluna_responsavel_bitrix]]
         msg_erro = ""
         if cols_necessarias_origem:
              msg_erro += f"Erro: As seguintes colunas são necessárias e não foram encontradas nos dados originais: {', '.join(cols_necessarias_origem)}. Verifique o data_loader. "
         if coluna_data_venda_familia in colunas_faltantes:
              msg_erro += f"Erro: A coluna '{coluna_data_venda_familia}' (obtida da categoria 46 - UF_CRM_1746054586042) não foi encontrada. Verifique o merge no data_loader. "
-        if coluna_responsavel in colunas_faltantes: # Adicionar verificação do responsável
-             msg_erro += f"Erro: A coluna '{coluna_responsavel}' (necessária para o responsável) não foi encontrada. Verifique o data_loader."
+        if coluna_responsavel_bitrix in colunas_faltantes: # Adicionar verificação do responsável
+             msg_erro += f"Erro: A coluna '{coluna_responsavel_bitrix}' (necessária como fallback para o responsável) não foi encontrada. Verifique o data_loader."
         
         # Adicionar espaço entre as mensagens se ambas existirem
         msg_erro = msg_erro.strip() # Remover espaços extras no início/fim
@@ -66,12 +88,33 @@ def exibir_acompanhamento(df_cartorio):
         # st.dataframe(df_cartorio.head()) # Descomentar se precisar debugar
         return
 
-    # --- Pré-processamento --- 
+    # --- Pré-processamento e Merge para atualizar o responsável --- 
     df = df_cartorio.copy()
+
+    if not df_responsavel_atualizado.empty:
+        # --- PREPARAR CHAVES PARA O MERGE ---
+        # Garantir que ambas as chaves sejam strings e sem espaços extras para um merge robusto
+        df[coluna_nome_familia] = df[coluna_nome_familia].astype(str).str.strip()
+        df_responsavel_atualizado['NOME_FAMILIA_PLANILHA'] = df_responsavel_atualizado['NOME_FAMILIA_PLANILHA'].astype(str).str.strip()
+
+        df = pd.merge(
+            df,
+            df_responsavel_atualizado,
+            left_on=coluna_nome_familia,
+            right_on='NOME_FAMILIA_PLANILHA',
+            how='left'
+        )
+        # Define 'responsavel_final', priorizando a planilha.
+        df['responsavel_final'] = df['CONSULTOR RESPONSÁVEL'].fillna(df[coluna_responsavel_bitrix])
+    else:
+        # Se a planilha não carregar, usa a coluna original.
+        df['responsavel_final'] = df[coluna_responsavel_bitrix]
+        
+    coluna_responsavel = 'responsavel_final' # Usar esta coluna como a definitiva
 
     # 1. Garantir tipo correto para ID Requerente (já feito no loader, mas confirmando)
     df[coluna_id_requerente] = df[coluna_id_requerente].fillna('Req. Desconhecido').astype(str)
-    # Tratar responsável Nulo (antes da agregação)
+    # Tratar responsável Nulo (agora na coluna final)
     df[coluna_responsavel] = df[coluna_responsavel].fillna('Desconhecido').astype(str)
     
     # Coluna Data Venda Família (do data_loader) - Garantir Datetime
@@ -93,12 +136,55 @@ def exibir_acompanhamento(df_cartorio):
     df[coluna_nome_familia] = df[coluna_nome_familia].fillna('Família Desconhecida').astype(str)
     df[coluna_nome_familia] = df[coluna_nome_familia].replace(r'^\s*$', 'Família Desconhecida', regex=True)
 
+    # --- Lógica para Status da Família (Adendo/Distrato) ---
+    coluna_adendo_campo = 'UF_CRM_1751313454983'
+    coluna_deal_stage_id = 'DEAL_STAGE_ID' # Coluna que contém os estágios como C46:LOSE
+    
+    # Inicializa a coluna de status como vazia
+    df['status_familia'] = ''
+
+    # Verificar se a coluna de estágios do deal existe
+    if coluna_deal_stage_id in df.columns:
+        # 1. Distrato (prioridade máxima) - Estágio C46:LOSE
+        cond_distrato = df[coluna_deal_stage_id] == 'C46:LOSE'
+        df.loc[cond_distrato, 'status_familia'] = 'DISTRATO'
+
+        # 2. Adendo (menor prioridade) - Baseado apenas no campo UF_CRM_1751313454983
+        cond_adendo_final = pd.Series(False, index=df.index) # Inicia com um Series de False
+        
+        if coluna_adendo_campo in df.columns:
+            # Garante que a coluna seja string para usar .str.contains
+            # Procura por 'ADENDO' OU 'FILHOS E NETOS', ignorando maiúsculas/minúsculas
+            cond_adendo_campo_val = df[coluna_adendo_campo].astype(str).str.contains(
+                'ADENDO|FILHOS E NETOS', 
+                case=False, 
+                na=False, 
+                regex=True
+            )
+            cond_adendo_final = cond_adendo_campo_val
+        
+        # Aplica 'ADENDO' somente onde o status ainda não for 'DISTRATO'
+        df.loc[cond_adendo_final & (df['status_familia'] == ''), 'status_familia'] = 'ADENDO'
+    else:
+        # Emite um aviso se a coluna de estágio do deal não for encontrada (apenas uma vez)
+        if 'aviso_deal_stage_emitido' not in st.session_state:
+            st.warning(f"Coluna '{coluna_deal_stage_id}' não encontrada. O status de Adendo/Distrato não será calculado.")
+            st.session_state['aviso_deal_stage_emitido'] = True
+
     # --- LÓGICA ESPECIAL PARA PIPELINE 104 (Pesquisa BR) ---
     # Aplicar lógica de precedência para evitar duplicação de contagem
     df = aplicar_logica_precedencia_pipeline_104(df, coluna_id_requerente)
     
     # --- Agrupamento por Família (pré-filtro) ---
     coluna_protocolizado = 'UF_CRM_34_PROTOCOLIZADO'
+
+    def aggregate_status(series):
+        # Define a prioridade do status para a família inteira
+        if 'DISTRATO' in series.values:
+            return 'DISTRATO'
+        if 'ADENDO' in series.values:
+            return 'ADENDO'
+        return '' # Retorna vazio se nenhum status for encontrado
 
     def check_protocolado(series):
         # Normaliza para maiúsculas e lida com possíveis NaNs
@@ -113,7 +199,8 @@ def exibir_acompanhamento(df_cartorio):
         'total_requerentes': (coluna_id_requerente, pd.Series.nunique),
         'concluidas': ('CONCLUIDA', 'sum'),
         'data_venda_familia': (coluna_data_venda_familia, 'first'),
-        'responsavel': (coluna_responsavel, 'first')
+        'responsavel': (coluna_responsavel, 'first'),
+        'status_familia': ('status_familia', aggregate_status) # Adicionar agregação de status
     }
 
     # Adiciona a agregação de protocolado dinamicamente se a coluna existir
@@ -283,12 +370,16 @@ def exibir_acompanhamento(df_cartorio):
             df_filtrado_agrupado[coluna_nome_familia].str.contains(search_term, case=False, na=False)
         ]
 
-    if data_venda_min and data_venda_max:
-         df_filtrado_agrupado = df_filtrado_agrupado.dropna(subset=['data_venda_familia']) 
-         df_filtrado_agrupado = df_filtrado_agrupado[
-             (df_filtrado_agrupado['data_venda_familia'] >= data_venda_min) & 
-             (df_filtrado_agrupado['data_venda_familia'] < data_venda_max) 
-         ]
+    # Aplicar filtro de data apenas se os valores selecionados forem diferentes dos padrões
+    is_date_filter_default = (data_inicio_selecionada == min_date_default) and (data_fim_selecionada == max_date_default)
+
+    if not is_date_filter_default and data_venda_min and data_venda_max:
+        # Ao ativar o filtro de data, removemos famílias sem data de venda definida
+        df_filtrado_agrupado = df_filtrado_agrupado.dropna(subset=['data_venda_familia']) 
+        df_filtrado_agrupado = df_filtrado_agrupado[
+            (df_filtrado_agrupado['data_venda_familia'] >= data_venda_min) & 
+            (df_filtrado_agrupado['data_venda_familia'] < data_venda_max) 
+        ]
 
     if faixas_selecionadas:
         condicoes = [] 
@@ -436,7 +527,8 @@ def exibir_acompanhamento(df_cartorio):
         'concluidas': 'Concluídas',
         'percentual_conclusao': '% Conclusão',
         'data_venda_familia': 'Data Venda', # Renomear coluna de data
-        'responsavel': 'Responsável' # Renomear coluna de responsável
+        'responsavel': 'Responsável', # Renomear coluna de responsável
+        'status_familia': 'Status' # Renomear coluna de status
     })
 
     # Ordenar a tabela final (opcional, pode escolher outra coluna)
@@ -445,7 +537,7 @@ def exibir_acompanhamento(df_cartorio):
     # Verificar se, após todos os filtros, o dataframe está vazio
     if df_tabela.empty:
         # Verificar se algum filtro ESTÁ ativo para mostrar a mensagem
-        filtros_ativos = search_term or (data_venda_min and data_venda_max) or faixas_selecionadas or responsaveis_selecionados
+        filtros_ativos = search_term or (data_venda_min and data_venda_max) or faixas_selecionadas or responsaveis_selecionados or (protocolizado_selecionado != "Todos")
         if filtros_ativos:
              st.warning("Nenhuma família encontrada com os critérios de filtros aplicados.")
         # else: Não mostrar nada se não há filtros e a tabela está vazia (já avisado no início)
@@ -458,6 +550,7 @@ def exibir_acompanhamento(df_cartorio):
     # Selecionar e reordenar colunas para exibição
     colunas_exibicao = [
         'Nome da Família',
+        'Status', # Adicionada
         'Data Venda', # Adicionada
         'Total Requerentes',
         'Responsável', # Adicionada
@@ -475,6 +568,7 @@ def exibir_acompanhamento(df_cartorio):
     # Configuração dinâmica das colunas
     column_config_dict = {
         "Nome da Família": st.column_config.TextColumn(label="Nome da Família"),
+        "Status": st.column_config.TextColumn(label="Status"),
         "Total Requerentes": st.column_config.NumberColumn(
             label="Total Requerentes", 
             format="%d",
