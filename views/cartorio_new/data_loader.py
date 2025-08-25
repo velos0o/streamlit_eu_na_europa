@@ -406,10 +406,6 @@ def carregar_dados_crm_deal_cat46():
     # Garantir que UF_CRM_1722605592778 esteja como string para facilitar o merge
     df_mesclado['UF_CRM_1722605592778'] = df_mesclado['UF_CRM_1722605592778'].fillna('N/A').astype(str).str.strip()
     
-    # --- DEBUG: Exibir dados brutos da Categoria 46 ---
-    st.expander("DEBUG: Dados Brutos da Categoria 46 (Pasta Pronta)").dataframe(df_mesclado)
-    # --- FIM DEBUG ---
-    
     return df_mesclado
 
 # A função principal agora chama load_data(), que usa o cache internamente
