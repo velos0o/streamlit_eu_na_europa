@@ -15,6 +15,7 @@ KEY_DATA_FIM = "data_venda_fim_acompanhamento"
 KEY_PERCENTUAL = "filtro_percentual_acompanhamento"
 KEY_RESPONSAVEL = "filtro_responsavel_acompanhamento"  # Nova constante para filtro de responsável
 KEY_PROTOCOLIZADO = "filtro_protocolizado_acompanhamento"  # Nova constante para filtro de protocolizado
+KEY_STATUS_FAMILIA = "filtro_status_acompanhamento" # Novo status
 
 def exibir_acompanhamento(df_cartorio):
     """
@@ -251,6 +252,8 @@ def exibir_acompanhamento(df_cartorio):
         st.session_state[KEY_RESPONSAVEL] = []
     if KEY_PROTOCOLIZADO not in st.session_state:  # Inicialização do state para protocolizado
         st.session_state[KEY_PROTOCOLIZADO] = "Todos"
+    if KEY_STATUS_FAMILIA not in st.session_state:
+        st.session_state[KEY_STATUS_FAMILIA] = "Todos"
 
     # --- Função para Limpar Filtros --- 
     def clear_filters():
@@ -260,12 +263,13 @@ def exibir_acompanhamento(df_cartorio):
         st.session_state[KEY_PERCENTUAL] = []
         st.session_state[KEY_RESPONSAVEL] = []  # Limpar filtro de responsável
         st.session_state[KEY_PROTOCOLIZADO] = "Todos"  # Limpar filtro de protocolizado
+        st.session_state[KEY_STATUS_FAMILIA] = "Todos"
 
     # --- Filtros --- 
     with st.expander("Filtros", expanded=True): 
         # Layout: Linha 1 (Família, Data), Linha 2 (Percentual, Responsável, Protocolizado), Linha 3 (Botão Limpar)
         col_l1_familia, col_l1_data = st.columns([0.5, 0.5])
-        col_l2_perc, col_l2_resp, col_l2_protocolo = st.columns([0.4, 0.4, 0.2])  # Nova linha com 3 colunas
+        col_l2_perc, col_l2_resp, col_l2_protocolo, col_l2_status = st.columns([0.35, 0.35, 0.15, 0.15])
         col_l3_empty, col_l3_btn = st.columns([0.8, 0.2])  # Renomear para l3 (linha 3)
         
         with col_l1_familia:
@@ -343,6 +347,14 @@ def exibir_acompanhamento(df_cartorio):
                 key=KEY_PROTOCOLIZADO
             )
             
+        with col_l2_status:
+            st.selectbox(
+                "Status Contrato:",
+                options=["Todos", "Contrato Padrão", "Adendo", "Distrato"],
+                key=KEY_STATUS_FAMILIA,
+                help="Filtra as famílias pelo status do contrato (Adendo, Distrato ou Padrão)."
+            )
+
         with col_l3_btn:
             st.button("Limpar", on_click=clear_filters, help="Limpar todos os filtros")
             
@@ -355,6 +367,7 @@ def exibir_acompanhamento(df_cartorio):
     faixas_selecionadas = st.session_state[KEY_PERCENTUAL]
     responsaveis_selecionados = st.session_state[KEY_RESPONSAVEL]  # Ler valores de responsáveis selecionados
     protocolizado_selecionado = st.session_state[KEY_PROTOCOLIZADO]  # Ler valor do filtro de protocolizado
+    status_selecionado = st.session_state[KEY_STATUS_FAMILIA]
     
     # Processar datas selecionadas
     data_venda_min, data_venda_max = None, None
@@ -414,6 +427,15 @@ def exibir_acompanhamento(df_cartorio):
         df_filtrado_agrupado = df_filtrado_agrupado[
             df_filtrado_agrupado['protocolado_familia'] == protocolizado_selecionado.upper()
         ]
+
+    # Aplicar filtro por status do contrato
+    if status_selecionado != "Todos":
+        if status_selecionado == "Contrato Padrão":
+            # Status 'Contrato Padrão' corresponde a um valor vazio na coluna 'status_familia'
+            df_filtrado_agrupado = df_filtrado_agrupado[df_filtrado_agrupado['status_familia'] == '']
+        else:
+            # Para 'Adendo' e 'Distrato', o valor é o nome do status em maiúsculas
+            df_filtrado_agrupado = df_filtrado_agrupado[df_filtrado_agrupado['status_familia'] == status_selecionado.upper()]
 
     # --- Cálculos Macro DIN MICOS (após filtros) ---
     # Obter a lista de famílias que passaram pelos filtros
@@ -537,7 +559,7 @@ def exibir_acompanhamento(df_cartorio):
     # Verificar se, após todos os filtros, o dataframe está vazio
     if df_tabela.empty:
         # Verificar se algum filtro ESTÁ ativo para mostrar a mensagem
-        filtros_ativos = search_term or (data_venda_min and data_venda_max) or faixas_selecionadas or responsaveis_selecionados or (protocolizado_selecionado != "Todos")
+        filtros_ativos = search_term or not is_date_filter_default or faixas_selecionadas or responsaveis_selecionados or (protocolizado_selecionado != "Todos") or (status_selecionado != "Todos")
         if filtros_ativos:
              st.warning("Nenhuma família encontrada com os critérios de filtros aplicados.")
         # else: Não mostrar nada se não há filtros e a tabela está vazia (já avisado no início)
