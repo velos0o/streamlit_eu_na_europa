@@ -16,6 +16,7 @@ KEY_PERCENTUAL = "filtro_percentual_acompanhamento"
 KEY_RESPONSAVEL = "filtro_responsavel_acompanhamento"  # Nova constante para filtro de responsável
 KEY_PROTOCOLIZADO = "filtro_protocolizado_acompanhamento"  # Nova constante para filtro de protocolizado
 KEY_STATUS_FAMILIA = "filtro_status_acompanhamento" # Novo status
+KEY_CERTIDOES_FALTANTES = "filtro_faltantes_acompanhamento" # Nova constante
 
 def exibir_acompanhamento(df_cartorio):
     """
@@ -220,6 +221,9 @@ def exibir_acompanhamento(df_cartorio):
         (df_agrupado['concluidas'] / df_agrupado['total_certidoes'] * 100)
     ).fillna(0) # Preencher NaN com 0 se total_certidoes for 0
 
+    # Adicionar coluna de certidões faltantes
+    df_agrupado['certidoes_faltantes'] = df_agrupado['total_certidoes'] - df_agrupado['concluidas']
+
     # --- Valores Padrão para Filtros (Necessário para Reset) ---
     df_agrupado_com_data = df_agrupado.dropna(subset=['data_venda_familia'])
     min_date_default = df_agrupado_com_data['data_venda_familia'].min().date() if not df_agrupado_com_data.empty else date.today()
@@ -254,6 +258,8 @@ def exibir_acompanhamento(df_cartorio):
         st.session_state[KEY_PROTOCOLIZADO] = "Todos"
     if KEY_STATUS_FAMILIA not in st.session_state:
         st.session_state[KEY_STATUS_FAMILIA] = "Todos"
+    if KEY_CERTIDOES_FALTANTES not in st.session_state:
+        st.session_state[KEY_CERTIDOES_FALTANTES] = [] # Alterado para lista vazia para multiselect
 
     # --- Função para Limpar Filtros --- 
     def clear_filters():
@@ -264,12 +270,13 @@ def exibir_acompanhamento(df_cartorio):
         st.session_state[KEY_RESPONSAVEL] = []  # Limpar filtro de responsável
         st.session_state[KEY_PROTOCOLIZADO] = "Todos"  # Limpar filtro de protocolizado
         st.session_state[KEY_STATUS_FAMILIA] = "Todos"
+        st.session_state[KEY_CERTIDOES_FALTANTES] = [] # Alterado para lista vazia
 
     # --- Filtros --- 
     with st.expander("Filtros", expanded=True): 
         # Layout: Linha 1 (Família, Data), Linha 2 (Percentual, Responsável, Protocolizado), Linha 3 (Botão Limpar)
         col_l1_familia, col_l1_data = st.columns([0.5, 0.5])
-        col_l2_perc, col_l2_resp, col_l2_protocolo, col_l2_status = st.columns([0.35, 0.35, 0.15, 0.15])
+        col_l2_perc, col_l2_resp, col_l2_protocolo, col_l2_status, col_l2_faltantes = st.columns([0.25, 0.25, 0.15, 0.15, 0.2])
         col_l3_empty, col_l3_btn = st.columns([0.8, 0.2])  # Renomear para l3 (linha 3)
         
         with col_l1_familia:
@@ -355,6 +362,18 @@ def exibir_acompanhamento(df_cartorio):
                 help="Filtra as famílias pelo status do contrato (Adendo, Distrato ou Padrão)."
             )
 
+        with col_l2_faltantes:
+            opcoes_faltantes = ["Falta 1 certidão"] # Removido "Todos"
+            opcoes_faltantes.extend([f"Faltam {i} certidões" for i in range(2, 10)])
+            opcoes_faltantes.append("Faltam 10 ou mais certidões")
+            st.multiselect( # Alterado de selectbox para multiselect
+                "Certidões Faltantes:",
+                options=opcoes_faltantes,
+                key=KEY_CERTIDOES_FALTANTES,
+                placeholder="Selecione a(s) faixa(s)",
+                help="Filtra as famílias pelo número de certidões pendentes de conclusão."
+            )
+
         with col_l3_btn:
             st.button("Limpar", on_click=clear_filters, help="Limpar todos os filtros")
             
@@ -368,6 +387,7 @@ def exibir_acompanhamento(df_cartorio):
     responsaveis_selecionados = st.session_state[KEY_RESPONSAVEL]  # Ler valores de responsáveis selecionados
     protocolizado_selecionado = st.session_state[KEY_PROTOCOLIZADO]  # Ler valor do filtro de protocolizado
     status_selecionado = st.session_state[KEY_STATUS_FAMILIA]
+    faltantes_selecionado = st.session_state[KEY_CERTIDOES_FALTANTES]
     
     # Processar datas selecionadas
     data_venda_min, data_venda_max = None, None
@@ -436,6 +456,26 @@ def exibir_acompanhamento(df_cartorio):
         else:
             # Para 'Adendo' e 'Distrato', o valor é o nome do status em maiúsculas
             df_filtrado_agrupado = df_filtrado_agrupado[df_filtrado_agrupado['status_familia'] == status_selecionado.upper()]
+
+    # Aplicar filtro de certidões faltantes (agora com multiselect)
+    if faltantes_selecionado:
+        condicoes_faltantes = []
+        for selecao in faltantes_selecionado:
+            if selecao == "Falta 1 certidão":
+                condicoes_faltantes.append(df_filtrado_agrupado['certidoes_faltantes'] == 1)
+            elif selecao == "Faltam 10 ou mais certidões":
+                condicoes_faltantes.append(df_filtrado_agrupado['certidoes_faltantes'] >= 10)
+            else:
+                try:
+                    num_faltantes = int(selecao.split(" ")[1])
+                    condicoes_faltantes.append(df_filtrado_agrupado['certidoes_faltantes'] == num_faltantes)
+                except (ValueError, IndexError):
+                    pass # Ignora opção inválida
+        
+        if condicoes_faltantes:
+            filtro_combinado_faltantes = pd.concat(condicoes_faltantes, axis=1).any(axis=1)
+            df_filtrado_agrupado = df_filtrado_agrupado[filtro_combinado_faltantes]
+
 
     # --- Cálculos Macro DIN MICOS (após filtros) ---
     # Obter a lista de famílias que passaram pelos filtros
@@ -559,7 +599,7 @@ def exibir_acompanhamento(df_cartorio):
     # Verificar se, após todos os filtros, o dataframe está vazio
     if df_tabela.empty:
         # Verificar se algum filtro ESTÁ ativo para mostrar a mensagem
-        filtros_ativos = search_term or not is_date_filter_default or faixas_selecionadas or responsaveis_selecionados or (protocolizado_selecionado != "Todos") or (status_selecionado != "Todos")
+        filtros_ativos = search_term or not is_date_filter_default or faixas_selecionadas or responsaveis_selecionados or (protocolizado_selecionado != "Todos") or (status_selecionado != "Todos") or faltantes_selecionado # Alterado
         if filtros_ativos:
              st.warning("Nenhuma família encontrada com os critérios de filtros aplicados.")
         # else: Não mostrar nada se não há filtros e a tabela está vazia (já avisado no início)
