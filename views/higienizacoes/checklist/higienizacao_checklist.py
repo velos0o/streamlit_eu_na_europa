@@ -288,11 +288,12 @@ def show_higienizacao_checklist():
             col_date1, col_date2 = st.columns(2)
             with col_date1:
                 # Determinar valores mín/máx para os inputs de data
-                min_date = df["data"].min().date() if not df["data"].empty else (datetime.now() - timedelta(days=365)).date()
-                max_date = df["data"].max().date() if not df["data"].empty else datetime.now().date()
+                min_date = df["data"].min().date() if not df["data"].empty and df["data"].notna().any() else (datetime.now() - timedelta(days=365)).date()
+                max_date = df["data"].max().date() if not df["data"].empty and df["data"].notna().any() else datetime.now().date()
                 
-                # Calcular um valor padrão seguro (30 dias atrás ou o mínimo, o que for maior)
-                default_start_date = max(min_date, (datetime.now() - timedelta(days=30)).date())
+                # Calcular um valor padrão mais inteligente: os últimos 30 dias de dados
+                default_end_date = max_date
+                default_start_date = max(min_date, default_end_date - timedelta(days=30))
                 
                 data_inicial = st.date_input("Data Inicial", 
                                     value=default_start_date,
@@ -300,10 +301,6 @@ def show_higienizacao_checklist():
                                     max_value=max_date,
                                     disabled=False)  # Não desabilitar visualmente
             with col_date2:
-                # Valor padrão para data final (hoje ou max_date, o que for menor)
-                today = datetime.now().date()
-                default_end_date = min(today, max_date)
-                
                 data_final = st.date_input("Data Final", 
                                     value=default_end_date,
                                     min_value=min_date,
@@ -359,10 +356,9 @@ def show_higienizacao_checklist():
         nulos_data = df_filtrado["data"].isna().sum()
         print(f"Registros com data nula: {nulos_data}")
         
-        # Aplicar filtro incluindo registros sem data
-        mask_data_valida = df_filtrado["data"].notna()
+        # Aplicar filtro de data. Registros com data nula serão excluídos quando o filtro estiver ativo.
         mask_intervalo = (df_filtrado["data"] >= data_inicial_dt) & (df_filtrado["data"] <= data_final_dt)
-        df_filtrado = df_filtrado[mask_intervalo | ~mask_data_valida]
+        df_filtrado = df_filtrado[mask_intervalo]
         
         # Verificar quantos registros ficaram de fora
         total_depois = len(df_filtrado)
@@ -586,7 +582,7 @@ def show_higienizacao_checklist():
                                 # Aplicar estilo apenas à coluna 'Status' usando .map()
                                 styled_df = df_exibir.style.map(highlight_single_status, subset=[display_status_col_name])
                                 # Exibir a tabela ESTILIZADA
-                                st.dataframe(ensure_pandas_df(styled_df), use_container_width=True, height=400)
+                                st.dataframe(styled_df, use_container_width=True, height=400)
                             except Exception as style_error:
                                 st.warning(f"Não foi possível aplicar estilo: {str(style_error)}. Tentando abordagem alternativa...")
                                 
