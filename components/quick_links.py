@@ -18,7 +18,8 @@ def show_quick_links():
         with col1:
             st.subheader("Páginas Principais")
             st.markdown("🏠 [Página Inicial](?page=pagina_inicial)")
-            st.markdown("📊 [Higienizações](?page=higienizacoes)")
+            # Higienizações oculto do usuário
+            # st.markdown("📊 [Higienizações](?page=higienizacoes)")
             st.markdown("📝 [Emissões Brasileiras](?page=cartorio_new)")
             st.markdown("🗺️ [Comune (Novo)](?page=comune_new)")
             st.markdown("🏛️ [Comune](?page=comune)")
@@ -39,11 +40,7 @@ def show_quick_links():
             st.markdown("⏱️ [Tempo de Solicitação](?page=comune_new&sub=tempo_solicitacao)")
             st.markdown("🗺️ [Mapa Comune 1](?page=comune_new&sub=mapa_comune_1)")
             
-            # Higienizações
-            st.markdown("**Higienizações:**")
-            st.markdown("🏭 [Produção](?page=higienizacoes&sub=producao)")
-            st.markdown("✅ [Conclusões](?page=higienizacoes&sub=conclusoes)")
-            st.markdown("📋 [Checklist](?page=higienizacoes&sub=checklist)")
+            # Seção Higienizações removida pois está oculta
         
         st.markdown("""
         ### Como usar os links
@@ -64,4 +61,4 @@ def show_page_links_sidebar():
         st.markdown("🏠 [Página Inicial](?page=pagina_inicial)")
         st.markdown("📝 [Emissões](?page=cartorio_new)")
         st.markdown("🗺️ [Comune](?page=comune_new)")
-        st.markdown("📊 [Higienizações](?page=higienizacoes)") 
+        # st.markdown("📊 [Higienizações](?page=higienizacoes)")

@@ -52,6 +52,7 @@ from views.reclamacoes.data_loader import carregar_dados_reclamacoes
 from views.cartorio_new.data_loader import carregar_dados_cartorio
 # Supondo que o data_loader de comune_new tenha uma função similar
 from views.comune_new.data_loader import load_comune_data # CORRIGIDO
+from views.scaner.data_loader import carregar_dados_spa_scanner
 
 # Importar a função central de carregamento do Bitrix
 from api.bitrix_connector import load_merged_data
@@ -293,6 +294,37 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
     # (Lógica de processamento de emissões, agora incluindo a posição na árvore)
     requerentes_data_list_of_dicts = []
     processamento_emissoes_ok = False
+    # Mapa de documentos por (ID_Requerente, TipoCertidao) -> link (Drive preferido)
+    docs_map = {}
+    try:
+        id_familia_str_local = str(familia_serie.get('UF_CRM_1722605592778', '')).strip()
+        if id_familia_str_local:
+            df_docs_spa_local = carregar_dados_spa_scanner()
+            if df_docs_spa_local is not None and not df_docs_spa_local.empty:
+                df_docs_spa_local['UF_CRM_48_ID_FAMILIA'] = df_docs_spa_local['UF_CRM_48_ID_FAMILIA'].astype(str).str.strip()
+                df_docs_spa_local['UF_CRM_48_ID_REQUERENTE'] = df_docs_spa_local['UF_CRM_48_ID_REQUERENTE'].astype(str).str.strip()
+                docs_familia_local = df_docs_spa_local[df_docs_spa_local['UF_CRM_48_ID_FAMILIA'] == id_familia_str_local].copy()
+                if not docs_familia_local.empty:
+                    def _inferir_tipo_certidao_spa(titulo: str) -> str:
+                        t = str(titulo).upper()
+                        if 'NASC' in t:
+                            return 'Nascimento'
+                        if 'CASA' in t or 'MATRIM' in t:
+                            return 'Casamento'
+                        if 'ÓBIT' in t or 'OBIT' in t or 'OBITO' in t:
+                            return 'Óbito'
+                        return 'Outro'
+                    docs_familia_local['__tipo__'] = docs_familia_local['TITLE'].apply(_inferir_tipo_certidao_spa)
+                    for _i, r in docs_familia_local.iterrows():
+                        req_id = str(r.get('UF_CRM_48_ID_REQUERENTE', '')).strip()
+                        tipo = str(r.get('__tipo__', 'Outro'))
+                        link_drive = str(r.get('UF_CRM_48_LINK_DRIVE', '')).strip()
+                        link_scan = str(r.get('UF_CRM_48_DOCUMENTO_SCANEADO', '')).strip()
+                        chosen_link = link_drive if link_drive.lower().startswith('http') else (link_scan if link_scan.lower().startswith('http') else '')
+                        if req_id and tipo in ['Nascimento', 'Casamento', 'Óbito'] and chosen_link:
+                            docs_map[(req_id, tipo)] = chosen_link
+    except Exception as _e:
+        print(f"[WARN] Falha ao montar docs_map SPA: {_e}")
     
     # NOVA LÓGICA: Função para determinar categoria baseada em Pipeline + Status
     # Esta correção resolve o problema de chaves duplicadas no mapeamento anterior
@@ -435,6 +467,7 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
 
                         # Incluir a posição na árvore nos dados a serem exibidos
                         requerentes_data_list_of_dicts.append({
+                            'ID_Requerente': id_req,
                             'Requerente': nome_req_disp, # Usar o nome limpo
                             'Posição': posicao_arvore,
                             **cert_status
@@ -503,9 +536,30 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
             html_ficha_completa += "<tr class='emissoes-data-row'>"
             html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{req_data['Posição']}</td>"
             html_ficha_completa += f"<td style='text-align:left; border:1px solid #ddd; padding:8px;'>{req_data['Requerente']}</td>"
-            html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{req_data['Nascimento']}</td>"
-            html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{req_data['Casamento']}</td>"
-            html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{req_data['Óbito']}</td>"
+            # Células com possível ícone de olho para link do drive
+            def _render_cell_with_eye(tipo_cert: str) -> str:
+                status_text = req_data.get(tipo_cert, '')
+                req_id_key = str(req_data.get('ID_Requerente', '')).strip()
+                link_key = docs_map.get((req_id_key, tipo_cert)) if req_id_key else None
+                if link_key and str(status_text).upper() in ['CERTIDÃO ENTREGUE']:
+                    link_svg = (
+                        "<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' "
+                        "fill='none' stroke='#0D6EFD' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' "
+                        "style='vertical-align:middle;'>"
+                        "<path d='M10 13a5 5 0 0 1 0-7.07l1.76-1.76a5 5 0 0 1 7.07 7.07L17.07 12' />"
+                        "<path d='M14 11a5 5 0 0 1 0 7.07l-1.76 1.76a5 5 0 0 1-7.07-7.07L6.93 12' />"
+                        "</svg>"
+                    )
+                    link_html = f"<a href='{link_key}' target='_blank' title='Abrir documento' style='margin-left:8px; text-decoration:none;'>{link_svg}</a>"
+                    return f"{status_text} {link_html}"
+                return f"{status_text}"
+
+            nasc_html = _render_cell_with_eye('Nascimento')
+            casa_html = _render_cell_with_eye('Casamento')
+            obito_html = _render_cell_with_eye('Óbito')
+            html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{nasc_html}</td>"
+            html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{casa_html}</td>"
+            html_ficha_completa += f"<td style='text-align:center; border:1px solid #ddd; padding:8px;'>{obito_html}</td>"
             html_ficha_completa += "</tr>"
         
         html_ficha_completa += "</table>"
@@ -681,10 +735,378 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
     st.markdown(css_fullwidth, unsafe_allow_html=True)
     st.markdown(html_ficha_completa, unsafe_allow_html=True)
 
+    # ==========================
+    # DOCUMENTOS (SPA 1132) - Links Drive
+    # ==========================
+    try:
+        id_familia_str = str(familia_serie.get('UF_CRM_1722605592778', '')).strip()
+        if id_familia_str and id_familia_str.upper() not in ['N/D', 'NONE', 'NAN', '']:
+            st.markdown("---")
+            st.markdown("#### Documentos (SPA - Scanner)")
+
+            df_docs_spa = carregar_dados_spa_scanner()
+            if df_docs_spa is not None and not df_docs_spa.empty:
+                df_docs_spa['UF_CRM_48_ID_FAMILIA'] = df_docs_spa['UF_CRM_48_ID_FAMILIA'].astype(str).str.strip()
+                docs_familia = df_docs_spa[df_docs_spa['UF_CRM_48_ID_FAMILIA'] == id_familia_str].copy()
+
+                if not docs_familia.empty:
+                    # Inferir tipo de certidão a partir do TITLE
+                    def inferir_tipo_certidao(titulo: str) -> str:
+                        t = str(titulo).upper()
+                        if 'NASC' in t:
+                            return 'Nascimento'
+                        if 'CASA' in t or 'MATRIM' in t:
+                            return 'Casamento'
+                        if 'ÓBIT' in t or 'OBIT' in t or 'OBITO' in t:
+                            return 'Óbito'
+                        return 'Outro'
+
+                    docs_familia['Certidão'] = docs_familia['TITLE'].apply(inferir_tipo_certidao)
+
+                    # Selecionar link do Drive preferencialmente
+                    def escolher_link(row):
+                        link_drive = str(row.get('UF_CRM_48_LINK_DRIVE', '')).strip()
+                        link_scan = str(row.get('UF_CRM_48_DOCUMENTO_SCANEADO', '')).strip()
+                        return link_drive if link_drive.lower().startswith('http') else (link_scan if link_scan.lower().startswith('http') else '')
+
+                    docs_familia['Link'] = docs_familia.apply(escolher_link, axis=1)
+
+                    # Agrupar por Requerente e exibir como "pastas" (expanders)
+                    id_to_name = {}
+                    try:
+                        if isinstance(requerentes_data_list_of_dicts, list):
+                            for it in requerentes_data_list_of_dicts:
+                                _id = str(it.get('ID_Requerente', '')).strip()
+                                _nm = str(it.get('Requerente', '')).strip()
+                                if _id and _id != 'ID Requerente N/D':
+                                    id_to_name[_id] = _nm
+                    except Exception:
+                        id_to_name = {}
+
+                    # Ordenar por nome do requerente quando possível
+                    try:
+                        docs_familia['_req_name'] = docs_familia['UF_CRM_48_ID_REQUERENTE'].map(id_to_name).fillna('')
+                    except Exception:
+                        docs_familia['_req_name'] = ''
+
+                    for req_id, g in docs_familia.groupby('UF_CRM_48_ID_REQUERENTE'):
+                        req_id_str = str(req_id)
+                        display_name = id_to_name.get(req_id_str, f"Requerente {req_id_str}")
+                        qtd = int(len(g))
+                        with st.expander(f"{display_name} — {qtd} documento(s)", expanded=False):
+                            # Ordenar documentos por tipo e título
+                            g_sorted = g.sort_values(by=['Certidão', 'TITLE'], kind='stable')
+                            for _i, r in g_sorted.iterrows():
+                                url = str(r.get('Link', '')).strip()
+                                cert = str(r.get('Certidão', 'Documento'))
+                                titulo = str(r.get('TITLE', 'Documento'))
+                                if url:
+                                    st.markdown(f"- {cert} • {titulo} — <a href='{url}' target='_blank'>abrir</a>", unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f"- {cert} • {titulo} — sem link disponível")
+                else:
+                    st.info("Nenhum documento encontrado na SPA para esta família.")
+            else:
+                st.info("Não foi possível carregar dados da SPA de documentos.")
+    except Exception as e:
+        st.warning(f"Falha ao processar documentos da SPA: {e}")
+
 def exibir_metricas_macro():
     st.markdown("### Métricas Macro")
-    st.info("Seção de métricas gerais ainda em desenvolvimento.")
-    pass
+    # ============================
+    # STATUS DE PROTOCOLO (GERAL)
+    # ============================
+    try:
+        df_crm_deals_full_local = load_crm_deal_data(category_id=46)
+    except Exception:
+        df_crm_deals_full_local = pd.DataFrame()
+
+    # ============================
+    # STATUS FAMILIAS
+    # ============================
+    st.markdown("---")
+    st.markdown("#### STATUS FAMILIAS")
+    st.caption("Concluídas: famílias que atingiram PROTOCOLO. Em andamento: famílias que ainda não atingiram PROTOCOLO.")
+
+    total_familias_f46 = 0
+    familias_concluidas_protocolo = 0
+    familias_andamento_protocolo = 0
+
+    try:
+        if df_crm_deals_full_local is not None and not df_crm_deals_full_local.empty:
+            col_id_familia = 'UF_CRM_1722605592778'
+            col_stage = 'STAGE_ID'
+            if col_id_familia in df_crm_deals_full_local.columns:
+                df_f46 = df_crm_deals_full_local[[c for c in [col_id_familia, col_stage] if c in df_crm_deals_full_local.columns]].copy()
+                df_f46[col_id_familia] = df_f46[col_id_familia].astype(str).str.strip()
+                ids_f46 = df_f46[col_id_familia].replace('', pd.NA).dropna().unique().tolist()
+                total_familias_f46 = len(ids_f46)
+
+                codigos_por_etapa_pp = {
+                    'EMISSÃO BRASILEIRA': {'UC_8Z2EZF'},
+                    'ANÁLISE DOCUMENTAL': {'UC_N1FI74', 'UC_SKSQFO', 'UC_K952AX', 'UC_2JQ8E2R'},
+                    'TRADUÇÃO': {'UC_CSFCZP'},
+                    'APOSTILAMENTO': {'UC_F12U3R'},
+                    'DRIVE': {'UC_1ARFYMM'},
+                    'RECURSO': {'UC_SISEKVR'},
+                    'PROTOCOLO': {'UC_5W7TYZ'},
+                }
+                ordem_por_etapa_pp = {
+                    'EMISSÃO BRASILEIRA': 70,
+                    'ANÁLISE DOCUMENTAL': 90,
+                    'TRADUÇÃO': 130,
+                    'APOSTILAMENTO': 140,
+                    'DRIVE': 150,
+                    'RECURSO': 160,
+                    'PROTOCOLO': 170,
+                }
+
+                def detectar_maior_ordem_pp(stages_serie: pd.Series) -> int:
+                    if stages_serie is None or stages_serie.empty:
+                        return 0
+                    valores = stages_serie.dropna().astype(str).tolist()
+                    maior = 0
+                    for v in valores:
+                        for etapa, codigos in codigos_por_etapa_pp.items():
+                            for codigo in codigos:
+                                if codigo in v:
+                                    maior = max(maior, ordem_por_etapa_pp.get(etapa, 0))
+                    return maior
+
+                maiores = []
+                for fam_id, g in df_f46.groupby(col_id_familia):
+                    maior = detectar_maior_ordem_pp(g[col_stage] if col_stage in g.columns else pd.Series([], dtype=object))
+                    maiores.append(maior)
+                familias_concluidas_protocolo = sum(1 for m in maiores if m >= 170)
+                familias_andamento_protocolo = max(0, total_familias_f46 - familias_concluidas_protocolo)
+    except Exception:
+        pass
+
+    st.markdown("""
+    <style>
+    .metricas-container-pp { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0 4px 0; }
+    .metrica-custom-pp { background: #F8F9FA; border: 2px solid #DEE2E6; border-radius: 6px; padding: 16px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .metrica-custom-pp:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: #ADB5BD; }
+    .metrica-custom-pp .label { color: #6C757D; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; line-height: 1.2; }
+    .metrica-custom-pp .valor { color: #495057; font-weight: 700; font-size: 30px; line-height: 1.2; margin-bottom: 4px; }
+    </style>
+    <div class="metricas-container-pp">
+        <div class="metrica-custom-pp"><div class="label">Total de Famílias</div><div class="valor">""" + str(int(total_familias_f46)) + """</div></div>
+        <div class="metrica-custom-pp"><div class="label">Em Andamento (não protocolado)</div><div class="valor">""" + str(int(familias_andamento_protocolo)) + """</div></div>
+        <div class="metrica-custom-pp"><div class="label">Concluídas (protocolado)</div><div class="valor">""" + str(int(familias_concluidas_protocolo)) + """</div></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    def _status_protocolo_por_familia_geral(df_cat46: pd.DataFrame) -> pd.DataFrame:
+        if df_cat46 is None or df_cat46.empty:
+            return pd.DataFrame()
+
+        col_nome = 'UF_CRM_1722883482527'
+        col_id_familia = 'UF_CRM_1722605592778'
+        col_stage = 'STAGE_ID'
+
+        for c in [col_nome, col_id_familia, col_stage]:
+            if c not in df_cat46.columns:
+                df_cat46[c] = None
+
+        codigos_por_etapa = {
+            'EMISSÃO BRASILEIRA': {'UC_8Z2EZF'},
+            'ANÁLISE DOCUMENTAL': {'UC_N1FI74', 'UC_SKSQFO', 'UC_K952AX', 'UC_2JQ8E2R'},
+            'TRADUÇÃO': {'UC_CSFCZP'},
+            'APOSTILAMENTO': {'UC_F12U3R'},
+            'DRIVE': {'UC_1ARFYMM'},
+            'RECURSO': {'UC_SISEKVR'},
+            'PROTOCOLO': {'UC_5W7TYZ'},
+        }
+
+        ordem_por_etapa = {
+            'EMISSÃO BRASILEIRA': 70,
+            'ANÁLISE DOCUMENTAL': 90,
+            'TRADUÇÃO': 130,
+            'APOSTILAMENTO': 140,
+            'DRIVE': 150,
+            'RECURSO': 160,
+            'PROTOCOLO': 170,
+        }
+
+        def detectar_maior_ordem(stages_serie: pd.Series) -> int:
+            if stages_serie is None or stages_serie.empty:
+                return 0
+            valores = stages_serie.dropna().astype(str).tolist()
+            maior = 0
+            for v in valores:
+                for etapa, codigos in codigos_por_etapa.items():
+                    for codigo in codigos:
+                        if codigo in v:
+                            maior = max(maior, ordem_por_etapa.get(etapa, 0))
+            return maior
+
+        grupo_cols = [c for c in [col_nome, col_id_familia] if c in df_cat46.columns]
+        if not grupo_cols:
+            return pd.DataFrame()
+
+        registros = []
+        for chave, g in df_cat46.groupby(grupo_cols):
+            if isinstance(chave, tuple):
+                nome_fam, id_fam = chave[0], chave[1]
+            else:
+                nome_fam, id_fam = chave, ''
+
+            maior_ordem = detectar_maior_ordem(g[col_stage])
+            etapas_status = {}
+            for etapa, ordem in ordem_por_etapa.items():
+                etapas_status[etapa] = '✅' if maior_ordem >= ordem else ''
+
+            registros.append({
+                'Nome da Família': str(nome_fam) if nome_fam is not None else '',
+                'ID da Família': str(id_fam) if id_fam is not None else '',
+                **etapas_status,
+                '__ORDEM_MAX__': maior_ordem,
+            })
+
+        df_out = pd.DataFrame(registros)
+        if not df_out.empty:
+            df_out = df_out.sort_values(by='__ORDEM_MAX__', ascending=False, kind='stable').drop(columns=['__ORDEM_MAX__'])
+
+        colunas_ordenadas = [
+            'Nome da Família', 'ID da Família',
+            'EMISSÃO BRASILEIRA', 'ANÁLISE DOCUMENTAL', 'TRADUÇÃO', 'APOSTILAMENTO', 'DRIVE', 'RECURSO', 'PROTOCOLO'
+        ]
+        presentes = [c for c in colunas_ordenadas if c in df_out.columns]
+        if presentes:
+            df_out = df_out[presentes]
+        return df_out
+
+    st.markdown("---")
+    st.markdown("#### STATUS DE PROTOCOLO (Geral)")
+    st.caption("Etapas concluídas até o protocolo para todas as famílias do funil 46.")
+
+    try:
+        df_status_geral = _status_protocolo_por_familia_geral(df_crm_deals_full_local)
+    except Exception as e:
+        df_status_geral = pd.DataFrame()
+        st.warning(f"Falha ao montar STATUS DE PROTOCOLO (Geral): {e}")
+
+    if df_status_geral is None or df_status_geral.empty:
+        st.info("Nenhuma informação de protocolo encontrada.")
+    else:
+        st.dataframe(
+            ensure_pandas_df(df_status_geral),
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                'Nome da Família': st.column_config.TextColumn('Nome da Família', width='large'),
+                'ID da Família': st.column_config.TextColumn('ID da Família', width='medium'),
+                'EMISSÃO BRASILEIRA': st.column_config.TextColumn('EMISSÃO BRASILEIRA', width='small'),
+                'ANÁLISE DOCUMENTAL': st.column_config.TextColumn('ANÁLISE DOCUMENTAL', width='small'),
+                'TRADUÇÃO': st.column_config.TextColumn('TRADUÇÃO', width='small'),
+                'APOSTILAMENTO': st.column_config.TextColumn('APOSTILAMENTO', width='small'),
+                'DRIVE': st.column_config.TextColumn('DRIVE', width='small'),
+                'RECURSO': st.column_config.TextColumn('RECURSO', width='small'),
+                'PROTOCOLO': st.column_config.TextColumn('PROTOCOLO', width='small'),
+            }
+        )
+
+    
+
+    # ============================
+    # ACOMPANHAMENTO GERAL (todas as famílias)
+    # ============================
+    st.markdown("---")
+    st.markdown("#### Acompanhamento Geral de Emissões (todas as famílias)")
+
+    with st.spinner("Carregando dados do SPA..."):
+        try:
+            df_cartorio_all = carregar_dados_cartorio()
+        except Exception:
+            df_cartorio_all = pd.DataFrame()
+
+    col_id_familia_spa = 'UF_CRM_34_ID_FAMILIA'
+    col_nome_familia_spa = 'UF_CRM_34_NOME_FAMILIA'
+    col_resp_spa = 'ASSIGNED_BY_NAME'
+
+    if df_cartorio_all is None or df_cartorio_all.empty or col_id_familia_spa not in df_cartorio_all.columns:
+        st.info("Sem dados suficientes para o acompanhamento geral.")
+        return
+
+    df_spa_base = df_cartorio_all[[c for c in [col_id_familia_spa, 'STAGE_ID', 'STAGE_NAME', col_nome_familia_spa, col_resp_spa] if c in df_cartorio_all.columns]].copy()
+    success_mask = pd.Series(False, index=df_spa_base.index)
+    if 'STAGE_ID' in df_spa_base.columns:
+        success_mask = success_mask | df_spa_base['STAGE_ID'].astype(str).str.contains('SUCCESS', na=False)
+    if 'STAGE_NAME' in df_spa_base.columns:
+        success_mask = success_mask | df_spa_base['STAGE_NAME'].astype(str).str.upper().isin(['CERTIDÃO EMITIDA', 'CERTIDÃO ENTREGUE'])
+    df_spa_base['__success__'] = success_mask.astype(int)
+
+    fam_metrics = df_spa_base.groupby(col_id_familia_spa).agg(
+        total_itens=('__success__', 'count'),
+        concluidas=('__success__', 'sum')
+    ).reset_index()
+
+    # KPIs
+    total_familias = fam_metrics[col_id_familia_spa].nunique()
+    fam_concluidas = fam_metrics[(fam_metrics['total_itens'] > 0) & (fam_metrics['concluidas'] == fam_metrics['total_itens'])]
+    familias_concluidas_count = int(len(fam_concluidas))
+    fam_andamento = fam_metrics[(fam_metrics['total_itens'] > 0) & (fam_metrics['concluidas'] < fam_metrics['total_itens'])]
+    familias_andamento_count = int(len(fam_andamento))
+
+    st.markdown("""
+    <style>
+    .metricas-container-geral { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0 4px 0; }
+    .metrica-custom-geral { background: #F8F9FA; border: 2px solid #DEE2E6; border-radius: 6px; padding: 16px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .metrica-custom-geral:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: #ADB5BD; }
+    .metrica-custom-geral .label { color: #6C757D; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; line-height: 1.2; }
+    .metrica-custom-geral .valor { color: #495057; font-weight: 700; font-size: 30px; line-height: 1.2; margin-bottom: 4px; }
+    </style>
+    <div class="metricas-container-geral">
+        <div class="metrica-custom-geral"><div class="label">Total Famílias no Funil</div><div class="valor">""" + str(int(total_familias)) + """</div></div>
+        <div class="metrica-custom-geral"><div class="label">Em Andamento</div><div class="valor">""" + str(int(familias_andamento_count)) + """</div></div>
+        <div class="metrica-custom-geral"><div class="label">Concluídas</div><div class="valor">""" + str(int(familias_concluidas_count)) + """</div></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Tabela de Progresso (todas as famílias)
+    nome_por_id = pd.Series(dtype=object)
+    if col_nome_familia_spa in df_spa_base.columns:
+        nome_por_id = (
+            df_spa_base[[col_id_familia_spa, col_nome_familia_spa]]
+            .dropna(subset=[col_id_familia_spa])
+            .drop_duplicates(subset=[col_id_familia_spa])
+            .set_index(col_id_familia_spa)[col_nome_familia_spa]
+        )
+    resp_por_id = pd.Series(dtype=object)
+    if col_resp_spa in df_spa_base.columns:
+        resp_por_id = (
+            df_spa_base[[col_id_familia_spa, col_resp_spa]]
+            .dropna(subset=[col_id_familia_spa])
+            .drop_duplicates(subset=[col_id_familia_spa])
+            .set_index(col_id_familia_spa)[col_resp_spa]
+        )
+
+    fam_metrics['Percentual'] = fam_metrics.apply(lambda r: (r['concluidas'] / r['total_itens'] * 100) if r['total_itens'] > 0 else 0.0, axis=1)
+    fam_metrics['Concluídas/Total'] = fam_metrics.apply(lambda r: f"{int(r['concluidas'])}/{int(r['total_itens'])}", axis=1)
+    fam_metrics['Progresso'] = fam_metrics['Percentual']
+    fam_metrics['Percentual'] = fam_metrics['Percentual'].apply(lambda v: '🟢 100%' if v >= 100 else f"{v:.1f}%")
+
+    fam_metrics[col_id_familia_spa] = fam_metrics[col_id_familia_spa].astype(str).str.strip()
+    df_prog_show = fam_metrics.copy()
+    df_prog_show['ID da Família'] = df_prog_show[col_id_familia_spa]
+    df_prog_show['Nome da Família'] = df_prog_show['ID da Família'].map(nome_por_id.to_dict()) if not nome_por_id.empty else ''
+    df_prog_show['Responsável'] = df_prog_show['ID da Família'].map(resp_por_id.to_dict()) if not resp_por_id.empty else ''
+
+    cols_final = [c for c in ['Nome da Família', 'ID da Família', 'Responsável', 'Progresso', 'Concluídas/Total', 'Percentual'] if c in df_prog_show.columns]
+    st.dataframe(
+        ensure_pandas_df(df_prog_show[cols_final]),
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            'Nome da Família': st.column_config.TextColumn('Nome da Família', width='large'),
+            'ID da Família': st.column_config.TextColumn('ID da Família', width='medium'),
+            'Responsável': st.column_config.TextColumn('Responsável', width='medium'),
+            'Progresso': st.column_config.ProgressColumn('Progresso', format='%.1f%%', min_value=0, max_value=100),
+            'Concluídas/Total': st.column_config.TextColumn('Concluídas/Total', width='small'),
+            'Percentual': st.column_config.TextColumn('Percentual', width='small'),
+        }
+    )
 
 def show_ficha_familia():
     # REMOVIDO: Configuração do layout da página (já feita em main.py)

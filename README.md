@@ -144,7 +144,35 @@ O dashboard inclui as seguintes páginas (visualizações) e funcionalidades:
     git clone https://github.com/velos0o/streamlit_eu_na_europa.git
     cd streamlit_eu_na_europa
     ```
-2.  **Crie um ambiente virtual (recomendado):**
+2.  **(Opção recomendada) Usar UV para ambiente e instalações muito rápidas:**
+    - Instale o UV
+      - Windows (PowerShell):
+        ```powershell
+        irm https://astral.sh/uv/install.ps1 | iex
+        ```
+      - Linux/macOS:
+        ```bash
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        ```
+    - Crie e ative o ambiente virtual com UV
+      - Windows (PowerShell):
+        ```powershell
+        uv venv .venv
+        .\.venv\Scripts\Activate.ps1
+        ```
+      - Linux/macOS:
+        ```bash
+        uv venv .venv
+        source .venv/bin/activate
+        ```
+    - Instale as dependências com o resolver rápido do UV
+      ```bash
+      uv pip install -r requirements.txt
+      ```
+
+    - Siga para o passo 4.
+
+2.b  **(Alternativa) Criar ambiente virtual com Python (pip padrão):**
     ```bash
     python -m venv venv
     source venv/bin/activate  # Linux/macOS
@@ -153,6 +181,9 @@ O dashboard inclui as seguintes páginas (visualizações) e funcionalidades:
     ```
 3.  **Instale as dependências:**
     ```bash
+    # Com UV (recomendado):
+    uv pip install -r requirements.txt
+    # Ou com pip padrão:
     pip install -r requirements.txt
     ```
 4.  **Configure as credenciais conforme a seção "Gerenciamento Seguro de Credenciais"**
@@ -165,6 +196,12 @@ O dashboard inclui as seguintes páginas (visualizações) e funcionalidades:
     ```bash
     streamlit run main.py
     ```
+
+### Observações sobre UV
+
+- O UV usa um resolvedor extremamente rápido e é compatível com `requirements.txt` existente.
+- Para reinstalar do zero, você pode limpar o ambiente: `deactivate` e remover a pasta `.venv`/`venv`.
+- Se preferir um nome único para o ambiente, mantenha `.venv` para integração com IDEs.
 
 ## Otimização de Carregamento
 
@@ -180,7 +217,7 @@ O dashboard inclui as seguintes páginas (visualizações) e funcionalidades:
 
 ## Notas de Desenvolvimento
 
-- Última atualização: Julho 2024
+- Última atualização: Setembro 2025
 - A estrutura modular com subpastas em `views/` permite melhor organização e escalabilidade.
 - O uso de `__init__.py` em cada subpasta as torna pacotes Python importáveis.
 

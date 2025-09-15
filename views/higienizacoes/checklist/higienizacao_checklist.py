@@ -54,6 +54,18 @@ def show_higienizacao_checklist():
     Exibe a página de checklist de produção de higienização.
     Esta página mostra um dashboard voltado para checklist de tarefas de higienização.
     """
+    # Guard clause: não carregar dados se o relatório estiver oculto
+    oculto_flag = st.session_state.get('ocultar_higienizacoes', False)
+    relatorios_ocultos = st.session_state.get('relatorios_ocultos', [])
+    relatorios_ocultos_map = st.session_state.get('relatorios_ocultos_map', {})
+    esta_oculto = (
+        oculto_flag
+        or ('Higienizações' in relatorios_ocultos)
+        or (relatorios_ocultos_map.get('Higienizações') is True)
+    )
+    if esta_oculto:
+        st.info("Relatório 'Higienizações' está oculto. Dados não foram carregados.")
+        return
     st.header("Controle de Conclusão Higienização")
     
     # Carregamento de estilo CSS

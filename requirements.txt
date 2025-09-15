@@ -1,5 +1,5 @@
 # Bibliotecas principais para análise de dados e visualização
-streamlit==1.44.0        # Framework para construção de dashboards interativos
+streamlit==1.49.0        # Framework para construção de dashboards interativos (novas métricas/design)
 pandas==2.2.0            # Manipulação e análise de dados
 numpy==1.26.3            # Computação numérica
 altair==5.4.1            # Gráficos declarativos (corrigido para versão compatível)

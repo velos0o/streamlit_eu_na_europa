@@ -21,6 +21,7 @@ from views.inicio import show_inicio
 from views.extracoes.extracoes_main import show_extracoes
 from views.cartorio_new.cartorio_new_main import show_cartorio_new
 from views.ficha_familia import show_ficha_familia
+from views.congelado import show_congelado
 from views.higienizacoes.higienizacoes_main import show_higienizacoes
 from views.negociacao.negociacao_main import show_negociacao
 from views.priorizados.priorizados_main import show_priorizados
@@ -42,6 +43,7 @@ from components.quick_links import show_quick_links, show_page_links_sidebar
 # Mapeamento de rotas para páginas
 ROTAS = {
     "ficha_familia": "Ficha da Família",
+    "congelado": "Congelado",
     "higienizacoes": "Higienizações", 
     "cartorio_new": "Emissões Brasileiras",
     "comune": "Comune",
@@ -173,6 +175,14 @@ def sincronizar_estado_e_url():
         query_params = {k: v[0] if v else '' for k, v in query_params_experimental.items()}
 
     pagina_na_url = query_params.get("page")
+
+    # Bloqueio explícito de acesso à página Higienizações via URL
+    if pagina_na_url == 'higienizacoes':
+        st.session_state['pagina_atual'] = 'Ficha da Família'
+        st.query_params['page'] = 'ficha_familia'
+        if 'sub' in st.query_params:
+            del st.query_params['sub']
+        st.rerun()
 
     if pagina_na_url and pagina_na_url in ROTAS:
         pagina_desejada_pela_url = ROTAS[pagina_na_url]
@@ -425,6 +435,13 @@ def ir_para_ficha_familia():
     if 'sub' in st.query_params:
         del st.query_params['sub']
 
+def ir_para_congelado():
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Congelado'
+    st.query_params['page'] = 'congelado'
+    if 'sub' in st.query_params:
+        del st.query_params['sub']
+
 def toggle_emissao_submenu():
     st.session_state.emissao_submenu_expanded = not st.session_state.get('emissao_submenu_expanded', False)
     st.session_state.higienizacao_submenu_expanded = False
@@ -671,24 +688,41 @@ st.sidebar.button(
 )
 
 st.sidebar.button(
-    "Higienizações", 
-    key="btn_higienizacoes", 
-    on_click=toggle_higienizacao_submenu, 
+    "Congelado", 
+    key="btn_congelado",
+    on_click=ir_para_congelado,
     use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Higienizações" else "secondary",
-    help="Módulo unificado de Higienizações"
+    type="primary" if st.session_state['pagina_atual'] == "Congelado" else "secondary"
 )
 
-# Submenu Higienizações
-if st.session_state.get('higienizacao_submenu_expanded', False):
-    with st.sidebar.container():
-        st.button(
-            "Checklist", 
-            key="subbtn_higienizacao_checklist",
-            on_click=ir_para_higienizacao_checklist,
-            use_container_width=True,
-            type="primary" if st.session_state.get('higienizacao_subpagina') == "Checklist" else "secondary"
-        )
+_ocultar_hig = True or st.session_state.get('ocultar_higienizacoes', False)
+_relatorios_ocultos_hig = st.session_state.get('relatorios_ocultos', [])
+_relatorios_ocultos_map_hig = st.session_state.get('relatorios_ocultos_map', {})
+_hig_oculto = (
+    _ocultar_hig
+    or ('Higienizações' in _relatorios_ocultos_hig)
+    or (_relatorios_ocultos_map_hig.get('Higienizações') is True)
+)
+if not _hig_oculto:
+    st.sidebar.button(
+        "Higienizações", 
+        key="btn_higienizacoes", 
+        on_click=toggle_higienizacao_submenu, 
+        use_container_width=True,
+        type="primary" if st.session_state['pagina_atual'] == "Higienizações" else "secondary",
+        help="Módulo unificado de Higienizações"
+    )
+
+    # Submenu Higienizações
+    if st.session_state.get('higienizacao_submenu_expanded', False):
+        with st.sidebar.container():
+            st.button(
+                "Checklist", 
+                key="subbtn_higienizacao_checklist",
+                on_click=ir_para_higienizacao_checklist,
+                use_container_width=True,
+                type="primary" if st.session_state.get('higienizacao_subpagina') == "Checklist" else "secondary"
+            )
 
 st.sidebar.button(
     "Emissões Brasileiras", 
@@ -877,14 +911,24 @@ st.sidebar.button(
     help="Módulo de tradução de documentos"
 )
 
-st.sidebar.button(
-    "Extrações de Dados", 
-    key="btn_extracoes", 
-    on_click=ir_para_extracoes,
-    use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Extrações de Dados" else "secondary",
-    help="Módulo de extrações e relatórios"
+# Ocultar botão de Extrações de Dados se marcado como oculto
+_ocultar_extracoes = st.session_state.get('ocultar_extracoes', False)
+_relatorios_ocultos = st.session_state.get('relatorios_ocultos', [])
+_relatorios_ocultos_map = st.session_state.get('relatorios_ocultos_map', {})
+_extracoes_oculto = (
+    _ocultar_extracoes
+    or ('Extrações de Dados' in _relatorios_ocultos)
+    or (_relatorios_ocultos_map.get('Extrações de Dados') is True)
 )
+if not _extracoes_oculto:
+    st.sidebar.button(
+        "Extrações de Dados", 
+        key="btn_extracoes", 
+        on_click=ir_para_extracoes,
+        use_container_width=True,
+        type="primary" if st.session_state['pagina_atual'] == "Extrações de Dados" else "secondary",
+        help="Módulo de extrações e relatórios"
+    )
 
 # Exibição da página selecionada
 current_page = st.session_state.get('pagina_atual', 'Ficha da Família')
@@ -892,7 +936,14 @@ current_page = st.session_state.get('pagina_atual', 'Ficha da Família')
 try:
     if current_page == "Ficha da Família":
         show_ficha_familia()
+    elif current_page == "Congelado":
+        show_congelado()
     elif current_page == "Higienizações":
+        # Se oculto, redireciona para Ficha da Família e não renderiza
+        if _hig_oculto:
+            st.session_state['pagina_atual'] = 'Ficha da Família'
+            st.query_params['page'] = 'ficha_familia'
+            st.rerun()
         if st.session_state.get('higienizacao_subpagina') == "Checklist":
             show_higienizacoes(sub_page="checklist")
         else:

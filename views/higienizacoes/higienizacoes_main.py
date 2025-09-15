@@ -8,6 +8,18 @@ def show_higienizacoes(sub_page=None):
     Função principal que controla a exibição das subpáginas de Higienizações
     baseada no parâmetro sub_page ou no estado da sessão.
     """
+    # Não carregar nada se o relatório estiver oculto
+    relatorios_ocultos = st.session_state.get('relatorios_ocultos', [])
+    relatorios_ocultos_map = st.session_state.get('relatorios_ocultos_map', {})
+    oculto_flag = st.session_state.get('ocultar_higienizacoes', False)
+    esta_oculto = (
+        oculto_flag
+        or ('Higienizações' in relatorios_ocultos)
+        or (relatorios_ocultos_map.get('Higienizações') is True)
+    )
+    if esta_oculto:
+        st.info("Relatório 'Higienizações' está oculto. Dados não foram carregados.")
+        return
     # Título principal da página
     st.title("Higienizações")
     
