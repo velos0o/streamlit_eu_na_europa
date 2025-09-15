@@ -90,6 +90,7 @@ def show_traducao():
         ENVIAR_FAMILIA_ASSINATURA_COL = 'UF_CRM_50_1755540132711'
         AVALIACAO_TRADUCAO_COL = 'UF_CRM_50_1755539995076'
         STAGE_ID_COL = 'STAGE_ID'
+        CATEGORY_ID_COL = 'CATEGORY_ID'
 
         # IDs dos Estágios
         STAGE_PRODUZIDO = 'DT1136_130:UC_8OTF6D'
@@ -97,6 +98,16 @@ def show_traducao():
         STAGE_DEVOLVIDO = 'DT1136_130:UC_ZUUSW4'
 
         df_traducao = df_traducao_full[df_traducao_full[USER_ID_COL] != '10'].copy()
+
+        # Filtrar somente o funil (pipeline) CATEGORY_ID = 130
+        if CATEGORY_ID_COL in df_traducao.columns:
+            df_traducao[CATEGORY_ID_COL] = pd.to_numeric(df_traducao[CATEGORY_ID_COL], errors='coerce')
+            df_traducao = df_traducao[df_traducao[CATEGORY_ID_COL] == 130].copy()
+        elif STAGE_ID_COL in df_traducao.columns:
+            # Fallback: usar prefixo do STAGE_ID que indica o pipeline 130
+            df_traducao = df_traducao[df_traducao[STAGE_ID_COL].astype(str).str.startswith('DT1136_130:')].copy()
+        else:
+            st.warning("Não foi possível aplicar o filtro de CATEGORY_ID=130 (colunas ausentes).")
         
         mapa_usuarios = {}
         if not df_usuarios.empty:
@@ -114,6 +125,13 @@ def show_traducao():
         df_traducao[TIMESTAMP_COL] = pd.to_datetime(df_traducao[TIMESTAMP_COL], errors='coerce') - pd.Timedelta(hours=6)
         df_traducao.dropna(subset=[TIMESTAMP_COL], inplace=True)
         df_traducao.sort_values(by=TIMESTAMP_COL, inplace=True)
+
+        # --- FILTRO DE ESTÁGIOS PERMITIDOS (descartar qualquer outro) ---
+        estagios_em_andamento = {'DT1136_130:PREPARATION'}
+        estagios_concluidos = {'DT1136_130:SUCCESS', 'DT1136_130:UC_8OTF6D'}
+        estagios_permitidos = estagios_em_andamento.union(estagios_concluidos).union({'DT1136_130:NEW', 'DT1136_130:UC_ZUUSW4'})
+        if STAGE_ID_COL in df_traducao.columns:
+            df_traducao = df_traducao[df_traducao[STAGE_ID_COL].astype(str).isin(estagios_permitidos)].copy()
         
         # --- PREPARAÇÃO DE DADOS PARA FILTROS ---
         # Converter colunas de data para datetime
@@ -208,21 +226,52 @@ def show_traducao():
         # Métricas Gerais
         df_filtrado[DATA_EM_ANDAMENTO_COL] = pd.to_datetime(df_filtrado[DATA_EM_ANDAMENTO_COL], errors='coerce')
         df_filtrado[DATA_REVISAO_TRADUCAO_COL] = pd.to_datetime(df_filtrado[DATA_REVISAO_TRADUCAO_COL], errors='coerce') # Usar data de revisão
-        df_filtrado['tempo_traducao_conclusao'] = df_filtrado[DATA_REVISAO_TRADUCAO_COL] - df_filtrado[DATA_EM_ANDAMENTO_COL]
+
+        # Registros válidos para produção: evitar casos onde EM_ANDAMENTO > REVISAO (duração negativa)
+        ordem_valida_producao_mask = (
+            df_filtrado[DATA_EM_ANDAMENTO_COL].isna()
+        ) | (
+            df_filtrado[DATA_REVISAO_TRADUCAO_COL].isna()
+        ) | (
+            df_filtrado[DATA_EM_ANDAMENTO_COL] <= df_filtrado[DATA_REVISAO_TRADUCAO_COL]
+        )
+
+        # Tempo de tradução somente quando a ordem das datas é válida
+        df_filtrado['tempo_traducao_conclusao'] = (
+            df_filtrado[DATA_REVISAO_TRADUCAO_COL] - df_filtrado[DATA_EM_ANDAMENTO_COL]
+        ).where(ordem_valida_producao_mask)
         tempo_medio_geral = df_filtrado['tempo_traducao_conclusao'].mean()
 
-        docs_produzidos_geral = df_filtrado[df_filtrado[STAGE_ID_COL] == STAGE_PRODUZIDO].shape[0]
-        docs_pendentes_geral = df_filtrado[df_filtrado[STAGE_ID_COL] == STAGE_PENDENTE].shape[0]
+        # Contagem de produzidos apenas quando a ordem das datas é válida
+        df_filtrado['conta_produzido'] = (
+            (df_filtrado[STAGE_ID_COL] == STAGE_PRODUZIDO) & ordem_valida_producao_mask
+        ).astype(int)
+        # Considerar concluídos apenas nos estágios mapeados como concluídos
+        if STAGE_ID_COL in df_filtrado.columns:
+            mask_concluidos_estagio = df_filtrado[STAGE_ID_COL].astype(str).isin(['DT1136_130:SUCCESS', 'DT1136_130:UC_8OTF6D'])
+        else:
+            mask_concluidos_estagio = False
+        docs_produzidos_geral = int((df_filtrado['conta_produzido'] & mask_concluidos_estagio).sum()) if isinstance(mask_concluidos_estagio, pd.Series) else int(df_filtrado['conta_produzido'].sum())
+        # Pendentes são NEW e UC_ZUUSW4
+        if STAGE_ID_COL in df_filtrado.columns:
+            mask_pendentes_estagio = df_filtrado[STAGE_ID_COL].astype(str).isin(['DT1136_130:NEW', 'DT1136_130:UC_ZUUSW4'])
+            docs_pendentes_geral = int(mask_pendentes_estagio.sum())
+        else:
+            docs_pendentes_geral = df_filtrado[df_filtrado[STAGE_ID_COL] == STAGE_PENDENTE].shape[0]
         docs_devolvidos_geral = df_filtrado[df_filtrado[STAGE_ID_COL] == STAGE_DEVOLVIDO].shape[0]
 
         # Métricas de Desempenho por Tradutor
         df_tradutores = pd.DataFrame() # Inicializa vazio
         if not df_filtrado.empty and USER_TRADUTOR_COL in df_filtrado.columns:
-            df_filtrado['em_andamento'] = df_filtrado[DATA_EM_ANDAMENTO_COL].notna() & df_filtrado[DATA_REVISAO_TRADUCAO_COL].isna() # Usar data de revisão
+            # Em andamento: apenas STAGE_ID PREPARATION (sem regra de datas)
+            if STAGE_ID_COL in df_filtrado.columns:
+                df_filtrado['em_andamento'] = df_filtrado[STAGE_ID_COL].astype(str).isin(['DT1136_130:PREPARATION'])
+            else:
+                df_filtrado['em_andamento'] = False
             df_tradutores = df_filtrado.groupby(USER_TRADUTOR_COL).agg(
                 docs_pendentes=(STAGE_ID_COL, lambda x: (x == STAGE_PENDENTE).sum()),
                 docs_em_andamento=('em_andamento', 'sum'),
-                docs_produzidos=(STAGE_ID_COL, lambda x: (x == STAGE_PRODUZIDO).sum()),
+                docs_produzidos=('conta_produzido', 'sum'),
                 tempo_medio_conclusao=('tempo_traducao_conclusao', 'mean')
             ).reset_index()
             df_tradutores.rename(columns={
