@@ -57,6 +57,7 @@ from views.scaner.data_loader import carregar_dados_spa_scanner
 # Importar a função central de carregamento do Bitrix
 from api.bitrix_connector import load_merged_data
 from utils.dataframe_utils import ensure_pandas_df
+from unidecode import unidecode
 
 # Importar função de simplificação de estágio
 # Tratamento de erro caso o arquivo não exista ou a função não seja encontrada
@@ -306,12 +307,21 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
                 docs_familia_local = df_docs_spa_local[df_docs_spa_local['UF_CRM_48_ID_FAMILIA'] == id_familia_str_local].copy()
                 if not docs_familia_local.empty:
                     def _inferir_tipo_certidao_spa(titulo: str) -> str:
-                        t = str(titulo).upper()
-                        if 'NASC' in t:
+                        # Normaliza acentuação e caixa para evitar falsos positivos
+                        t_norm = unidecode(str(titulo)).upper()
+                        # Match exato prioritário
+                        if 'CERTIDAO NASCIMENTO' in t_norm or 'NASCIMENTO' in t_norm:
                             return 'Nascimento'
-                        if 'CASA' in t or 'MATRIM' in t:
+                        if 'CERTIDAO CASAMENTO' in t_norm or 'MATRIMONIO' in t_norm or 'CASAMENTO' in t_norm:
                             return 'Casamento'
-                        if 'ÓBIT' in t or 'OBIT' in t or 'OBITO' in t:
+                        if 'CERTIDAO OBITO' in t_norm or 'OBITO' in t_norm or 'OBITO' in t_norm or 'OBIT' in t_norm:
+                            return 'Óbito'
+                        # Alguns títulos podem vir abreviados; fallback seguro
+                        if 'NASC' in t_norm:
+                            return 'Nascimento'
+                        if 'CASA' in t_norm or 'MATRIM' in t_norm:
+                            return 'Casamento'
+                        if 'OBIT' in t_norm:
                             return 'Óbito'
                         return 'Outro'
                     docs_familia_local['__tipo__'] = docs_familia_local['TITLE'].apply(_inferir_tipo_certidao_spa)
@@ -321,8 +331,9 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
                         link_drive = str(r.get('UF_CRM_48_LINK_DRIVE', '')).strip()
                         link_scan = str(r.get('UF_CRM_48_DOCUMENTO_SCANEADO', '')).strip()
                         chosen_link = link_drive if link_drive.lower().startswith('http') else (link_scan if link_scan.lower().startswith('http') else '')
+                        # Guardar um link por par (Requerente, Tipo). Não sobrescrever se já existir
                         if req_id and tipo in ['Nascimento', 'Casamento', 'Óbito'] and chosen_link:
-                            docs_map[(req_id, tipo)] = chosen_link
+                            docs_map.setdefault((req_id, tipo), chosen_link)
     except Exception as _e:
         print(f"[WARN] Falha ao montar docs_map SPA: {_e}")
     
@@ -752,12 +763,12 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
                 if not docs_familia.empty:
                     # Inferir tipo de certidão a partir do TITLE
                     def inferir_tipo_certidao(titulo: str) -> str:
-                        t = str(titulo).upper()
-                        if 'NASC' in t:
+                        t_norm = unidecode(str(titulo)).upper()
+                        if 'CERTIDAO NASCIMENTO' in t_norm or 'NASCIMENTO' in t_norm or 'NASC' in t_norm:
                             return 'Nascimento'
-                        if 'CASA' in t or 'MATRIM' in t:
+                        if 'CERTIDAO CASAMENTO' in t_norm or 'MATRIMONIO' in t_norm or 'CASAMENTO' in t_norm or 'MATRIM' in t_norm or 'CASA' in t_norm:
                             return 'Casamento'
-                        if 'ÓBIT' in t or 'OBIT' in t or 'OBITO' in t:
+                        if 'CERTIDAO OBITO' in t_norm or 'OBITO' in t_norm or 'OBIT' in t_norm or 'OBITO' in t_norm:
                             return 'Óbito'
                         return 'Outro'
 
