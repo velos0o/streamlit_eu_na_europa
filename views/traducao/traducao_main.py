@@ -242,16 +242,15 @@ def show_traducao():
         ).where(ordem_valida_producao_mask)
         tempo_medio_geral = df_filtrado['tempo_traducao_conclusao'].mean()
 
-        # Contagem de produzidos apenas quando a ordem das datas é válida
-        df_filtrado['conta_produzido'] = (
-            (df_filtrado[STAGE_ID_COL] == STAGE_PRODUZIDO) & ordem_valida_producao_mask
-        ).astype(int)
-        # Considerar concluídos apenas nos estágios mapeados como concluídos
+        # Contagem de produzidos: SUCCESS e UC_8OTF6D, respeitando ordem válida de datas
         if STAGE_ID_COL in df_filtrado.columns:
             mask_concluidos_estagio = df_filtrado[STAGE_ID_COL].astype(str).isin(['DT1136_130:SUCCESS', 'DT1136_130:UC_8OTF6D'])
         else:
-            mask_concluidos_estagio = False
-        docs_produzidos_geral = int((df_filtrado['conta_produzido'] & mask_concluidos_estagio).sum()) if isinstance(mask_concluidos_estagio, pd.Series) else int(df_filtrado['conta_produzido'].sum())
+            mask_concluidos_estagio = pd.Series([False] * len(df_filtrado), index=df_filtrado.index)
+        df_filtrado['conta_produzido'] = (
+            mask_concluidos_estagio & ordem_valida_producao_mask
+        ).astype(int)
+        docs_produzidos_geral = int(df_filtrado['conta_produzido'].sum())
         # Pendentes são NEW e UC_ZUUSW4
         if STAGE_ID_COL in df_filtrado.columns:
             mask_pendentes_estagio = df_filtrado[STAGE_ID_COL].astype(str).isin(['DT1136_130:NEW', 'DT1136_130:UC_ZUUSW4'])
@@ -269,7 +268,7 @@ def show_traducao():
             else:
                 df_filtrado['em_andamento'] = False
             df_tradutores = df_filtrado.groupby(USER_TRADUTOR_COL).agg(
-                docs_pendentes=(STAGE_ID_COL, lambda x: (x == STAGE_PENDENTE).sum()),
+                docs_pendentes=(STAGE_ID_COL, lambda x: x.astype(str).isin(['DT1136_130:NEW', 'DT1136_130:UC_ZUUSW4']).sum()),
                 docs_em_andamento=('em_andamento', 'sum'),
                 docs_produzidos=('conta_produzido', 'sum'),
                 tempo_medio_conclusao=('tempo_traducao_conclusao', 'mean')
