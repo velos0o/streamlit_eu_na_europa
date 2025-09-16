@@ -2,7 +2,7 @@
 FICHA DA FAMÍLIA - Relatório Individual de Famílias
 ===================================================
 
-ATUALIZAÇÃO DEZEMBRO 2024 - NOVOS PIPELINES 102 E 104:
+ATUALIZAÇÃO - NOVOS PIPELINES 102 E 104:
 - Pipeline 102: Paróquia 
 - Pipeline 104: Pesquisa BR
 
@@ -823,7 +823,6 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
         st.warning(f"Falha ao processar documentos da SPA: {e}")
 
 def exibir_metricas_macro():
-    st.markdown("### Métricas Macro")
     # ============================
     # STATUS DE PROTOCOLO (GERAL)
     # ============================
@@ -832,13 +831,8 @@ def exibir_metricas_macro():
     except Exception:
         df_crm_deals_full_local = pd.DataFrame()
 
-    # ============================
-    # STATUS FAMILIAS
-    # ============================
-    st.markdown("---")
     st.markdown("#### STATUS FAMILIAS")
-    st.caption("Concluídas: famílias que atingiram PROTOCOLO. Em andamento: famílias que ainda não atingiram PROTOCOLO.")
-
+    
     total_familias_f46 = 0
     familias_concluidas_protocolo = 0
     familias_andamento_protocolo = 0
@@ -848,7 +842,7 @@ def exibir_metricas_macro():
             col_id_familia = 'UF_CRM_1722605592778'
             col_stage = 'STAGE_ID'
             if col_id_familia in df_crm_deals_full_local.columns:
-                df_f46 = df_crm_deals_full_local[[c for c in [col_id_familia, col_stage] if c in df_crm_deals_full_local.columns]].copy()
+                df_f46 = df_crm_deals_full_local[[c for c in [col_id_familia, col_stage, 'STAGE_NAME', 'STAGE_SEMANTIC_ID'] if c in df_crm_deals_full_local.columns]].copy()
                 df_f46[col_id_familia] = df_f46[col_id_familia].astype(str).str.strip()
                 ids_f46 = df_f46[col_id_familia].replace('', pd.NA).dropna().unique().tolist()
                 total_familias_f46 = len(ids_f46)
@@ -872,21 +866,52 @@ def exibir_metricas_macro():
                     'PROTOCOLO': 170,
                 }
 
-                def detectar_maior_ordem_pp(stages_serie: pd.Series) -> int:
-                    if stages_serie is None or stages_serie.empty:
+                def calcular_maior_ordem_para_grupo(stages_df: pd.DataFrame) -> int:
+                    if stages_df is None or stages_df.empty:
                         return 0
-                    valores = stages_serie.dropna().astype(str).tolist()
                     maior = 0
-                    for v in valores:
-                        for etapa, codigos in codigos_por_etapa_pp.items():
-                            for codigo in codigos:
-                                if codigo in v:
-                                    maior = max(maior, ordem_por_etapa_pp.get(etapa, 0))
+                    try:
+                        if 'STAGE_SEMANTIC_ID' in stages_df.columns:
+                            semanticas = stages_df['STAGE_SEMANTIC_ID'].dropna().astype(str).str.upper().tolist()
+                            if any(s in ['S', 'SUCCESS', 'WON'] for s in semanticas):
+                                maior = max(maior, ordem_por_etapa_pp.get('PROTOCOLO', 170))
+                    except Exception:
+                        pass
+                    valores_id = []
+                    valores_nome = []
+                    try:
+                        if 'STAGE_ID' in stages_df.columns:
+                            valores_id = stages_df['STAGE_ID'].dropna().astype(str).tolist()
+                    except Exception:
+                        valores_id = []
+                    try:
+                        if 'STAGE_NAME' in stages_df.columns:
+                            valores_nome = stages_df['STAGE_NAME'].dropna().astype(str).tolist()
+                    except Exception:
+                        valores_nome = []
+                    tokens = [unidecode(v).upper() for v in (valores_id + valores_nome)]
+                    for etapa, codigos in codigos_por_etapa_pp.items():
+                        for codigo in codigos:
+                            if any(codigo in t for t in tokens):
+                                maior = max(maior, ordem_por_etapa_pp.get(etapa, 0))
+                    stage_keywords = {
+                        'PROTOCOLO': ['PROTOCOLO', 'WON', 'SUCCESS'],
+                        'RECURSO': ['RECURSO'],
+                        'DRIVE': ['DRIVE'],
+                        'APOSTILAMENTO': ['APOSTILAMENTO', 'APOSTILA'],
+                        'TRADUÇÃO': ['TRADUCAO', 'TRADU', 'TRADUÇÃO'],
+                        'ANÁLISE DOCUMENTAL': ['ANALISE DOCUMENTAL', 'ANALISE', 'ANÁLISE DOCUMENTAL'],
+                        'EMISSÃO BRASILEIRA': ['EMISSAO', 'EMISSÃO', 'EMISSAO BRASILEIRA', 'EMISSÃO BRASILEIRA']
+                    }
+                    for etapa, keywords in stage_keywords.items():
+                        if any(any(kw in t for kw in keywords) for t in tokens):
+                            maior = max(maior, ordem_por_etapa_pp.get(etapa, 0))
                     return maior
 
                 maiores = []
                 for fam_id, g in df_f46.groupby(col_id_familia):
-                    maior = detectar_maior_ordem_pp(g[col_stage] if col_stage in g.columns else pd.Series([], dtype=object))
+                    cols_grp = [c for c in [col_stage, 'STAGE_NAME', 'STAGE_SEMANTIC_ID'] if c in g.columns]
+                    maior = calcular_maior_ordem_para_grupo(g[cols_grp] if cols_grp else pd.DataFrame())
                     maiores.append(maior)
                 familias_concluidas_protocolo = sum(1 for m in maiores if m >= 170)
                 familias_andamento_protocolo = max(0, total_familias_f46 - familias_concluidas_protocolo)
@@ -940,16 +965,46 @@ def exibir_metricas_macro():
             'PROTOCOLO': 170,
         }
 
-        def detectar_maior_ordem(stages_serie: pd.Series) -> int:
-            if stages_serie is None or stages_serie.empty:
+        def calcular_maior_ordem_para_grupo_detalhe(stages_df: pd.DataFrame) -> int:
+            if stages_df is None or stages_df.empty:
                 return 0
-            valores = stages_serie.dropna().astype(str).tolist()
             maior = 0
-            for v in valores:
-                for etapa, codigos in codigos_por_etapa.items():
-                    for codigo in codigos:
-                        if codigo in v:
-                            maior = max(maior, ordem_por_etapa.get(etapa, 0))
+            try:
+                if 'STAGE_SEMANTIC_ID' in stages_df.columns:
+                    semanticas = stages_df['STAGE_SEMANTIC_ID'].dropna().astype(str).str.upper().tolist()
+                    if any(s in ['S', 'SUCCESS', 'WON'] for s in semanticas):
+                        maior = max(maior, ordem_por_etapa.get('PROTOCOLO', 170))
+            except Exception:
+                pass
+            valores_id = []
+            valores_nome = []
+            try:
+                if 'STAGE_ID' in stages_df.columns:
+                    valores_id = stages_df['STAGE_ID'].dropna().astype(str).tolist()
+            except Exception:
+                valores_id = []
+            try:
+                if 'STAGE_NAME' in stages_df.columns:
+                    valores_nome = stages_df['STAGE_NAME'].dropna().astype(str).tolist()
+            except Exception:
+                valores_nome = []
+            tokens = [unidecode(v).upper() for v in (valores_id + valores_nome)]
+            for etapa, codigos in codigos_por_etapa.items():
+                for codigo in codigos:
+                    if any(codigo in t for t in tokens):
+                        maior = max(maior, ordem_por_etapa.get(etapa, 0))
+            stage_keywords = {
+                'PROTOCOLO': ['PROTOCOLO', 'WON', 'SUCCESS'],
+                'RECURSO': ['RECURSO'],
+                'DRIVE': ['DRIVE'],
+                'APOSTILAMENTO': ['APOSTILAMENTO', 'APOSTILA'],
+                'TRADUÇÃO': ['TRADUCAO', 'TRADU', 'TRADUÇÃO'],
+                'ANÁLISE DOCUMENTAL': ['ANALISE DOCUMENTAL', 'ANALISE', 'ANÁLISE DOCUMENTAL'],
+                'EMISSÃO BRASILEIRA': ['EMISSAO', 'EMISSÃO', 'EMISSAO BRASILEIRA', 'EMISSÃO BRASILEIRA']
+            }
+            for etapa, keywords in stage_keywords.items():
+                if any(any(kw in t for kw in keywords) for t in tokens):
+                    maior = max(maior, ordem_por_etapa.get(etapa, 0))
             return maior
 
         grupo_cols = [c for c in [col_nome, col_id_familia] if c in df_cat46.columns]
@@ -963,7 +1018,8 @@ def exibir_metricas_macro():
             else:
                 nome_fam, id_fam = chave, ''
 
-            maior_ordem = detectar_maior_ordem(g[col_stage])
+            cols_grp = [c for c in [col_stage, 'STAGE_NAME', 'STAGE_SEMANTIC_ID'] if c in g.columns]
+            maior_ordem = calcular_maior_ordem_para_grupo_detalhe(g[cols_grp] if cols_grp else pd.DataFrame())
             etapas_status = {}
             for etapa, ordem in ordem_por_etapa.items():
                 etapas_status[etapa] = '✅' if maior_ordem >= ordem else ''
@@ -989,7 +1045,7 @@ def exibir_metricas_macro():
         return df_out
 
     st.markdown("---")
-    st.markdown("#### STATUS DE PROTOCOLO (Geral)")
+    st.markdown("#### STATUS FAMÍLIAS")
     st.caption("Etapas concluídas até o protocolo para todas as famílias do funil 46.")
 
     try:
@@ -1024,7 +1080,7 @@ def exibir_metricas_macro():
     # ACOMPANHAMENTO GERAL (todas as famílias)
     # ============================
     st.markdown("---")
-    st.markdown("#### Acompanhamento Geral de Emissões (todas as famílias)")
+    st.markdown("#### ACOMPANHAMENTO EMISSÕES BRASILEIRAS FAMÍLIAS")
 
     with st.spinner("Carregando dados do SPA..."):
         try:
@@ -1059,7 +1115,7 @@ def exibir_metricas_macro():
     familias_concluidas_count = int(len(fam_concluidas))
     fam_andamento = fam_metrics[(fam_metrics['total_itens'] > 0) & (fam_metrics['concluidas'] < fam_metrics['total_itens'])]
     familias_andamento_count = int(len(fam_andamento))
-
+1
     st.markdown("""
     <style>
     .metricas-container-geral { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0 4px 0; }
@@ -1096,7 +1152,7 @@ def exibir_metricas_macro():
     fam_metrics['Percentual'] = fam_metrics.apply(lambda r: (r['concluidas'] / r['total_itens'] * 100) if r['total_itens'] > 0 else 0.0, axis=1)
     fam_metrics['Concluídas/Total'] = fam_metrics.apply(lambda r: f"{int(r['concluidas'])}/{int(r['total_itens'])}", axis=1)
     fam_metrics['Progresso'] = fam_metrics['Percentual']
-    fam_metrics['Percentual'] = fam_metrics['Percentual'].apply(lambda v: '🟢 100%' if v >= 100 else f"{v:.1f}%")
+    fam_metrics['Percentual'] = fam_metrics['Percentual'].apply(lambda v: '✅ 100%' if v >= 100 else f"{v:.1f}%")
 
     fam_metrics[col_id_familia_spa] = fam_metrics[col_id_familia_spa].astype(str).str.strip()
     df_prog_show = fam_metrics.copy()
@@ -1129,7 +1185,7 @@ def show_ficha_familia():
     #     pass # Ignora o erro se já foi configurado
 
     st.markdown("<h1 class='page-title initial-page-title'>Ficha da Família</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='page-subtitle'>Busque por uma família para ver detalhes ou visualize métricas gerais.</p>", unsafe_allow_html=True)
+    st.markdown("<p class='page-subtitle'>Busque por uma famílias para encontrar status do processo da mesma.</p>", unsafe_allow_html=True)
 
     # Garantir que toda a página use a largura máxima disponível
     st.markdown('''
@@ -1191,21 +1247,25 @@ def show_ficha_familia():
 
     # Container para busca e resultados
     with st.container():
-        col1, col2 = st.columns([3, 1])
+        col1, col2 = st.columns([5, 1])
         
         with col1:
             campo_busca_familia_principal = 'UF_CRM_1722883482527'
             termo_busca = st.text_input(
                 "Busca Nome da Família",
-                placeholder="Digite o nome da família...",
-                key="busca_familia_principal_input"
+                placeholder="Digite o nome da família...", 
+                key="busca_familia_principal_input",
+                label_visibility="collapsed"
             ).strip()
-        
-        # Botão de pesquisa avançada (opcional)
-        with col2:
-            st.markdown("<br>", unsafe_allow_html=True)  # Espaçamento para alinhar com o campo de busca
-            busca_avancada = st.button("🔍 Busca Avançada", help="Abre opções de busca avançada")
 
+            if "busca_avancada_loading" not in st.session_state:
+                st.session_state.busca_avancada_loading = False
+
+        with col2:
+            if st.button("🔍 BUSCAR", help="Abre opções de buscar"):
+                with st.spinner('Carregando busca...'):
+                    time.sleep(0.8) # Simula carregamento 
+                    st.session_state.busca_avancada_loading = True
     # Processamento da busca
     familia_selecionada_data = pd.Series(dtype=object)
     df_emissoes_filtradas = pd.DataFrame()
