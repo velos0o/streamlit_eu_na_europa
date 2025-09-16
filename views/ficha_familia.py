@@ -46,6 +46,7 @@ import streamlit as st
 # importยอด_เยี่ยม_navigation_utils # Comentado por enquanto
 import pandas as pd # Adicionado para manipulação de dados
 import os # Adicionado para manipulação de caminhos
+import time
 
 # Importar data loaders dos módulos
 from views.reclamacoes.data_loader import carregar_dados_reclamacoes
@@ -1115,7 +1116,6 @@ def exibir_metricas_macro():
     familias_concluidas_count = int(len(fam_concluidas))
     fam_andamento = fam_metrics[(fam_metrics['total_itens'] > 0) & (fam_metrics['concluidas'] < fam_metrics['total_itens'])]
     familias_andamento_count = int(len(fam_andamento))
-1
     st.markdown("""
     <style>
     .metricas-container-geral { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 12px 0 4px 0; }
