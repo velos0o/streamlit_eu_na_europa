@@ -395,12 +395,14 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
         if col_stage_para_simplificar:
             try:
                 emissoes_df['STAGE_NAME_LEGIVEL'] = emissoes_df[col_stage_para_simplificar].apply(simplificar_nome_estagio)
-                # Normalização para novo estágio: UC_PBAY8U -> [EM EXECUÇÃO] DEVOLUÇÃO ADM
+                # Normalização para novo estágio: UC_PBAY8U -> [EM EXECUÇÃO]DEVOLUÇÃO ADM
                 try:
-                    emissoes_df['STAGE_NAME_LEGIVEL'] = emissoes_df['STAGE_NAME_LEGIVEL'].astype(str)
-                    emissoes_df[col_stage_para_simplificar] = emissoes_df[col_stage_para_simplificar].astype(str)
-                    mask_uc_pbay8u = emissoes_df[col_stage_para_simplificar].str.upper().eq('UC_PBAY8U')
-                    emissoes_df.loc[mask_uc_pbay8u, 'STAGE_NAME_LEGIVEL'] = '[EM EXECUÇÃO] DEVOLUÇÃO ADM'
+                    mask_uc_pbay8u = pd.Series(False, index=emissoes_df.index)
+                    if 'STAGE_ID' in emissoes_df.columns:
+                        mask_uc_pbay8u = mask_uc_pbay8u | emissoes_df['STAGE_ID'].astype(str).str.upper().str.contains('UC_PBAY8U', na=False)
+                    if 'STAGE_NAME' in emissoes_df.columns:
+                        mask_uc_pbay8u = mask_uc_pbay8u | emissoes_df['STAGE_NAME'].astype(str).str.upper().str.contains('UC_PBAY8U', na=False)
+                    emissoes_df.loc[mask_uc_pbay8u, 'STAGE_NAME_LEGIVEL'] = '[EM EXECUÇÃO]DEVOLUÇÃO ADM'
                 except Exception:
                     pass
                 processamento_emissoes_ok = True
