@@ -352,7 +352,7 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
                 if status_upper in ["AGUARDANDO CERTIDÃO", "BUSCA - CRC", "DEVOLUTIVA BUSCA - CRC", 
                                   "APENAS ASS. REQ CLIENTE P/MONTAGEM", "MONTAGEM REQUERIMENTO CARTÓRIO", 
                                   "SOLICITAR CARTÓRIO DE ORIGEM", "SOLICITAR CARTÓRIO DE ORIGEM PRIORIDADE", 
-                                  "DEVOLUÇÃO ADM", "DEVOLVIDO REQUERIMENTO"]:
+                                  "DEVOLUÇÃO ADM", "DEVOLVIDO REQUERIMENTO"] or "DEVOLUÇÃO ADM" in status_upper:
                     return "Brasileiras Pendências"
                 elif status_upper == "PESQUISA - BR":
                     return "Brasileiras Pesquisas"
@@ -365,7 +365,7 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
                     
             # Pipeline 102 (Paróquia)
             elif category_id_str == '102':
-                if status_upper in ["SOLICITAR PARÓQUIA DE ORIGEM", "DEVOLUÇÃO ADM"]:
+                if status_upper in ["SOLICITAR PARÓQUIA DE ORIGEM", "DEVOLUÇÃO ADM"] or "DEVOLUÇÃO ADM" in status_upper:
                     return "Paróquia Pendências"
                 elif status_upper == "AGUARDANDO PARÓQUIA DE ORIGEM":
                     return "Paróquia Solicitadas"
@@ -395,6 +395,14 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
         if col_stage_para_simplificar:
             try:
                 emissoes_df['STAGE_NAME_LEGIVEL'] = emissoes_df[col_stage_para_simplificar].apply(simplificar_nome_estagio)
+                # Normalização para novo estágio: UC_PBAY8U -> [EM EXECUÇÃO] DEVOLUÇÃO ADM
+                try:
+                    emissoes_df['STAGE_NAME_LEGIVEL'] = emissoes_df['STAGE_NAME_LEGIVEL'].astype(str)
+                    emissoes_df[col_stage_para_simplificar] = emissoes_df[col_stage_para_simplificar].astype(str)
+                    mask_uc_pbay8u = emissoes_df[col_stage_para_simplificar].str.upper().eq('UC_PBAY8U')
+                    emissoes_df.loc[mask_uc_pbay8u, 'STAGE_NAME_LEGIVEL'] = '[EM EXECUÇÃO] DEVOLUÇÃO ADM'
+                except Exception:
+                    pass
                 processamento_emissoes_ok = True
                 # DEBUG ADICIONADO
                 print("\n[DEBUG ANTES DO LOOP DE REQUERENTES] Primeiras 20 linhas de emissoes_df com STAGE_NAME_LEGIVEL:")
