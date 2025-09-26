@@ -22,6 +22,7 @@ from views.extracoes.extracoes_main import show_extracoes
 from views.cartorio_new.cartorio_new_main import show_cartorio_new
 from views.ficha_familia import show_ficha_familia
 from views.congelado import show_congelado
+from views.fechamento_pasta import show_fechamento_pasta
 from views.higienizacoes.higienizacoes_main import show_higienizacoes
 from views.negociacao.negociacao_main import show_negociacao
 from views.priorizados.priorizados_main import show_priorizados
@@ -44,6 +45,7 @@ from components.quick_links import show_quick_links, show_page_links_sidebar
 ROTAS = {
     "ficha_familia": "Ficha da Família",
     "congelado": "Congelado",
+    "fechamento_pasta": "Fechamento de Pasta",
     "higienizacoes": "Higienizações", 
     "cartorio_new": "Emissões Brasileiras",
     "comune": "Comune",
@@ -442,6 +444,13 @@ def ir_para_congelado():
     if 'sub' in st.query_params:
         del st.query_params['sub']
 
+def ir_para_fechamento_pasta():
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Fechamento de Pasta'
+    st.query_params['page'] = 'fechamento_pasta'
+    if 'sub' in st.query_params:
+        del st.query_params['sub']
+
 def toggle_emissao_submenu():
     st.session_state.emissao_submenu_expanded = not st.session_state.get('emissao_submenu_expanded', False)
     st.session_state.higienizacao_submenu_expanded = False
@@ -695,6 +704,14 @@ st.sidebar.button(
     type="primary" if st.session_state['pagina_atual'] == "Congelado" else "secondary"
 )
 
+st.sidebar.button(
+    "Fechamento de Pasta",
+    key="btn_fechamento_pasta",
+    on_click=ir_para_fechamento_pasta,
+    use_container_width=True,
+    type="primary" if st.session_state['pagina_atual'] == "Fechamento de Pasta" else "secondary"
+)
+
 _ocultar_hig = True or st.session_state.get('ocultar_higienizacoes', False)
 _relatorios_ocultos_hig = st.session_state.get('relatorios_ocultos', [])
 _relatorios_ocultos_map_hig = st.session_state.get('relatorios_ocultos_map', {})
@@ -938,6 +955,8 @@ try:
         show_ficha_familia()
     elif current_page == "Congelado":
         show_congelado()
+    elif current_page == "Fechamento de Pasta":
+        show_fechamento_pasta()
     elif current_page == "Higienizações":
         # Se oculto, redireciona para Ficha da Família e não renderiza
         if _hig_oculto:
