@@ -7,6 +7,7 @@ datas de início e finalização da pasta.
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import altair as alt
 from typing import Dict, Any, Optional, Tuple
@@ -14,7 +15,155 @@ from datetime import date
 
 from api.bitrix_connector import load_merged_data
 from utils.dataframe_utils import ensure_pandas_df
+import calendar
 
+
+def _montar_calendario_html(calendario_df: pd.DataFrame, weeks: list[list[date]], weekday_names: list[str], target_month: int) -> tuple[str, int]:
+    dias = calendario_df.copy()
+    dias["data"] = pd.to_datetime(dias["data"]).dt.date
+    dias_map = dias.set_index("data").to_dict("index")
+
+    html = [
+        "<div class='calendar-container'>",
+        "  <div class='calendar-grid'>"
+    ]
+
+    html.append("    <div class='calendar-header'></div>")
+    for nome in weekday_names:
+        html.append(f"    <div class='calendar-header-day'>{nome}</div>")
+
+    for semana_idx, semana in enumerate(weeks):
+        semana_nome = f"Semana {semana_idx + 1}"
+        html.append(f"    <div class='calendar-week-label'>{semana_nome}</div>")
+
+        for dia in semana:
+            info = dias_map.get(dia, {})
+            no_mes = info.get("no_mes", 1 if dia.month == target_month else 0)
+            is_hoje = info.get("is_hoje", 1 if dia == date.today() else 0)
+            entregas = int(info.get("Entregas", 0))
+            familias = info.get("Familias", "Sem entregas")
+            responsaveis = info.get("Responsaveis", "-")
+
+            classes = ["calendar-cell"]
+            if no_mes != 1:
+                classes.append("out-month")
+            if is_hoje:
+                classes.append("today")
+            if entregas > 0:
+                classes.append("has-delivery")
+
+            tooltip = (
+                f"Dia {dia.strftime('%d/%m/%Y')}<br>"
+                f"Entregas: {entregas}<br>"
+                f"Famílias: {familias}<br>"
+                f"Responsáveis: {responsaveis}"
+            )
+
+            html.append(
+                "    <div class='{}' title='{}'>"
+                .format(" ".join(classes), tooltip.replace("'", "&#39;"))
+            )
+            html.append(f"      <div class='cell-day'>Dia {dia.day}</div>")
+            if entregas > 0:
+                suffix = "entregues" if entregas > 1 else "entrega"
+                html.append(f"      <div class='cell-badge'>> {entregas} {suffix}</div>")
+            html.append("    </div>")
+
+    html.append("  </div>")
+    html.append("</div>")
+
+    estilos = """
+    <style>
+    .calendar-container {
+        width: 100%;
+        background: #ffffff;
+        border: 1px solid #e1e5eb;
+        border-radius: 16px;
+        padding: 16px 20px 20px 20px;
+        box-shadow: 0 14px 24px rgba(15, 23, 42, 0.08);
+        margin-top: 16px;
+    }
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: 120px repeat(7, minmax(120px, 1fr));
+        gap: 10px;
+        align-items: stretch;
+    }
+    .calendar-header {
+        height: 32px;
+    }
+    .calendar-header-day {
+        font-weight: 700;
+        color: #1f2937;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-align: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    .calendar-week-label {
+        font-weight: 600;
+        color: #0f172a;
+        padding: 16px 8px 16px 4px;
+        font-size: 13px;
+        letter-spacing: 0.02em;
+    }
+    .calendar-cell {
+        background: linear-gradient(120deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.9));
+        border-radius: 16px;
+        padding: 16px;
+        min-height: 92px;
+        position: relative;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        transition: all 0.2s ease;
+    }
+    .calendar-cell:hover {
+        border-color: #2563eb;
+        box-shadow: 0 14px 30px rgba(37, 99, 235, 0.15);
+        transform: translateY(-2px);
+        background: #eef2ff;
+    }
+    .calendar-cell.out-month {
+        background: rgba(248, 250, 252, 0.6);
+        border-style: dashed;
+        opacity: 0.65;
+    }
+    .calendar-cell.today {
+        border-color: #22c55e;
+        background: linear-gradient(120deg, rgba(220, 252, 231, 0.8), rgba(187, 247, 208, 0.8));
+    }
+    .calendar-cell.has-delivery {
+        background: linear-gradient(145deg, rgba(37, 99, 235, 0.14), rgba(37, 99, 235, 0.05));
+        border-color: rgba(37, 99, 235, 0.35);
+    }
+    .calendar-cell.empty {
+        background: transparent;
+        border: none;
+    }
+    .cell-day {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 10px;
+    }
+    .cell-badge {
+        display: inline-flex;
+        align-items: center;
+        background: linear-gradient(135deg, #1d4ed8, #2563eb);
+        color: #fff;
+        font-weight: 600;
+        font-size: 11px;
+        border-radius: 999px;
+        padding: 4px 10px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    </style>
+    """
+
+    altura = 120 + (len(weeks) * 120)
+    return estilos + "\n".join(html), altura
 
 @st.cache_data(show_spinner=False)
 def load_crm_deal_data(category_id: int) -> pd.DataFrame:
@@ -455,13 +604,6 @@ def _renderizar_resumo_visual(df: pd.DataFrame) -> None:
     tabela_resumo["TOTAL"] = tabela_resumo.sum(axis=1)
     tabela_resumo = tabela_resumo.reset_index()
 
-    st.markdown("##### Quantidade de Famílias por Etapa")
-    st.dataframe(
-        ensure_pandas_df(tabela_resumo),
-        hide_index=True,
-        use_container_width=True,
-    )
-
     totais = resumo.groupby("Responsável")["Famílias"].sum().reset_index(name="Total")
     resumo = resumo.merge(totais, on="Responsável", how="left")
 
@@ -534,6 +676,242 @@ def _renderizar_resumo_visual(df: pd.DataFrame) -> None:
         alt.vconcat(grafico_superior, grafico_inferior).resolve_scale(x="shared"),
         use_container_width=True
     )
+
+    tabela_resumo_display = tabela_resumo.copy()
+    numeric_cols = [col for col in tabela_resumo_display.columns if col != "Responsável"]
+    tabela_resumo_display[numeric_cols] = tabela_resumo_display[numeric_cols].fillna(0).astype(int)
+
+    styled_table_html = (
+        tabela_resumo_display.style
+        .format(precision=0)
+        .background_gradient(axis=1, cmap="Blues")
+        .set_properties(**{"font-weight": "600"}, subset=pd.IndexSlice[:, ["TOTAL"]])
+        .set_table_attributes('style="border-collapse:collapse;width:100%;"')
+        .set_table_styles([
+            {"selector": "th", "props": [("font-size", "14px"), ("background-color", "#f1f3f5"), ("color", "#1c1c1c"), ("padding", "8px"), ("text-align", "center"), ("border", "1px solid #dee2e6")]},
+            {"selector": "td", "props": [("padding", "8px"), ("text-align", "center"), ("border", "1px solid #dee2e6"), ("font-size", "13px")]}])
+        .to_html()
+    )
+
+    st.markdown("##### Quantidade de Famílias por Etapa")
+    st.markdown(styled_table_html, unsafe_allow_html=True)
+    st.markdown("---")
+
+
+def _renderizar_timeline(df_andamento: pd.DataFrame, df_concluidos: pd.DataFrame) -> None:
+    st.markdown("### Linha do Tempo e Entregas")
+
+    if (df_andamento is None or df_andamento.empty) and (df_concluidos is None or df_concluidos.empty):
+        st.info("Sem dados suficientes para montar a linha do tempo.")
+        return
+
+    campos_base = ["Responsável", "Nome da Família", "ID da Família", "Data Início", "Data Finalização"]
+
+    df_lista = []
+    if df_andamento is not None and not df_andamento.empty:
+        df_lista.append(df_andamento[campos_base].copy())
+    if df_concluidos is not None and not df_concluidos.empty:
+        missing_cols = [col for col in ["Nome da Família", "ID da Família", "Data Início"] if col not in df_concluidos.columns]
+        for col in missing_cols:
+            df_concluidos[col] = pd.NA
+        df_lista.append(df_concluidos[campos_base].copy())
+
+    if not df_lista:
+        st.info("Sem registros para exibir na linha do tempo.")
+        return
+
+    df_timeline = pd.concat(df_lista, ignore_index=True)
+    df_timeline["Responsável"] = df_timeline["Responsável"].fillna("Sem responsável")
+
+    today = pd.Timestamp.today().normalize()
+    df_timeline["Data Final Plot"] = df_timeline["Data Finalização"].fillna(today)
+    df_timeline["Data Início Plot"] = df_timeline["Data Início"].fillna(df_timeline["Data Final Plot"])
+
+    df_timeline = df_timeline.dropna(subset=["Data Início Plot", "Data Final Plot"])
+
+    df_timeline["Status"] = df_timeline["Data Finalização"].apply(lambda x: "Concluída" if pd.notna(x) else "Em andamento")
+
+    if df_timeline.empty:
+        st.info("Sem datas válidas para exibir na linha do tempo.")
+    else:
+        st.markdown("#### Linha do Tempo de Conclusões")
+
+        timeline_chart = (
+            alt.Chart(df_timeline)
+            .mark_bar(height=22, cornerRadius=6)
+            .encode(
+                y=alt.Y(
+                    "Responsável:N",
+                    sort="-x",
+                    axis=alt.Axis(title="Responsável", labelFontSize=12, titleFontSize=14)
+                ),
+                x=alt.X(
+                    "Data Início Plot:T",
+                    title="Período",
+                    axis=alt.Axis(format="%d/%m", labelAngle=0, tickCount="day")
+                ),
+                x2=alt.X2("Data Final Plot:T"),
+                color=alt.Color(
+                    "Status:N",
+                    scale=alt.Scale(domain=["Em andamento", "Concluída"], range=["#FFC107", "#198754"]),
+                    legend=alt.Legend(title="Status")
+                ),
+                tooltip=[
+                    alt.Tooltip("Responsável", title="Responsável"),
+                    alt.Tooltip("Nome da Família", title="Família"),
+                    alt.Tooltip("Data Início Plot:T", title="Início"),
+                    alt.Tooltip("Data Finalização:T", title="Entrega"),
+                    alt.Tooltip("Status", title="Status"),
+                ],
+            )
+            .properties(height=max(420, 28 * df_timeline["Responsável"].nunique()), width="container")
+        )
+
+        pontos_entrega = (
+            alt.Chart(df_timeline[pd.notna(df_timeline["Data Finalização"])])
+            .mark_point(size=120, filled=True, color="#0f5132")
+            .encode(
+                y=alt.Y("Responsável:N", sort="-x"),
+                x=alt.X("Data Finalização:T"),
+                tooltip=[
+                    alt.Tooltip("Responsável", title="Responsável"),
+                    alt.Tooltip("Nome da Família", title="Família"),
+                    alt.Tooltip("Data Finalização:T", title="Entrega"),
+                ],
+            )
+        )
+
+        linha_entrega = (
+            alt.Chart(df_timeline[pd.notna(df_timeline["Data Finalização"])])
+            .mark_rule(color="#0f5132", strokeDash=[4, 4])
+            .encode(x="Data Finalização:T")
+        )
+
+        st.altair_chart(timeline_chart + pontos_entrega + linha_entrega, use_container_width=True)
+
+        df_entregas = df_timeline[pd.notna(df_timeline["Data Finalização"])][[
+            "Responsável", "Nome da Família", "Data Finalização"
+        ]].copy()
+
+        if not df_entregas.empty:
+            st.markdown("##### Calendário de Entregas (estilo mês)")
+            st.markdown(
+                """
+                <style>
+                .calendar-select-label {
+                    font-weight: 600;
+                    color: #1f2937;
+                    font-size: 13px;
+                    letter-spacing: 0.04em;
+                    text-transform: uppercase;
+                    margin-bottom: 6px;
+                }
+                div[data-testid="stSelectbox"][data-key="sel_mes_calendario"] > label {
+                    display: none;
+                }
+                div[data-testid="stSelectbox"][data-key="sel_mes_calendario"] div[data-baseweb="select"] {
+                    background: linear-gradient(115deg, rgba(248,250,252,0.95), rgba(226,232,240,0.9));
+                    border: 1px solid rgba(148, 163, 184, 0.4);
+                    border-radius: 12px;
+                    padding: 12px 14px;
+                    min-height: 48px;
+                    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+                }
+                div[data-testid="stSelectbox"][data-key="sel_mes_calendario"] div[data-baseweb="select"] span {
+                    font-weight: 600;
+                    color: #0f172a;
+                    letter-spacing: 0.02em;
+                }
+                div[data-testid="stSelectbox"][data-key="sel_mes_calendario"] div[data-baseweb="select"] svg {
+                    color: #1d4ed8;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.markdown("<div class='calendar-select-label'>Selecione o mês</div>", unsafe_allow_html=True)
+
+            df_entregas["Data Finalização"] = pd.to_datetime(df_entregas["Data Finalização"]).dt.normalize()
+            meses_disponiveis = (
+                df_entregas["Data Finalização"].dt.to_period("M").sort_values().unique()
+            )
+
+            if len(meses_disponiveis) == 0:
+                st.info("Nenhuma entrega com data definida.")
+            else:
+                meses_labels = [p.strftime("%B/%Y") for p in meses_disponiveis]
+                idx_default = len(meses_disponiveis) - 1
+                mes_escolhido_label = st.selectbox(
+                    "Selecione o mês",
+                    options=list(range(len(meses_disponiveis))),
+                    format_func=lambda i: meses_labels[i],
+                    index=idx_default,
+                    key="sel_mes_calendario",
+                    label_visibility="collapsed"
+                )
+                mes_period = meses_disponiveis[mes_escolhido_label]
+                mes_inicio = mes_period.to_timestamp()
+                mes_fim = (mes_period + 1).to_timestamp() - pd.Timedelta(days=1)
+
+                cal = calendar.Calendar(firstweekday=6)  # Domingo primeiro
+                month_weeks = cal.monthdatescalendar(mes_inicio.year, mes_inicio.month)
+
+                registros = []
+                for semana_idx, semana in enumerate(month_weeks):
+                    for dia in semana:
+                        registros.append({
+                            "data": pd.Timestamp(dia),
+                            "semana_idx": semana_idx,
+                            "dia": dia.day,
+                            "no_mes": 1 if dia.month == mes_inicio.month else 0,
+                            "is_hoje": 1 if dia == pd.Timestamp.today().date() else 0
+                        })
+
+                calendario_df = pd.DataFrame(registros)
+
+                def _join_limited(series, limit=3):
+                    itens = list(dict.fromkeys(map(str, series)))
+                    if len(itens) > limit:
+                        return ", ".join(itens[:limit]) + f" +{len(itens)-limit}"
+                    return ", ".join(itens)
+
+                agregados = (
+                    df_entregas[df_entregas["Data Finalização"].between(mes_inicio, mes_fim)]
+                    .groupby("Data Finalização")
+                    .agg(
+                        Entregas=("Nome da Família", "count"),
+                        Familias=("Nome da Família", _join_limited),
+                        Responsaveis=("Responsável", _join_limited)
+                    )
+                    .reset_index()
+                    .rename(columns={"Data Finalização": "data"})
+                )
+
+                calendario_df = calendario_df.merge(agregados, on="data", how="left")
+                calendario_df["Entregas"] = calendario_df["Entregas"].fillna(0).astype(int)
+                calendario_df["Familias"] = calendario_df["Familias"].fillna("Sem entregas")
+                calendario_df["Responsaveis"] = calendario_df["Responsaveis"].fillna("-")
+
+                calendario_df["data"] = calendario_df["data"].dt.date
+
+                cal = calendar.Calendar(firstweekday=6)
+                month_weeks = cal.monthdatescalendar(mes_inicio.year, mes_inicio.month)
+                weekday_names = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+
+                calendario_html, calendario_altura = _montar_calendario_html(
+                    calendario_df,
+                    weeks=month_weeks,
+                    weekday_names=weekday_names,
+                    target_month=mes_inicio.month
+                )
+
+                components.html(
+                    calendario_html,
+                    height=calendario_altura,
+                    scrolling=False
+                )
+
     st.markdown("---")
 
 
@@ -616,7 +994,7 @@ def show_fechamento_pasta():
 
     if df_status.empty:
         st.info("Nenhuma pasta marcada como 'EM ANDAMENTO' no momento.")
-    
+
     if df_status.empty and df_concluidos.empty:
         return
 
@@ -632,19 +1010,17 @@ def show_fechamento_pasta():
         _renderizar_metricas(df_ordenado)
         _renderizar_resumo_visual(df_ordenado)
 
-    if not df_ordenado.empty:
-        st.markdown("#### Status das Famílias")
-        st.dataframe(
-            ensure_pandas_df(
-                df_ordenado.drop(columns=["__ORDEM_MAX__"], errors="ignore")
-            ),
-            hide_index=True,
-            use_container_width=True,
-            column_config={
-                "Data Início": st.column_config.DateColumn("Data Início"),
-                "Data Finalização": st.column_config.DateColumn("Data Finalização"),
-            }
-        )
+    if st.session_state.get("_mostrar_timeline_fechamento") is None:
+        st.session_state._mostrar_timeline_fechamento = True
+
+    st.session_state._mostrar_timeline_fechamento = st.checkbox(
+        "Mostrar linha do tempo e entregas por período",
+        value=st.session_state._mostrar_timeline_fechamento,
+        help="Desmarque para ocultar a visão temporal e focar apenas nos indicadores",
+    )
+
+    if st.session_state._mostrar_timeline_fechamento:
+        _renderizar_timeline(df_ordenado, df_concluidos)
 
     _renderizar_alerta_ajustes(df_concluidos)
 
