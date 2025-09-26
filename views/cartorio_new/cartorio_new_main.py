@@ -15,6 +15,7 @@ from .higienizacao_desempenho import exibir_higienizacao_desempenho
 from .producao_adm import exibir_producao_adm
 from .producao_time_doutora import exibir_producao_time_doutora
 from .pesquisa_br import exibir_pesquisa_br
+from .montagem_requerimento import exibir_montagem_requerimento
 
 # Importar componente TOC - REMOVIDO
 # from components.table_of_contents import render_toc 
@@ -67,6 +68,8 @@ def show_cartorio_new(subpagina_selecionada, adm_subpagina):
         exibir_producao_time_doutora(df_cartorio)
     elif subpagina_selecionada == "Pesquisa BR":
         exibir_pesquisa_br(df_cartorio)
+    elif subpagina_selecionada == "Montagem de Requerimento":
+        exibir_montagem_requerimento(df_cartorio)
     else:
         st.warning(f"Subpágina desconhecida: {subpagina_selecionada}")
 

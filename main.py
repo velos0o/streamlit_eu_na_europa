@@ -69,8 +69,22 @@ SUB_ROTAS_EMISSOES = {
     "certidoes_pendentes_responsavel": "Certidões Pendentes por responsável",
     "desempenho_conclusao_pasta": "Desempenho Conclusão de Pasta",
     "producao_time_doutora": "Produção Time Doutora",
-    "pesquisa_br": "Pesquisa BR"
+    "pesquisa_br": "Pesquisa BR",
+    "montagem_requerimento": "Montagem de Requerimento"
 }
+
+
+def normalizar_query_sub_emissao(valor_sub: str | None) -> str | None:
+    """Normaliza aliases legados de sub-rotas de emissões."""
+    if not valor_sub:
+        return valor_sub
+    aliases = {
+        'pesquisabr': 'pesquisa_br',
+        'montagem': 'montagem_requerimento',
+        'montagem_requerimentos': 'montagem_requerimento',
+        'montagemreq': 'montagem_requerimento'
+    }
+    return aliases.get(valor_sub, valor_sub)
 
 # Mapeamento de sub-rotas para o submenu ADM
 SUB_ROTAS_ADM = {
@@ -196,7 +210,7 @@ def sincronizar_estado_e_url():
             # Lógica para restaurar o estado dos submenus com base na URL
             if pagina_na_url == 'cartorio_new':
                 st.session_state.emissao_submenu_expanded = True
-                sub_rota = query_params.get('sub')
+                sub_rota = normalizar_query_sub_emissao(query_params.get('sub'))
                 if sub_rota and sub_rota in SUB_ROTAS_EMISSOES:
                     st.session_state.emissao_subpagina = SUB_ROTAS_EMISSOES[sub_rota]
             elif pagina_na_url == 'higienizacoes':
@@ -524,6 +538,21 @@ def ir_para_emissao_pesquisa_br():
     st.query_params['page'] = 'cartorio_new'
     st.query_params['sub'] = 'pesquisa_br'
 
+def ir_para_emissao_montagem_requerimento():
+    st.session_state['pagina_atual'] = 'Emissões Brasileiras'
+    st.session_state.emissao_subpagina = 'Montagem de Requerimento'
+    st.query_params['page'] = 'cartorio_new'
+    st.query_params['sub'] = 'montagem_requerimento'
+
+def normalizar_query_sub_emissao(valor_sub):
+    if not valor_sub:
+        return valor_sub
+    equivalencias = {
+        'pesquisabr': 'pesquisa_br',
+        'montagem': 'montagem_requerimento',
+    }
+    return equivalencias.get(valor_sub, valor_sub)
+
 def ir_para_higienizacao_checklist():
     st.session_state['pagina_atual'] = 'Higienizações'
     st.session_state.higienizacao_subpagina = 'Checklist'
@@ -822,6 +851,13 @@ if st.session_state.get('emissao_submenu_expanded', False):
             on_click=ir_para_emissao_pesquisa_br,
             use_container_width=True,
             type="primary" if st.session_state.get('emissao_subpagina') == "Pesquisa BR" else "secondary"
+        )
+        st.button(
+            "Montagem de Requerimento", 
+            key="subbtn_emissao_montagem_requerimento",
+            on_click=ir_para_emissao_montagem_requerimento,
+            use_container_width=True,
+            type="primary" if st.session_state.get('emissao_subpagina') == "Montagem de Requerimento" else "secondary"
         )
 
 # Novo botão para a aba Comune (DEPOIS do submenu de Emissões Brasileiras)
