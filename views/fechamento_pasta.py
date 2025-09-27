@@ -473,6 +473,21 @@ def _aplicar_filtros(df: pd.DataFrame) -> pd.DataFrame:
 
 def _renderizar_metricas(df: pd.DataFrame) -> None:
     st.markdown("#### Indicadores por Responsável")
+    st.markdown(
+        """
+        <div style='background: linear-gradient(120deg, rgba(248,250,252,0.95), rgba(226,232,240,0.9)); border: 1px solid rgba(148,163,184,0.4); border-radius: 14px; padding: 16px 20px; margin-bottom: 18px;'>
+            <div style='font-size: 15px; font-weight: 700; color: #0b2447; margin-bottom: 10px; letter-spacing: 0.02em;'>Como interpretar os números</div>
+            <ul style='margin: 0; padding-left: 18px; color: #1f2937; font-size: 13px; line-height: 1.5;'>
+                <li><strong>Total de Famílias</strong>: quantidade de famílias sob responsabilidade do gestor no funil.</li>
+                <li><strong>Em Andamento</strong>: famílias ainda sem data de finalização registrada.</li>
+                <li><strong>Pastas Prontas</strong>: famílias que já possuem data de finalização (entregues).</li>
+                <li><strong>Demais cartões coloridos</strong>: mostram quantas famílias já alcançaram cada etapa (Emissão Brasileira, Análise, Tradução, Apostilamento, Drive). Valores maiores indicam avanço em direção à conclusão.</li>
+                <li><strong>Ícone ✅</strong>: indica que a família já passou por aquela etapa em algum momento, mesmo que hoje esteja em outra fase.</li>
+            </ul>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     responsaveis = sorted(df["Responsável"].dropna().unique())
     for responsavel in responsaveis:
         subset = df[df["Responsável"] == responsavel]
@@ -516,21 +531,27 @@ def _renderizar_metricas(df: pd.DataFrame) -> None:
             unsafe_allow_html=True
         )
 
-        row1 = st.columns(4)
-        _render_card(row1[0], f"Total de Famílias", total_resp, "#f1f3f5")
-        _render_card(row1[1], "Em Andamento", andamento_resp, "rgba(255, 193, 7, 0.5)")
-        _render_card(row1[2], "Em Drive", drive_resp, "rgba(13, 110, 253, 0.35)", text_color="#0b2447")
-        _render_card(row1[3], "Em Apostilamento", apost_resp, "rgba(255, 159, 64, 0.4)")
+        row_totais = st.columns(3)
+        _render_card(row_totais[0], "Total de Famílias", total_resp, "#f1f3f5")
+        _render_card(row_totais[1], "Em Andamento", andamento_resp, "rgba(255, 193, 7, 0.5)")
+        _render_card(row_totais[2], "Pastas Prontas", finalizadas_resp, "rgba(25, 135, 84, 0.45)", text_color="#0f3d27")
 
-        row2 = st.columns(4)
-        _render_card(row2[0], "Pasta Pronta", finalizadas_resp, "rgba(25, 135, 84, 0.45)", text_color="#0f3d27")
-        _render_card(row2[1], "Emissão Brasileira", emissao_resp, "rgba(0, 123, 255, 0.2)")
-        _render_card(row2[2], "Tradução", traducao_resp, "rgba(102, 16, 242, 0.2)")
-        _render_card(row2[3], "Análise Documental", analise_resp, "rgba(13, 202, 240, 0.25)")
+        st.markdown("<div style='margin: 8px 0 10px 0;'></div>", unsafe_allow_html=True)
 
-        row3 = st.columns(2)
-        _render_card(row3[0], "Análise Negativa", analise_neg_resp, "rgba(220, 53, 69, 0.35)", text_color="#5a0a14")
-        _render_card(row3[1], "Análise Positiva", analise_pos_resp, "rgba(25, 135, 84, 0.35)", text_color="#0f3d27")
+        cards_config = [
+            ("Emissão Brasileira", emissao_resp, "rgba(0, 123, 255, 0.2)", "#1c1c1c"),
+            ("Análise Documental", analise_resp, "rgba(13, 202, 240, 0.25)", "#1c1c1c"),
+            ("Análise Negativa", analise_neg_resp, "rgba(220, 53, 69, 0.35)", "#5a0a14"),
+            ("Análise Positiva", analise_pos_resp, "rgba(25, 135, 84, 0.35)", "#0f3d27"),
+            ("Tradução", traducao_resp, "rgba(102, 16, 242, 0.2)", "#1c1c1c"),
+            ("Em Apostilamento", apost_resp, "rgba(255, 159, 64, 0.4)", "#1c1c1c"),
+            ("Em Drive", drive_resp, "rgba(13, 110, 253, 0.35)", "#0b2447"),
+        ]
+
+        for idx in range(0, len(cards_config), 4):
+            row = st.columns(min(4, len(cards_config) - idx))
+            for col, (label, value, background, text_color) in zip(row, cards_config[idx: idx + 4]):
+                _render_card(col, label, value, background, text_color=text_color)
 
         st.markdown(
             f"""
