@@ -161,7 +161,16 @@ def obter_url_card(familia_serie: pd.Series, tipo: str) -> str | None:
 
 
 def construir_link_card_pipeline(row: pd.Series) -> str | None:
-    """Monta o link direto para o card Bitrix da linha informada."""
+    """Monta o link direto para o card Bitrix da linha informada.
+    
+    Pipelines de Emissão Brasileira (usam /crm/type/1098/details/):
+    - 92: Casa Verde
+    - 94: Tatuapé  
+    - 102: Paróquia
+    - 104: Pesquisa BR
+    
+    Outros pipelines usam /crm/deal/details/
+    """
     categoria = str(row.get('CATEGORY_ID', '') or '').strip()
     candidatos_id = [
         row.get('ID'),
@@ -181,7 +190,9 @@ def construir_link_card_pipeline(row: pd.Series) -> str | None:
     if not card_id or not card_id.replace(' ', '').isdigit():
         return None
 
-    if categoria in {'104', '1098'}:
+    # Pipelines de emissão brasileira (92=Casa Verde, 94=Tatuapé, 102=Paróquia, 104=Pesquisa BR)
+    # Todos usam o URL /crm/type/1098/details/
+    if categoria in {'92', '94', '102', '104', '1098'}:
         return f"{BASE_URL_TYPE_1098}{card_id}/"
     return f"{BASE_URL_DEAL}{card_id}/"
 
