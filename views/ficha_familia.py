@@ -70,17 +70,12 @@ try:
 except ImportError:  # pragma: no cover - dependência opcional
     SimpleDocTemplate = None
 
-# Importar data loaders dos módulos
-from views.reclamacoes.data_loader import carregar_dados_reclamacoes
-from views.cartorio_new.data_loader import carregar_dados_cartorio
-# Supondo que o data_loader de comune_new tenha uma função similar
-from views.comune_new.data_loader import load_comune_data # CORRIGIDO
-from views.scaner.data_loader import carregar_dados_spa_scanner
-
 # Importar a função central de carregamento do Bitrix
 from api.bitrix_connector import load_merged_data
 from utils.dataframe_utils import ensure_pandas_df
 from unidecode import unidecode
+
+# Nota: Imports de views.* movidos para dentro das funções para evitar importação circular
 
 
 BASE_URL_DEAL = "https://eunaeuropacidadania.bitrix24.com.br/crm/deal/details/"
@@ -567,6 +562,12 @@ def load_page_specific_css(file_path):
 # Função removida - agora usamos load_data_all_pipelines() do views.cartorio_new.data_loader
 
 def exibir_ficha_familia(familia_serie, emissoes_df):
+    # Imports lazy para evitar importação circular
+    from views.scaner.data_loader import carregar_dados_spa_scanner
+    from views.cartorio_new.data_loader import carregar_dados_cartorio
+    from views.reclamacoes.data_loader import carregar_dados_reclamacoes
+    from views.comune_new.data_loader import load_comune_data
+    
     alertas_para_pdf = []
     resumo_status_categorias = {}
     total_certidoes_reais_para_exibicao = 0
@@ -2685,6 +2686,9 @@ def exibir_metricas_macro():
     )
 
 def show_ficha_familia():
+    # Imports lazy para evitar importação circular
+    from views.cartorio_new.data_loader import carregar_dados_cartorio
+    
     # REMOVIDO: Configuração do layout da página (já feita em main.py)
     # Comentado para evitar conflito: st.set_page_config() deve ser chamado apenas uma vez
     # try:
