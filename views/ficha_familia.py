@@ -416,25 +416,27 @@ def gerar_pdf_ficha(contexto_pdf: dict) -> bytes:
     requerentes = contexto_pdf.get("requerentes") or []
     if requerentes:
         story.append(Paragraph("Status Emissões Brasileiras", section_title_style))
-        cards = []
-        cards_data = []
+        
         for req in requerentes:
-            cards_data.append(
-                [
-                    Paragraph(f"<b>{_format_text_for_paragraph(req.get('Requerente'))}</b>", table_label_style),
-                    Paragraph(f"Posição: {_format_text_for_paragraph(req.get('Posição'))}", table_value_style),
-                    Paragraph(f"Nascimento: {_format_text_for_paragraph(req.get('Nascimento'))}", table_value_style),
-                    Paragraph(f"Casamento: {_format_text_for_paragraph(req.get('Casamento'))}", table_value_style),
-                    Paragraph(f"Óbito: {_format_text_for_paragraph(req.get('Óbito'))}", table_value_style),
-                ]
+            # Card com informações básicas
+            info_basica = [
+                Paragraph(f"<b>{_format_text_for_paragraph(req.get('Requerente'))}</b>", table_label_style),
+                Paragraph(f"Posição: {_format_text_for_paragraph(req.get('Posição'))}", table_value_style),
+            ]
+            
+            # Adicionar status simples
+            certidoes_info = []
+            for tipo in ['Nascimento', 'Casamento', 'Óbito']:
+                status_simples = req.get(tipo, 'N/D')
+                certidoes_info.append(Paragraph(f"{tipo}: {_format_text_for_paragraph(status_simples)}", table_value_style))
+            
+            info_basica.extend(certidoes_info)
+            
+            card_basico = Table(
+                [info_basica],
+                colWidths=[None, 35 * mm, 35 * mm, 35 * mm],
             )
-
-        for dados_card in cards_data:
-            card = Table(
-                [dados_card],
-                colWidths=[None, 32 * mm, 32 * mm, 32 * mm, 32 * mm],
-            )
-            card.setStyle(
+            card_basico.setStyle(
                 TableStyle(
                     [
                         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FFFFFF")),
@@ -447,11 +449,65 @@ def gerar_pdf_ficha(contexto_pdf: dict) -> bytes:
                     ]
                 )
             )
-            cards.append(card)
-
-        for card in cards:
-            story.append(card)
-            story.append(Spacer(1, 4 * mm))
+            story.append(card_basico)
+            
+            # Adicionar detalhes das certidões se disponíveis
+            tem_detalhes = False
+            detalhes_rows = []
+            
+            for tipo in ['Nascimento', 'Casamento', 'Óbito']:
+                detalhes_key = f'{tipo}_Detalhes'
+                if detalhes_key in req and req[detalhes_key]:
+                    tem_detalhes = True
+                    for idx, detalhe in enumerate(req[detalhes_key]):
+                        pipeline = detalhe.get('pipeline', 'N/D')
+                        status = detalhe.get('status', 'N/D')
+                        card_id = detalhe.get('card_id', 'N/D')
+                        
+                        if idx == 0:
+                            tipo_label = tipo
+                        else:
+                            tipo_label = f"  └ Duplicado"
+                        
+                        detalhes_rows.append([
+                            Paragraph(f"<font size='8'>{tipo_label}</font>", table_value_style),
+                            Paragraph(f"<font size='8'>{_format_text_for_paragraph(pipeline)}</font>", table_value_style),
+                            Paragraph(f"<font size='8'>{_format_text_for_paragraph(status)}</font>", table_value_style),
+                            Paragraph(f"<font size='8'>Card: {card_id}</font>", table_value_style),
+                        ])
+            
+            if tem_detalhes:
+                # Adicionar cabeçalho da tabela de detalhes
+                detalhes_rows.insert(0, [
+                    Paragraph("<b><font size='8'>Certidão</font></b>", table_label_style),
+                    Paragraph("<b><font size='8'>Pipeline</font></b>", table_label_style),
+                    Paragraph("<b><font size='8'>Status</font></b>", table_label_style),
+                    Paragraph("<b><font size='8'>ID Card</font></b>", table_label_style),
+                ])
+                
+                tabela_detalhes = Table(
+                    detalhes_rows,
+                    colWidths=[35 * mm, 40 * mm, 50 * mm, 25 * mm],
+                )
+                tabela_detalhes.setStyle(
+                    TableStyle(
+                        [
+                            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F5F8FF")),
+                            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#FAFBFF")),
+                            ("BOX", (0, 0), (-1, -1), 0.3, colors.HexColor("#E0E5F0")),
+                            ("GRID", (0, 0), (-1, -1), 0.2, colors.HexColor("#E8EBF2")),
+                            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                            ("TOPPADDING", (0, 0), (-1, -1), 3),
+                            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                        ]
+                    )
+                )
+                story.append(Spacer(1, 2 * mm))
+                story.append(tabela_detalhes)
+            
+            story.append(Spacer(1, 5 * mm))
 
     resumo = contexto_pdf.get("resumo") or {}
     total_certidoes = contexto_pdf.get("total_certidoes") or 0
@@ -2333,16 +2389,49 @@ def exibir_ficha_familia(familia_serie, emissoes_df):
     except Exception as e:
         st.warning(f"Falha ao processar documentos da SPA: {e}")
 
-    dados_pdf['requerentes'] = [
-        {
+    # Enriquecer dados dos requerentes com detalhes das emissões para o PDF
+    requerentes_pdf = []
+    for item in requerentes_data_list_of_dicts:
+        req_pdf = {
             'Posição': item.get('Posição', 'N/D'),
             'Requerente': item.get('Requerente', 'N/D'),
             'Nascimento': item.get('Nascimento', 'N/D'),
             'Casamento': item.get('Casamento', 'N/D'),
             'Óbito': item.get('Óbito', 'N/D'),
         }
-        for item in requerentes_data_list_of_dicts
-    ]
+        
+        # Adicionar detalhes adicionais das certidões
+        if processamento_emissoes_ok and emissoes_df is not None and not emissoes_df.empty:
+            req_id_key = str(item.get('ID_Requerente', '')).strip()
+            req_id_grupo = str(item.get('ID_Requerente_Grupo', '')).strip()
+            chave_busca = req_id_key if req_id_key and req_id_key.upper() not in ['ID REQUERENTE N/D', ''] else req_id_grupo
+            
+            if chave_busca:
+                # Adicionar detalhes por tipo de certidão
+                for tipo_cert in ['NASCIMENTO', 'CASAMENTO', 'ÓBITO']:
+                    registros = emissoes_df[
+                        (emissoes_df['_ID_REQUERENTE_GRUPO'].astype(str) == chave_busca) &
+                        (emissoes_df['UF_CRM_34_TIPO_DE_CERTIDAO'].astype(str).str.upper() == tipo_cert)
+                    ]
+                    
+                    if not registros.empty:
+                        detalhes = []
+                        for _, reg in registros.iterrows():
+                            pipeline = obter_nome_pipeline_legivel(reg) or 'N/D'
+                            status_det = reg.get('STAGE_NAME_LEGIVEL', 'N/D')
+                            card_id = reg.get('ID', '')
+                            detalhes.append({
+                                'pipeline': pipeline,
+                                'status': str(status_det),
+                                'card_id': str(card_id)
+                            })
+                        
+                        tipo_label = tipo_cert.capitalize()
+                        req_pdf[f'{tipo_label}_Detalhes'] = detalhes
+        
+        requerentes_pdf.append(req_pdf)
+    
+    dados_pdf['requerentes'] = requerentes_pdf
 
 def exibir_metricas_macro():
     # ============================
