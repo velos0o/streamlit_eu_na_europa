@@ -6,11 +6,9 @@ import unicodedata
 from api.bitrix_connector import load_merged_data
 from views.cartorio_new.data_loader import carregar_dados_cartorio
 from utils.dataframe_utils import ensure_pandas_df
-from utils.refresh_utils import load_csv_with_refresh
-from utils.google_sheets_connector import get_google_sheets_client, fetch_data_from_sheet
 
 
-def _carregar_congelados_df() -> pd.DataFrame:
+def carregar_congelados_df() -> pd.DataFrame:
     """Carrega deals do funil 46 e filtra registros com congelamento indicado.
 
     Campos relevantes:
@@ -245,16 +243,7 @@ def _status_protocolo_por_familia(df_cat46: pd.DataFrame) -> pd.DataFrame:
     return df_out
 
 
-def show_congelado():
-    st.markdown("<h1 class='page-title'>Congelado</h1>", unsafe_allow_html=True)
-
-    with st.spinner("Carregando dados..."):
-        df_congelados = _carregar_congelados_df()
-
-    if df_congelados.empty:
-        st.info("Nenhum registro congelado encontrado no funil 46.")
-        return
-
+def render_congelado_content(df_congelados: pd.DataFrame):
     # Renomear para apresentação
     rename_map = {
         'UF_CRM_1722883482527': 'Nome da Família',
@@ -272,7 +261,428 @@ def show_congelado():
         use_container_width=True
     )
 
-    
+    # Construir visão consolidada por família (usado para acompanhamento; não exibido)
+    col_nome = 'UF_CRM_1722883482527'
+    col_id_familia = 'UF_CRM_1722605592778'
+
+    df_flags = df_congelados.copy()
+    # Garantir colunas de flags
+    for c in ['Congelado Emissão Brasileira', 'Congelado Comune', 'Congelado Protocolo']:
+        if c not in df_flags.columns:
+            df_flags[c] = ''
+
+    # Agregar por família (qualquer SIM dentro do grupo => SIM)
+    def any_sim(series):
+        return 'SIM' if (series.astype(str).str.upper() == 'SIM').any() else ''
+
+    group_cols = [c for c in [col_nome, col_id_familia] if c in df_flags.columns]
+    if group_cols:
+        df_consol = (
+            df_flags.groupby(group_cols).agg({
+                'Congelado Emissão Brasileira': any_sim,
+                'Congelado Comune': any_sim,
+                'Congelado Protocolo': any_sim,
+            }).reset_index()
+        )
+    else:
+        df_consol = pd.DataFrame(columns=[
+            col_nome, col_id_familia,
+            'Congelado Emissão Brasileira', 'Congelado Comune', 'Congelado Protocolo'
+        ])
+
+    # Trazer status de congelado do SPA (UF_CRM_34_CONGELADO)
+    with st.spinner("Carregando status de congelamento (Emissões)..."):
+        try:
+            df_cartorio = carregar_dados_cartorio()
+        except Exception:
+            df_cartorio = pd.DataFrame()
+
+    col_id_familia_spa = 'UF_CRM_34_ID_FAMILIA'
+    col_nome_familia_spa = 'UF_CRM_34_NOME_FAMILIA'
+    col_congelado_spa = 'UF_CRM_34_CONGELADO'
+
+    if not df_cartorio.empty and col_id_familia_spa in df_cartorio.columns:
+        df_spa = df_cartorio[[c for c in [col_id_familia_spa, col_nome_familia_spa, col_congelado_spa] if c in df_cartorio.columns]].copy()
+        # Normalizar status por família: CONGELADO se qualquer item marcar
+        if col_congelado_spa in df_spa.columns:
+            spa_agg = (
+                df_spa.groupby(col_id_familia_spa)[col_congelado_spa]
+                .apply(lambda s: 'CONGELADO' if (s.astype(str).str.upper() == 'CONGELADO').any() else 'NÃO CONGELADO')
+                .reset_index()
+            )
+        else:
+            spa_agg = df_spa.copy()
+            spa_agg[col_congelado_spa] = 'NÃO CONGELADO'
+
+        # Preparar chaves de merge (strings, trim)
+        if col_id_familia in df_consol.columns:
+            df_consol[col_id_familia] = df_consol[col_id_familia].astype(str).str.strip()
+        spa_agg[col_id_familia_spa] = spa_agg[col_id_familia_spa].astype(str).str.strip()
+
+        df_consol = pd.merge(
+            df_consol, spa_agg,
+            left_on=col_id_familia,
+            right_on=col_id_familia_spa,
+            how='left'
+        )
+        # Se não houver informação no SPA, manter vazio
+        if col_congelado_spa in df_consol.columns:
+            df_consol[col_congelado_spa] = df_consol[col_congelado_spa].fillna('NÃO CONGELADO')
+    else:
+        # Sem dados do SPA: criar coluna default
+        df_consol[col_congelado_spa] = 'NÃO CONGELADO'
+
+    # Preparar para exibição posterior
+    rename_map2 = {
+        'UF_CRM_1722883482527': 'Nome da Família',
+        'UF_CRM_1722605592778': 'ID da Família',
+        col_congelado_spa: 'UF_CRM_34_CONGELADO'
+    }
+    df_consol_show = df_consol.rename(columns={k: v for k, v in rename_map2.items() if k in df_consol.columns})
+    ordered_cols = ['Nome da Família', 'ID da Família', 'UF_CRM_34_CONGELADO']
+    cols_presentes = [c for c in ordered_cols if c in df_consol_show.columns]
+    df_consol_show = df_consol_show[cols_presentes].copy()
+
+    # ============================
+    # Métricas Macros
+    # ============================
+    st.markdown("---")
+    st.markdown("#### Métricas Macros")
+
+    # Totais por tipo de congelado (Emissão, Comune)
+    total_emissao = 0
+    total_comune = 0
+    try:
+        base_id_col = 'UF_CRM_1722605592778'
+        col_flag_emissao = 'Congelado Emissão Brasileira'
+        col_flag_comune = 'Congelado Comune'
+        df_tmp = df_congelados.copy()
+        if base_id_col in df_tmp.columns:
+            df_tmp[base_id_col] = df_tmp[base_id_col].astype(str).str.strip()
+        # Emissão
+        if col_flag_emissao in df_tmp.columns:
+            em = df_tmp[df_tmp[col_flag_emissao].astype(str).str.upper().eq('SIM')]
+            if base_id_col in em.columns:
+                total_emissao = em[base_id_col].replace('', pd.NA).dropna().nunique()
+            else:
+                total_emissao = len(em)
+        # Comune
+        if col_flag_comune in df_tmp.columns:
+            cm = df_tmp[df_tmp[col_flag_comune].astype(str).str.upper().eq('SIM')]
+            if base_id_col in cm.columns:
+                total_comune = cm[base_id_col].replace('', pd.NA).dropna().nunique()
+            else:
+                total_comune = len(cm)
+    except Exception:
+        total_emissao, total_comune = 0, 0
+
+    # Famílias congeladas no SPA
+    familias_congeladas_count = 0
+    col_congelado_spa = 'UF_CRM_34_CONGELADO'
+    if col_congelado_spa in df_consol_show.columns:
+        try:
+            familias_congeladas_count = int(
+                (df_consol_show[col_congelado_spa].astype(str).str.upper() == 'CONGELADO').sum()
+            )
+        except Exception:
+            familias_congeladas_count = 0
+
+    # Famílias concluídas (100% dos itens no SPA)
+    familias_concluidas_count = 0
+    if not df_cartorio.empty and 'ID da Família' in df_consol_show.columns and 'UF_CRM_34_ID_FAMILIA' in df_cartorio.columns:
+        try:
+            df_spa_base_macro = df_cartorio[['UF_CRM_34_ID_FAMILIA', 'STAGE_ID', 'STAGE_NAME']].copy()
+            success_mask_macro = pd.Series(False, index=df_spa_base_macro.index)
+            if 'STAGE_ID' in df_spa_base_macro.columns:
+                success_mask_macro = success_mask_macro | df_spa_base_macro['STAGE_ID'].astype(str).str.contains('SUCCESS', na=False)
+            if 'STAGE_NAME' in df_spa_base_macro.columns:
+                success_mask_macro = success_mask_macro | df_spa_base_macro['STAGE_NAME'].astype(str).str.upper().isin(['CERTIDÃO EMITIDA', 'CERTIDÃO ENTREGUE'])
+            df_spa_base_macro['__success__'] = success_mask_macro.astype(int)
+            fam_metrics_macro = df_spa_base_macro.groupby('UF_CRM_34_ID_FAMILIA').agg(
+                total_itens=('__success__', 'count'),
+                concluidas=('__success__', 'sum')
+            ).reset_index()
+            fam_metrics_macro['UF_CRM_34_ID_FAMILIA'] = fam_metrics_macro['UF_CRM_34_ID_FAMILIA'].astype(str).str.strip()
+            df_congeladas_ids = (
+                df_consol_show[df_consol_show[col_congelado_spa].astype(str).str.upper() == 'CONGELADO']
+                ['ID da Família']
+                .astype(str)
+                .str.strip()
+                .unique()
+                .tolist()
+            )
+            fam_sel = fam_metrics_macro[fam_metrics_macro['UF_CRM_34_ID_FAMILIA'].isin(df_congeladas_ids)].copy()
+            familias_concluidas_count = int(((fam_sel['total_itens'] > 0) & (fam_sel['concluidas'] == fam_sel['total_itens'])).sum())
+        except Exception:
+            familias_concluidas_count = 0
+
+    st.markdown("""
+    <style>
+    .metricas-container-macro { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 0 4px 0; }
+    .metrica-custom-macro { background: #F8F9FA; border: 2px solid #DEE2E6; border-radius: 6px; padding: 16px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .metrica-custom-macro:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: #ADB5BD; }
+    .metrica-custom-macro .label { color: #6C757D; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; line-height: 1.2; }
+    .metrica-custom-macro .valor { color: #495057; font-weight: 700; font-size: 30px; line-height: 1.2; margin-bottom: 4px; }
+    </style>
+    <div class="metricas-container-macro">
+        <div class="metrica-custom-macro"><div class="label">Famílias Congeladas</div><div class="valor">""" + str(int(familias_congeladas_count)) + """</div></div>
+        <div class="metrica-custom-macro"><div class="label">Emissão Congeladas</div><div class="valor">""" + str(int(total_emissao)) + """</div></div>
+        <div class="metrica-custom-macro"><div class="label">Comune Congeladas</div><div class="valor">""" + str(int(total_comune)) + """</div></div>
+        <div class="metrica-custom-macro"><div class="label">Concluídas</div><div class="valor">""" + str(int(familias_concluidas_count)) + """</div></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ============================
+    # STATUS DE PROTOCOLO (logo abaixo das métricas)
+    # ============================
+    st.markdown("---")
+    st.markdown("#### STATUS DE PROTOCOLO")
+    st.caption("Etapas concluídas até o protocolo para famílias marcadas como 'Congelado Protocolo'. Onde estiver ✅ está completo.")
+
+    try:
+        df_status = _status_protocolo_por_familia(df_congelados)
+    except Exception as e:
+        df_status = pd.DataFrame()
+        st.warning(f"Falha ao montar STATUS DE PROTOCOLO: {e}")
+
+    if df_status is None or df_status.empty:
+        st.info("Nenhuma família marcada como 'Congelado Protocolo' encontrada.")
+    else:
+        st.dataframe(
+            ensure_pandas_df(df_status),
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                'Nome da Família': st.column_config.TextColumn('Nome da Família', width='large'),
+                'ID da Família': st.column_config.TextColumn('ID da Família', width='medium'),
+                'EMISSÃO BRASILEIRA': st.column_config.TextColumn('EMISSÃO BRASILEIRA', width='small'),
+                'ANÁLISE DOCUMENTAL': st.column_config.TextColumn('ANÁLISE DOCUMENTAL', width='small'),
+                'TRADUÇÃO': st.column_config.TextColumn('TRADUÇÃO', width='small'),
+                'APOSTILAMENTO': st.column_config.TextColumn('APOSTILAMENTO', width='small'),
+                'DRIVE': st.column_config.TextColumn('DRIVE', width='small'),
+                'RECURSO': st.column_config.TextColumn('RECURSO', width='small'),
+                'PROTOCOLO': st.column_config.TextColumn('PROTOCOLO', width='small'),
+            }
+        )
+
+    # ============================
+    # Acompanhamento de Emissão Congeladas
+    # ============================
+    st.markdown("---")
+    st.markdown("#### Acompanhamento de Emissão Congeladas")
+
+    # Enriquecer com Responsável (via SPA) para filtros, se possível
+    responsavel_col_name = 'Responsável'
+    if not df_cartorio.empty and 'ASSIGNED_BY_NAME' in df_cartorio.columns and col_id_familia_spa in df_cartorio.columns:
+        mapa_resp = (
+            df_cartorio[[col_id_familia_spa, 'ASSIGNED_BY_NAME']]
+            .dropna(subset=[col_id_familia_spa])
+            .drop_duplicates(subset=[col_id_familia_spa])
+        )
+        df_consol_show = pd.merge(
+            df_consol_show,
+            mapa_resp,
+            left_on='ID da Família' if 'ID da Família' in df_consol_show.columns else col_id_familia,
+            right_on=col_id_familia_spa,
+            how='left'
+        )
+        if 'ASSIGNED_BY_NAME' in df_consol_show.columns:
+            df_consol_show[responsavel_col_name] = df_consol_show['ASSIGNED_BY_NAME']
+            # Limpeza
+            cols_drop_aux = [c for c in ['ASSIGNED_BY_NAME', col_id_familia_spa] if c in df_consol_show.columns]
+            if cols_drop_aux:
+                df_consol_show.drop(columns=cols_drop_aux, inplace=True)
+    else:
+        df_consol_show[responsavel_col_name] = ''
+
+    # Filtros
+    with st.expander("Filtros", expanded=True):
+        col_f1, col_f3, col_f4 = st.columns([0.45, 0.3, 0.25])
+
+        with col_f1:
+            termo_busca_familia = st.text_input("Buscar Família/Contrato:", placeholder="Digite parte do nome...")
+
+        with col_f3:
+            # Status do SPA
+            status_congelado = st.selectbox(
+                "Status Congelado (SPA):",
+                options=["Todos", "CONGELADO", "NÃO CONGELADO"],
+                index=0
+            )
+
+        with col_f4:
+            # Responsável
+            responsaveis = sorted([r for r in df_consol_show[responsavel_col_name].dropna().astype(str).unique().tolist() if r.strip() != ''])
+            resp_sel = st.multiselect(
+                "Responsável (SPA):",
+                options=responsaveis,
+                placeholder="Selecione um ou mais"
+            )
+
+    # Aplicar filtros
+    df_acomp = df_consol_show.copy()
+    if termo_busca_familia:
+        if 'Nome da Família' in df_acomp.columns:
+            df_acomp = df_acomp[df_acomp['Nome da Família'].astype(str).str.contains(termo_busca_familia, case=False, na=False)]
+    if status_congelado != 'Todos' and 'UF_CRM_34_CONGELADO' in df_acomp.columns:
+        df_acomp = df_acomp[df_acomp['UF_CRM_34_CONGELADO'].astype(str).str.upper() == status_congelado]
+    if resp_sel and responsavel_col_name in df_acomp.columns:
+        df_acomp = df_acomp[df_acomp[responsavel_col_name].isin(resp_sel)]
+
+    # Exibir apenas famílias marcadas como CONGELADO no SPA
+    if 'UF_CRM_34_CONGELADO' in df_acomp.columns:
+        df_acomp = df_acomp[df_acomp['UF_CRM_34_CONGELADO'].astype(str).str.upper() == 'CONGELADO']
+
+    # KPIs: famílias, concluídas e % conclusão com base no SPA
+    total_familias = len(df_acomp) if not df_acomp.empty else 0
+    # Buscar métricas de conclusão no SPA para as famílias selecionadas
+    concluidas = 0
+    total_itens = 0
+    if not df_cartorio.empty and total_familias > 0 and 'ID da Família' in df_acomp.columns and col_id_familia_spa in df_cartorio.columns:
+        ids_sel = df_acomp['ID da Família'].astype(str).str.strip().unique().tolist()
+        df_spa_sel = df_cartorio[df_cartorio[col_id_familia_spa].astype(str).str.strip().isin(ids_sel)].copy()
+        if not df_spa_sel.empty:
+            total_itens = len(df_spa_sel)
+            # Concluídas: heurística SUCCESS em STAGE_ID ou STAGE_NAME em (CERTIDÃO EMITIDA/ENTREGUE)
+            mask_success = df_spa_sel['STAGE_ID'].astype(str).str.contains('SUCCESS', na=False) if 'STAGE_ID' in df_spa_sel.columns else False
+            if 'STAGE_NAME' in df_spa_sel.columns:
+                mask_success = mask_success | df_spa_sel['STAGE_NAME'].astype(str).str.upper().isin(['CERTIDÃO EMITIDA', 'CERTIDÃO ENTREGUE'])
+            concluidas = int(mask_success.sum()) if hasattr(mask_success, 'sum') else 0
+    perc_conclusao = (concluidas / total_itens * 100) if total_itens > 0 else 0.0
+
+    # KPIs em cards (novo formato) – remover card de "Concluídas (itens)"
+    st.markdown("""
+    <style>
+    .metricas-container-cong-top { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 12px 0 4px 0; }
+    .metrica-custom-cong { background: #F8F9FA; border: 2px solid #DEE2E6; border-radius: 6px; padding: 16px; text-align: center; min-height: 100px; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .metrica-custom-cong:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: #ADB5BD; }
+    .metrica-custom-cong .label { color: #6C757D; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; line-height: 1.2; }
+    .metrica-custom-cong .valor { color: #495057; font-weight: 700; font-size: 30px; line-height: 1.2; margin-bottom: 4px; }
+    </style>
+    <div class="metricas-container-cong-top">
+        <div class="metrica-custom-cong"><div class="label">Famílias</div><div class="valor">""" + str(int(total_familias)) + """</div></div>
+        <div class="metrica-custom-cong"><div class="label">% Conclusão (itens)</div><div class="valor">""" + (f"{perc_conclusao:.1f}%") + """</div></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Métricas específicas: CERTIDÕES EMITIDAS vs PENDENTES (design do acompanhamento)
+    emitidas_count = 0
+    pendentes_count = 0
+    if not df_cartorio.empty and total_familias > 0 and 'ID da Família' in df_acomp.columns and col_id_familia_spa in df_cartorio.columns:
+        ids_sel = df_acomp['ID da Família'].astype(str).str.strip().unique().tolist()
+        df_spa_sel = df_cartorio[df_cartorio[col_id_familia_spa].astype(str).str.strip().isin(ids_sel)].copy()
+        if not df_spa_sel.empty:
+            total_itens_emit_check = len(df_spa_sel)
+            # Emitidas: preferir STAGE_NAME == CERTIDÃO EMITIDA; fallback SUCCESS
+            mask_emitidas = pd.Series(False, index=df_spa_sel.index)
+            if 'STAGE_NAME' in df_spa_sel.columns:
+                mask_emitidas = df_spa_sel['STAGE_NAME'].astype(str).str.upper().eq('CERTIDÃO EMITIDA')
+            if 'STAGE_ID' in df_spa_sel.columns:
+                mask_emitidas = mask_emitidas | df_spa_sel['STAGE_ID'].astype(str).str.contains('SUCCESS', na=False)
+            emitidas_count = int(mask_emitidas.sum())
+            pendentes_count = int(total_itens_emit_check - emitidas_count)
+
+    st.markdown("""
+    <style>
+    .metrica-custom-cong {
+        background: #F8F9FA;
+        border: 2px solid #DEE2E6;
+        border-radius: 6px;
+        padding: 16px;
+        text-align: center;
+        min-height: 100px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    .metrica-custom-cong:hover { transform: translateY(-2px); box-shadow: 0 4px 12pxrgba(0,0,0,0.1); border-color: #ADB5BD; }
+    .metrica-custom-cong .label { color: #6C757D; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; line-height: 1.2; }
+    .metrica-custom-cong .valor { color: #495057; font-weight: 700; font-size: 30px; line-height: 1.2; margin-bottom: 4px; }
+    .metricas-container-cong2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 12px 0 4px 0; }
+    .metrica-emitidas { background: #E8F5E9; border-color: #A5D6A7; }
+    .metrica-pendentes { background: #FFF3E0; border-color: #FFCC80; }
+    </style>
+    <div class="metricas-container-cong2">
+        <div class="metrica-custom-cong metrica-emitidas"><div class="label">Certidões Emitidas</div><div class="valor">""" + str(int(emitidas_count)) + """</div></div>
+        <div class="metrica-custom-cong metrica-pendentes"><div class="label">Certidões Pendentes</div><div class="valor">""" + str(int(pendentes_count)) + """</div></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Exibição final com progresso individual (Concluídas/Total e barra %)
+    df_acomp_show = df_acomp.copy()
+    if 'UF_CRM_34_CONGELADO' in df_acomp_show.columns:
+        df_acomp_show = df_acomp_show.rename(columns={'UF_CRM_34_CONGELADO': 'Congelado'})
+
+    # Calcular métricas por família a partir do SPA
+    df_acomp_show['Concluídas/Total'] = ''
+    df_acomp_show['Percentual'] = 0.0
+    if not df_cartorio.empty and 'ID da Família' in df_acomp_show.columns and col_id_familia_spa in df_cartorio.columns:
+        df_spa_base = df_cartorio[[col_id_familia_spa, 'STAGE_ID', 'STAGE_NAME']].copy()
+        success_mask = pd.Series(False, index=df_spa_base.index)
+        if 'STAGE_ID' in df_spa_base.columns:
+            success_mask = success_mask | df_spa_base['STAGE_ID'].astype(str).str.contains('SUCCESS', na=False)
+        if 'STAGE_NAME' in df_spa_base.columns:
+            success_mask = success_mask | df_spa_base['STAGE_NAME'].astype(str).str.upper().isin(['CERTIDÃO EMITIDA', 'CERTIDÃO ENTREGUE'])
+        df_spa_base['__success__'] = success_mask.astype(int)
+        fam_metrics = df_spa_base.groupby(col_id_familia_spa).agg(
+            total_itens=('__success__', 'count'),
+            concluidas=('__success__', 'sum')
+        ).reset_index()
+        fam_metrics[col_id_familia_spa] = fam_metrics[col_id_familia_spa].astype(str).str.strip()
+        df_acomp_show['ID da Família'] = df_acomp_show['ID da Família'].astype(str).str.strip()
+        df_acomp_show = pd.merge(
+            df_acomp_show,
+            fam_metrics,
+            left_on='ID da Família',
+            right_on=col_id_familia_spa,
+            how='left'
+        )
+        for c in ['total_itens', 'concluidas']:
+            if c in df_acomp_show.columns:
+                df_acomp_show[c] = pd.to_numeric(df_acomp_show[c], errors='coerce').fillna(0).astype(int)
+        if 'total_itens' in df_acomp_show.columns and 'concluidas' in df_acomp_show.columns:
+            df_acomp_show['Percentual'] = df_acomp_show.apply(
+                lambda r: (r['concluidas'] / r['total_itens'] * 100) if r['total_itens'] > 0 else 0.0,
+                axis=1
+            )
+            df_acomp_show['Concluídas/Total'] = df_acomp_show.apply(
+                lambda r: f"{int(r['concluidas'])}/{int(r['total_itens'])}", axis=1
+            )
+            # Colunas auxiliares: barra de progresso (Progresso) e rótulo colorido para 100%
+            df_acomp_show['Progresso'] = df_acomp_show['Percentual']
+            df_acomp_show['Percentual'] = df_acomp_show['Percentual'].apply(lambda v: '🟢 100%' if v >= 100 else f"{v:.1f}%")
+        if col_id_familia_spa in df_acomp_show.columns:
+            df_acomp_show.drop(columns=[col_id_familia_spa], inplace=True, errors='ignore')
+
+    cols_final = [c for c in ['Nome da Família', 'ID da Família', 'Congelado', 'Progresso', responsavel_col_name, 'Concluídas/Total', 'Percentual'] if c in df_acomp_show.columns]
+    st.dataframe(
+        ensure_pandas_df(df_acomp_show[cols_final]),
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            'Nome da Família': st.column_config.TextColumn('Nome da Família', width='large'),
+            'ID da Família': st.column_config.TextColumn('ID da Família', width='medium'),
+            'Congelado': st.column_config.TextColumn('Congelado', width='small'),
+            'Progresso': st.column_config.ProgressColumn('Progresso', format='%.1f%%', min_value=0, max_value=100),
+            'Concluídas/Total': st.column_config.TextColumn('Concluídas/Total', width='small'),
+            'Percentual': st.column_config.TextColumn('Percentual', width='small'),
+            responsavel_col_name: st.column_config.TextColumn('Responsável', width='medium')
+        }
+    )
+def show_congelado():
+    st.markdown("<h1 class='page-title'>Congelado</h1>", unsafe_allow_html=True)
+
+    with st.spinner("Carregando dados..."):
+        df_congelados = carregar_congelados_df()
+
+    if df_congelados.empty:
+        st.info("Nenhum registro congelado encontrado no funil 46.")
+        return
+
+    render_congelado_content(df_congelados)
 
     # Construir visão consolidada por família (usado para acompanhamento; não exibido)
     col_nome = 'UF_CRM_1722883482527'

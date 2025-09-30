@@ -23,6 +23,8 @@ from views.cartorio_new.cartorio_new_main import show_cartorio_new
 from views.ficha_familia import show_ficha_familia
 from views.congelado import show_congelado
 from views.fechamento_pasta import show_fechamento_pasta
+from views.prioridades import show_prioridades
+from views.prioridades import show_prioridades
 from views.higienizacoes.higienizacoes_main import show_higienizacoes
 from views.negociacao.negociacao_main import show_negociacao
 from views.priorizados.priorizados_main import show_priorizados
@@ -50,6 +52,8 @@ ROTAS = {
     "cartorio_new": "Emissões Brasileiras",
     "comune": "Comune",
     "negociacao": "Negociação",
+    "prioridades": "Prioridades",
+    "prioridades_sub": "Reputação",
     "priorizados": "Priorizados",
     "insumos": "Insumos",
     "extracoes": "Extrações de Dados",
@@ -458,6 +462,31 @@ def ir_para_congelado():
     if 'sub' in st.query_params:
         del st.query_params['sub']
 
+
+def toggle_prioridades_submenu():
+    reset_submenu()
+    st.session_state['pagina_atual'] = 'Prioridades'
+    st.session_state.prioridades_submenu_expanded = not st.session_state.get('prioridades_submenu_expanded', False)
+    st.query_params = {'page': 'prioridades'}
+    if st.session_state.prioridades_submenu_expanded:
+        sub_rota = st.session_state.get('prioridades_subpagina', 'reputacao')
+        st.query_params['sub'] = sub_rota
+
+
+def ir_para_prioridades_reputacao():
+    st.session_state['pagina_atual'] = 'Prioridades'
+    st.session_state.prioridades_submenu_expanded = True
+    st.session_state.prioridades_subpagina = 'reputacao'
+    st.query_params = {'page': 'prioridades', 'sub': 'reputacao'}
+
+
+def ir_para_prioridades_congelado():
+    st.session_state['pagina_atual'] = 'Prioridades'
+    st.session_state.prioridades_submenu_expanded = True
+    st.session_state.prioridades_subpagina = 'congelado'
+    st.query_params = {'page': 'prioridades', 'sub': 'congelado'}
+
+
 def ir_para_fechamento_pasta():
     reset_submenu()
     st.session_state['pagina_atual'] = 'Fechamento de Pasta'
@@ -726,12 +755,27 @@ st.sidebar.button(
 )
 
 st.sidebar.button(
-    "Congelado", 
-    key="btn_congelado",
-    on_click=ir_para_congelado,
+    "Prioridades",
+    key="btn_prioridades",
+    on_click=toggle_prioridades_submenu,
     use_container_width=True,
-    type="primary" if st.session_state['pagina_atual'] == "Congelado" else "secondary"
+    type="primary" if st.session_state['pagina_atual'] == "Prioridades" else "secondary"
 )
+
+if st.session_state.get('prioridades_submenu_expanded', False):
+    with st.sidebar.container():
+        sub_button(
+            "Reputação",
+            "prioridades_reputacao",
+            st.session_state.get('prioridades_subpagina') == 'reputacao',
+            ir_para_prioridades_reputacao
+        )
+        sub_button(
+            "Congelado",
+            "prioridades_congelado",
+            st.session_state.get('prioridades_subpagina') == 'congelado',
+            ir_para_prioridades_congelado
+        )
 
 st.sidebar.button(
     "Fechamento de Pasta",
@@ -1016,6 +1060,22 @@ try:
             views.comune.comune_main.show_comune_main()
     elif current_page == "Negociação":
         show_negociacao()
+    elif current_page == "Prioridades":
+        sub = st.session_state.get('prioridades_subpagina', 'reputacao')
+        if sub == 'congelado':
+            from views.congelado import carregar_congelados_df, render_congelado_content
+
+            st.markdown("<h1 class='page-title'>Prioridades - Congelado</h1>", unsafe_allow_html=True)
+            with st.spinner("Carregando dados..."):
+                df = carregar_congelados_df()
+            if df.empty:
+                st.info("Nenhum registro congelado encontrado no funil 46.")
+            else:
+                render_congelado_content(df)
+        else:
+            show_prioridades()
+    elif current_page == "Prioridades":
+        show_prioridades()
     elif current_page == "Priorizados":
         show_priorizados(st.session_state.get('priorizado_subpagina'))
     elif current_page == "Extrações de Dados":

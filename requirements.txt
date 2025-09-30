@@ -51,3 +51,7 @@ streamlit-aggrid==0.3.4  # Para tabelas interativas avançadas (corrigido versã
 # Dependências adicionais para compatibilidade
 pytz==2024.1             # Manipulação de fusos horários
 tzdata==2024.1           # Dados de fusos horários
+
+# Dependências para geração de PDF e manipulação de SVG
+reportlab==4.2.0         # Geração de PDFs para a ficha da família
+cairosvg==2.7.1          # Conversão de SVG para PNG (logo nos PDFs)
