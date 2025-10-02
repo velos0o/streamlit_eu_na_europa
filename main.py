@@ -1063,19 +1063,9 @@ try:
     elif current_page == "Prioridades":
         sub = st.session_state.get('prioridades_subpagina', 'reputacao')
         if sub == 'congelado':
-            from views.congelado import carregar_congelados_df, render_congelado_content
-
-            st.markdown("<h1 class='page-title'>Prioridades - Congelado</h1>", unsafe_allow_html=True)
-            with st.spinner("Carregando dados..."):
-                df = carregar_congelados_df()
-            if df.empty:
-                st.info("Nenhum registro congelado encontrado no funil 46.")
-            else:
-                render_congelado_content(df)
+            show_congelado(title="Prioridades - Congelado")
         else:
             show_prioridades()
-    elif current_page == "Prioridades":
-        show_prioridades()
     elif current_page == "Priorizados":
         show_priorizados(st.session_state.get('priorizado_subpagina'))
     elif current_page == "Extrações de Dados":
