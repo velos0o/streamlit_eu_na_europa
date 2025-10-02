@@ -538,6 +538,37 @@ def _renderizar_metricas(df: pd.DataFrame) -> None:
 
         st.markdown("<div style='margin: 8px 0 10px 0;'></div>", unsafe_allow_html=True)
 
+        with st.expander(f"Famílias contabilizadas ({total_resp})", expanded=False):
+            colunas_detalhes = [
+                col
+                for col in [
+                    "Nome da Família",
+                    "ID da Família",
+                    "Etapa Atual",
+                    "Situação Pasta",
+                    "Data Início",
+                    "Data Finalização",
+                ]
+                if col in subset.columns
+            ]
+
+            ordenacao = [col for col in ["Nome da Família", "Etapa Atual", "Data Início"] if col in colunas_detalhes]
+            tabela_familias = subset
+            if colunas_detalhes:
+                tabela_familias = subset[colunas_detalhes]
+            if ordenacao:
+                tabela_familias = tabela_familias.sort_values(ordenacao, kind="stable")
+
+            st.dataframe(
+                ensure_pandas_df(tabela_familias),
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Data Início": st.column_config.DateColumn("Data Início"),
+                    "Data Finalização": st.column_config.DateColumn("Data Finalização"),
+                },
+            )
+
         cards_config = [
             ("Emissão Brasileira", emissao_resp, "rgba(0, 123, 255, 0.2)", "#1c1c1c"),
             ("Análise Documental", analise_resp, "rgba(13, 202, 240, 0.25)", "#1c1c1c"),
