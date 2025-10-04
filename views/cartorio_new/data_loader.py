@@ -27,7 +27,7 @@ def load_data_cached(table_name: str, filters: dict | None = None):
         return pd.DataFrame() # Retorna DF vazio em caso de erro
     return df
 
-# @st.cache_data # Cache será aplicado na chamada de load_data_cached
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Carregando dados dos pipelines...")
 def load_data_all_pipelines():
     """
     Carrega dados de TODOS os pipelines de cartório (categorias 92, 94, 102 e 104)
@@ -37,6 +37,8 @@ def load_data_all_pipelines():
     
     IMPORTANTE: Esta é agora a função PRINCIPAL para carregar dados de cartório.
     A função load_data() foi mantida apenas para compatibilidade com código antigo.
+    
+    OTIMIZAÇÃO: Cache ativado para evitar recarregamento a cada interação.
     """
     table_name = "crm_dynamic_items_1098"
     
@@ -49,7 +51,8 @@ def load_data_all_pipelines():
         "operator": "EQUALS"
     })
     
-    print(f"[INFO] Solicitando dados para {table_name} com filtro ALL PIPELINES: {category_filter}")
+    # Otimização: Logs de debug silenciados para melhorar performance
+    # print(f"[INFO] Solicitando dados para {table_name} com filtro ALL PIPELINES: {category_filter}")
     df_items = load_data_cached(table_name, filters=category_filter)
     
     # Se o DataFrame estiver vazio após filtro na API, retornar
@@ -57,7 +60,9 @@ def load_data_all_pipelines():
         st.warning(f"Nenhum dado encontrado para as categorias 92, 94, 102 ou 104 na tabela {table_name}.")
         return pd.DataFrame()
     
-    print(f"[DEBUG] Total de registros recebidos da API (ALL PIPELINES): {len(df_items)}")
+    # Otimização: Log simplificado
+    if len(df_items) > 0:
+        print(f"✓ {len(df_items)} registros carregados (pipelines: 92, 94, 102, 104)")
     
     # --- Processamento Pós-Carregamento ---
     df_items = df_items.copy()
@@ -81,7 +86,7 @@ def load_data_all_pipelines():
             df_items = df_items[df_items['CATEGORY_ID'].isin(categorias_validas)].copy()
 
     except Exception as e:
-        print(f"[DEBUG] Erro ao processar CATEGORY_ID: {str(e)}")
+        st.error(f"Erro ao processar CATEGORY_ID: {str(e)}")
         return pd.DataFrame()
     
     # Verificar duplicados por ID
@@ -89,7 +94,7 @@ def load_data_all_pipelines():
         duplicados = df_items.duplicated(subset=['ID'])
         n_duplicados = duplicados.sum()
         if n_duplicados > 0:
-            print(f"[DEBUG] Encontrados {n_duplicados} registros duplicados por ID. Removendo...")
+            # Otimização: Removido log verboso
             df_items = df_items.drop_duplicates(subset=['ID'], keep='first')
     
     # Adicionar nome do pipeline/cartório
@@ -108,17 +113,19 @@ def load_data_all_pipelines():
         104: 'PESQUISA BR'
     })
     
-    print(f"[DEBUG] Total final após processamento (ALL PIPELINES): {len(df_items)}")
-    print(f"[DEBUG] Distribuição por pipeline: {df_items['CATEGORY_ID'].value_counts().to_dict()}")
+    # Otimização: Logs simplificados
+    # print(f"[DEBUG] Total final: {len(df_items)} | Distribuição: {df_items['CATEGORY_ID'].value_counts().to_dict()}")
     
     return df_items
 
 # Modificar load_data para usar o cache e filtro na API
-# @st.cache_data # Cache será aplicado na chamada de load_data_cached
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Carregando dados do cartório...")
 def load_data():
     """
     Carrega dados do cartório (categorias 92 e 94 - SPA) com filtro aplicado na API
     e usando a função de carregamento cacheada.
+    
+    OTIMIZAÇÃO: Cache ativado para evitar recarregamento a cada interação.
     """
     table_name = "crm_dynamic_items_1098"  # Alterado para nova tabela SPA
     
@@ -131,16 +138,15 @@ def load_data():
         "operator": "EQUALS"
     })
     
-    print(f"[INFO] Solicitando dados para {table_name} com filtro: {category_filter}")
+    # Otimização: Logs silenciados
     df_items = load_data_cached(table_name, filters=category_filter)
     
     # Se o DataFrame estiver vazio após filtro na API, retornar
     if df_items.empty:
-        st.warning(f"Nenhum dado encontrado para as categorias 92 ou 94 na tabela {table_name}.") # Mensagem atualizada
+        st.warning(f"Nenhum dado encontrado para as categorias 92 ou 94 na tabela {table_name}.")
         return pd.DataFrame()
     
-    print(f"[DEBUG] Colunas recebidas da API para {table_name} (antes do processamento): {df_items.columns.tolist()}") # Log Adicionado
-    print(f"[DEBUG] Total de registros brutos recebidos da API (filtrados): {len(df_items)}")
+    # Otimização: Logs removidos para performance
     
     # --- Processamento Pós-Carregamento (verificações ainda importantes) ---
     # Criar cópia antes de modificar
@@ -183,6 +189,7 @@ def load_data():
     print(f"[DEBUG] Total final após processamento local: {len(df_items)}")
     return df_items
 
+@st.cache_data(ttl=CACHE_TTL)
 def carregar_dados_negocios():
     """
     Carrega os dados dos negócios da categoria 32 e seus campos personalizados,
@@ -227,14 +234,14 @@ def carregar_dados_negocios():
     
     return df_deal, df_deal_uf
 
-#@st.cache_data(ttl=CACHE_TTL) # Cachear também os estágios
+@st.cache_data(ttl=CACHE_TTL)
 def carregar_estagios_bitrix():
     """
     Carrega os estágios dos funis do Bitrix24, usando cache.
     """
     return load_data_cached("crm_status")
 
-#@st.cache_data(ttl=CACHE_TTL) # Cachear crm_deal categoria 0
+@st.cache_data(ttl=CACHE_TTL)
 def carregar_dados_crm_deal_com_uf():
     """
     Carrega dados de CRM_DEAL (cat 0) e CRM_DEAL_UF, usando cache.
@@ -309,10 +316,13 @@ def carregar_dados_crm_deal_com_uf():
     return df_mesclado
 
 # Função para carregar dados do crm_deal com category_id = 46
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Carregando dados de vendas...")
 def carregar_dados_crm_deal_cat46():
     """
     Carrega dados de CRM_DEAL (cat 46) e seus campos personalizados (UF_CRM_1746054586042 - data venda),
     usando a função de carregamento cacheada.
+    
+    OTIMIZAÇÃO: Cache ativado para evitar recarregamento a cada interação.
     
     Returns:
         pandas.DataFrame: DataFrame com dados da categoria 46 com data de venda.
@@ -409,13 +419,16 @@ def carregar_dados_crm_deal_cat46():
     return df_mesclado
 
 # A função principal agora chama load_data(), que usa o cache internamente
-# Não precisa cachear esta função diretamente
+@st.cache_data(ttl=CACHE_TTL, show_spinner="Processando dados do cartório...")
 def carregar_dados_cartorio():
     """
     Carrega os dados dos cartórios (cat 92, 94, 102 e 104) usando cache e filtro na API,
     e faz o merge com os dados de negócio (cat 46) para obter a data de venda (UF_CRM_1746054586042).
     
     ATUALIZADO DEZEMBRO 2024: Agora inclui os novos funis 102 (Paróquia) e 104 (Pesquisa BR)
+    
+    OTIMIZAÇÃO CRÍTICA: Cache ativado nesta função para evitar reprocessamento do merge
+    complexo entre cartório e vendas a cada interação.
 
     Returns:
         pandas.DataFrame: DataFrame com os dados dos cartórios filtrados e enriquecidos com a data de venda.

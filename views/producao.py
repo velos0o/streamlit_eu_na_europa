@@ -72,6 +72,7 @@ def generate_demo_data():
     
     return df
 
+@st.cache_data(ttl=600)  # Cache por 10 minutos
 def analyze_family_ids(df):
     """
     Analisa os IDs de família no DataFrame e retorna o resumo e detalhes
@@ -142,6 +143,7 @@ def analyze_family_ids(df):
     
     return summary, details
 
+@st.cache_data(ttl=900)  # Cache por 15 minutos
 def carregar_dados_categoria_34(date_from=None, date_to=None, debug=False, progress_bar=None, message_container=None):
     """
     Carrega dados da categoria 34 do Bitrix24
@@ -189,6 +191,7 @@ def carregar_dados_categoria_34(date_from=None, date_to=None, debug=False, progr
     
     return df_cat34
 
+@st.cache_data(ttl=600)  # Cache por 10 minutos
 def cruzar_dados_categorias(df_cat32, df_cat34, debug=False):
     """
     Cruza os dados das categorias 32 e 34 pelo campo UF_CRM_1722605592778 (ID Família)

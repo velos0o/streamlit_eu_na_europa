@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from datetime import datetime, date # Adicionar date
 from ..priorizados.priorizados_main import carregar_dados_priorizados
 
@@ -12,6 +13,8 @@ from utils.dataframe_utils import ensure_pandas_df
 KEY_BUSCA_FAMILIA = "busca_familia_acompanhamento"
 KEY_DATA_INICIO = "data_venda_inicio_acompanhamento"
 KEY_DATA_FIM = "data_venda_fim_acompanhamento"
+KEY_DATA_EMISSAO_INICIO = "data_emissao_inicio_acompanhamento"  # Nova constante para filtro de data de emissão
+KEY_DATA_EMISSAO_FIM = "data_emissao_fim_acompanhamento"  # Nova constante para filtro de data de emissão
 KEY_PERCENTUAL = "filtro_percentual_acompanhamento"
 KEY_RESPONSAVEL = "filtro_responsavel_acompanhamento"  # Nova constante para filtro de responsável
 KEY_PROTOCOLIZADO = "filtro_protocolizado_acompanhamento"  # Nova constante para filtro de protocolizado
@@ -68,6 +71,8 @@ def exibir_acompanhamento(df_cartorio):
     coluna_nome_familia = 'UF_CRM_34_NOME_FAMILIA'  # ATUALIZADO para o novo campo SPA
     coluna_id_requerente = 'UF_CRM_34_ID_REQUERENTE' # ATUALIZADO para o novo campo SPA
     coluna_data_venda_familia = 'DATA_VENDA_FAMILIA' # Vem da categoria 46 - UF_CRM_1746054586042
+    coluna_data_emissao = 'UF_CRM_34_DATA_CERTIDAO_EMITIDA' # Data de emissão da certidão
+    coluna_data_entregue = 'UF_CRM_34_DATA_CERTIDAO_ENTREGUE' # Data de entrega da certidão (fallback)
     coluna_responsavel_bitrix = 'ASSIGNED_BY_NAME' # Coluna do responsável original do Bitrix
     colunas_requeridas = ['ID', 'STAGE_ID', coluna_nome_familia, coluna_id_requerente, coluna_data_venda_familia, coluna_responsavel_bitrix]
     colunas_faltantes = [col for col in colunas_requeridas if col not in df_cartorio.columns]
@@ -125,11 +130,50 @@ def exibir_acompanhamento(df_cartorio):
         df[coluna_data_venda_familia] = pd.NaT 
     else:
         df[coluna_data_venda_familia] = pd.to_datetime(df[coluna_data_venda_familia], errors='coerce')
+    
+    # Coluna Data Emissão Certidão - Garantir Datetime
+    if coluna_data_emissao not in df.columns:
+        st.warning(f"Coluna '{coluna_data_emissao}' não encontrada. O filtro por data de emissão não estará disponível.")
+        df[coluna_data_emissao] = pd.NaT
+    else:
+        df[coluna_data_emissao] = pd.to_datetime(df[coluna_data_emissao], errors='coerce')
 
+    # Coluna Data Entregue Certidão - Garantir Datetime
+    if coluna_data_entregue in df.columns:
+        df[coluna_data_entregue] = pd.to_datetime(df[coluna_data_entregue], errors='coerce')
+    else:
+        df[coluna_data_entregue] = pd.NaT
+    
+    # Coluna Final de Data Certidão (Entregue com fallback para Emitida)
+    df['data_certidao_final'] = df[coluna_data_entregue].fillna(df[coluna_data_emissao])
+    
     # 2. Simplificar e Categorizar Estágios
     df['STAGE_ID'] = df['STAGE_ID'].astype(str)
     df['ESTAGIO_LEGIVEL'] = df['STAGE_ID'].apply(simplificar_nome_estagio)
     df['CATEGORIA_ESTAGIO'] = df['ESTAGIO_LEGIVEL'].apply(categorizar_estagio)
+    
+    # 2.1. Identificar certidões que chegaram na etapa "CERTIDÃO EMITIDA"
+    # Procurar por estágios que contenham "CERTIDÃO EMITIDA" ou "CERTIDAO EMITIDA" ou similares
+    df['chegou_certidao_emitida'] = df['ESTAGIO_LEGIVEL'].str.contains(
+        'CERTID[AÃ]O EMITIDA|CERTIDAO EMITIDA|EMITIDA',
+        case=False,
+        na=False,
+        regex=True
+    )
+    
+    # 2.2. Para certidões que chegaram em "CERTIDÃO EMITIDA", capturar a data de chegada nesse estágio
+    # Vamos usar a coluna MOVED_TIME (data de movimentação para o estágio atual)
+    coluna_moved_time = 'MOVED_TIME'
+    if coluna_moved_time in df.columns:
+        df[coluna_moved_time] = pd.to_datetime(df[coluna_moved_time], errors='coerce')
+        # Criar coluna que só tem data se a certidão chegou em "CERTIDÃO EMITIDA"
+        df['data_chegada_emitida'] = df.apply(
+            lambda row: row[coluna_moved_time] if row['chegou_certidao_emitida'] else pd.NaT,
+            axis=1
+        )
+    else:
+        st.warning(f"Coluna '{coluna_moved_time}' não encontrada. A data de finalização da pasta não poderá ser calculada com precisão.")
+        df['data_chegada_emitida'] = pd.NaT
     
     # NOVA LÓGICA: Aplicar regras específicas para os pipelines
     df['CONCLUIDA'] = df.apply(lambda row: calcular_conclusao_por_pipeline(row), axis=1)
@@ -201,6 +245,8 @@ def exibir_acompanhamento(df_cartorio):
         'total_requerentes': (coluna_id_requerente, pd.Series.nunique),
         'concluidas': ('CONCLUIDA', 'sum'),
         'data_venda_familia': (coluna_data_venda_familia, 'first'),
+        'data_certidao_final': ('data_certidao_final', 'max'),  # Usa data entregue com fallback
+        'data_finalizacao_pasta': ('data_chegada_emitida', 'max'),  # Pega a data mais recente que uma certidão chegou em "CERTIDÃO EMITIDA"
         'responsavel': (coluna_responsavel, 'first'),
         'status_familia': ('status_familia', aggregate_status) # Adicionar agregação de status
     }
@@ -223,11 +269,39 @@ def exibir_acompanhamento(df_cartorio):
 
     # Adicionar coluna de certidões faltantes
     df_agrupado['certidoes_faltantes'] = df_agrupado['total_certidoes'] - df_agrupado['concluidas']
-
+    
+    # --- CÁLCULO DE DIAS PARA FINALIZAÇÃO ---
+    # Calcular apenas para famílias 100% concluídas (percentual_conclusao == 100)
+    # Dias = diferença entre data_certidao_final (última certidão final) e data_venda_familia
+    df_agrupado['dias_para_finalizacao'] = None  # Inicializar com None
+    
+    # Condições: família 100% concluída E ambas as datas existem
+    condicao_finalizadas = (
+        (df_agrupado['percentual_conclusao'] == 100) & 
+        (df_agrupado['data_venda_familia'].notna()) & 
+        (df_agrupado['data_certidao_final'].notna())
+    )
+    
+    # Calcular diferença em dias
+    df_agrupado.loc[condicao_finalizadas, 'dias_para_finalizacao'] = (
+        df_agrupado.loc[condicao_finalizadas, 'data_certidao_final'] - 
+        df_agrupado.loc[condicao_finalizadas, 'data_venda_familia']
+    ).dt.days
+    
+    # --- NOVO CÁLCULO: Finalização da Pasta (baseado na última certidão emitida no funil) ---
+    # Garantir que famílias não finalizadas (menos de 100%) não apresentem data de finalização
+    mask_nao_finalizadas = df_agrupado['percentual_conclusao'] < 100
+    df_agrupado.loc[mask_nao_finalizadas, 'data_finalizacao_pasta'] = pd.NaT
+    
     # --- Valores Padrão para Filtros (Necessário para Reset) ---
     df_agrupado_com_data = df_agrupado.dropna(subset=['data_venda_familia'])
     min_date_default = df_agrupado_com_data['data_venda_familia'].min().date() if not df_agrupado_com_data.empty else date.today()
     max_date_default = df_agrupado_com_data['data_venda_familia'].max().date() if not df_agrupado_com_data.empty else date.today()
+    
+    # Valores padrão para filtro de data de emissão (usando coluna final)
+    df_agrupado_com_data_emissao = df_agrupado.dropna(subset=['data_certidao_final'])
+    min_date_emissao_default = df_agrupado_com_data_emissao['data_certidao_final'].min().date() if not df_agrupado_com_data_emissao.empty else date.today()
+    max_date_emissao_default = df_agrupado_com_data_emissao['data_certidao_final'].max().date() if not df_agrupado_com_data_emissao.empty else date.today()
 
     # --- Inicialização e VALIDAÇÃO do Session State (Robusto para Produção) ---
     if KEY_BUSCA_FAMILIA not in st.session_state:
@@ -250,6 +324,22 @@ def exibir_acompanhamento(df_cartorio):
     st.session_state[KEY_DATA_INICIO] = validated_start_date
     st.session_state[KEY_DATA_FIM] = validated_end_date
 
+    # VALIDAÇÃO DAS DATAS DE EMISSÃO: Similar à validação de data de venda
+    start_date_emissao_from_session = st.session_state.get(KEY_DATA_EMISSAO_INICIO, min_date_emissao_default)
+    end_date_emissao_from_session = st.session_state.get(KEY_DATA_EMISSAO_FIM, max_date_emissao_default)
+
+    # "Clampa" os valores da sessão para garantir que estão dentro do novo range válido.
+    validated_start_date_emissao = max(min_date_emissao_default, min(start_date_emissao_from_session, max_date_emissao_default))
+    validated_end_date_emissao = max(min_date_emissao_default, min(end_date_emissao_from_session, max_date_emissao_default))
+    
+    # Garante que a data de início não seja posterior à de fim.
+    if validated_start_date_emissao > validated_end_date_emissao:
+        validated_start_date_emissao = validated_end_date_emissao
+
+    # Atualiza a sessão com os valores validados ANTES de renderizar o widget.
+    st.session_state[KEY_DATA_EMISSAO_INICIO] = validated_start_date_emissao
+    st.session_state[KEY_DATA_EMISSAO_FIM] = validated_end_date_emissao
+
     if KEY_PERCENTUAL not in st.session_state:
         st.session_state[KEY_PERCENTUAL] = []
     if KEY_RESPONSAVEL not in st.session_state:  # Inicialização do state para responsável
@@ -266,6 +356,8 @@ def exibir_acompanhamento(df_cartorio):
         st.session_state[KEY_BUSCA_FAMILIA] = ""
         st.session_state[KEY_DATA_INICIO] = min_date_default
         st.session_state[KEY_DATA_FIM] = max_date_default
+        st.session_state[KEY_DATA_EMISSAO_INICIO] = min_date_emissao_default  # Limpar filtro de data de emissão
+        st.session_state[KEY_DATA_EMISSAO_FIM] = max_date_emissao_default  # Limpar filtro de data de emissão
         st.session_state[KEY_PERCENTUAL] = []
         st.session_state[KEY_RESPONSAVEL] = []  # Limpar filtro de responsável
         st.session_state[KEY_PROTOCOLIZADO] = "Todos"  # Limpar filtro de protocolizado
@@ -274,9 +366,10 @@ def exibir_acompanhamento(df_cartorio):
 
     # --- Filtros --- 
     with st.expander("Filtros", expanded=True): 
-        # Layout: Linha 1 (Família, Data), Linha 2 (Percentual, Responsável, Protocolizado), Linha 3 (Botão Limpar)
+        # Layout: Linha 1 (Família, Data Venda), Linha 1.5 (Data Emissão), Linha 2 (Percentual, Responsável, Protocolizado, Status, Faltantes), Linha 3 (Botão Limpar)
         col_l1_familia, col_l1_data = st.columns([0.5, 0.5])
-        col_l2_perc, col_l2_resp, col_l2_protocolo, col_l2_status, col_l2_faltantes = st.columns([0.25, 0.25, 0.15, 0.15, 0.2])
+        col_l1_5_data_emissao = st.columns([1.0])[0]  # Nova linha para data de emissão
+        col_l2_perc, col_l2_resp, col_l2_protocolo, col_l2_status, col_l2_faltantes = st.columns([0.20, 0.20, 0.15, 0.15, 0.15])
         col_l3_empty, col_l3_btn = st.columns([0.8, 0.2])  # Renomear para l3 (linha 3)
         
         with col_l1_familia:
@@ -314,6 +407,17 @@ def exibir_acompanhamento(df_cartorio):
                 st.date_input("Até:", key=KEY_DATA_FIM, min_value=min_date_default, max_value=max_date_default, label_visibility="collapsed")
             if st.session_state[KEY_DATA_INICIO] > st.session_state[KEY_DATA_FIM]:
                  st.warning("Data 'De' não pode ser maior que a data 'Até'.")
+        
+        # Filtro de Data de Emissão (nova linha)
+        with col_l1_5_data_emissao:
+            st.markdown("**Data de Emissão da Certidão**")
+            date_emissao_col1, date_emissao_col2 = st.columns(2)
+            with date_emissao_col1:
+                st.date_input("De:", key=KEY_DATA_EMISSAO_INICIO, min_value=min_date_emissao_default, max_value=max_date_emissao_default, label_visibility="collapsed")
+            with date_emissao_col2:
+                st.date_input("Até:", key=KEY_DATA_EMISSAO_FIM, min_value=min_date_emissao_default, max_value=max_date_emissao_default, label_visibility="collapsed")
+            if st.session_state[KEY_DATA_EMISSAO_INICIO] > st.session_state[KEY_DATA_EMISSAO_FIM]:
+                st.warning("Data 'De' não pode ser maior que a data 'Até'.")
 
         with col_l2_perc:
             opcoes_percentual = [
@@ -373,7 +477,7 @@ def exibir_acompanhamento(df_cartorio):
                 placeholder="Selecione a(s) faixa(s)",
                 help="Filtra as famílias pelo número de certidões pendentes de conclusão."
             )
-
+        
         with col_l3_btn:
             st.button("Limpar", on_click=clear_filters, help="Limpar todos os filtros")
             
@@ -383,17 +487,25 @@ def exibir_acompanhamento(df_cartorio):
     search_term = st.session_state[KEY_BUSCA_FAMILIA].strip()
     data_inicio_selecionada = st.session_state[KEY_DATA_INICIO]
     data_fim_selecionada = st.session_state[KEY_DATA_FIM]
+    data_emissao_inicio_selecionada = st.session_state[KEY_DATA_EMISSAO_INICIO]  # Ler data de emissão início
+    data_emissao_fim_selecionada = st.session_state[KEY_DATA_EMISSAO_FIM]  # Ler data de emissão fim
     faixas_selecionadas = st.session_state[KEY_PERCENTUAL]
     responsaveis_selecionados = st.session_state[KEY_RESPONSAVEL]  # Ler valores de responsáveis selecionados
     protocolizado_selecionado = st.session_state[KEY_PROTOCOLIZADO]  # Ler valor do filtro de protocolizado
     status_selecionado = st.session_state[KEY_STATUS_FAMILIA]
     faltantes_selecionado = st.session_state[KEY_CERTIDOES_FALTANTES]
-    
-    # Processar datas selecionadas
+
+    # Processar datas selecionadas (Data de Venda)
     data_venda_min, data_venda_max = None, None
     if data_inicio_selecionada and data_fim_selecionada and data_inicio_selecionada <= data_fim_selecionada:
         data_venda_min = pd.to_datetime(data_inicio_selecionada)
         data_venda_max = pd.to_datetime(data_fim_selecionada) + pd.Timedelta(days=1)
+    
+    # Processar datas selecionadas (Data de Emissão)
+    data_emissao_min, data_emissao_max = None, None
+    if data_emissao_inicio_selecionada and data_emissao_fim_selecionada and data_emissao_inicio_selecionada <= data_emissao_fim_selecionada:
+        data_emissao_min = pd.to_datetime(data_emissao_inicio_selecionada)
+        data_emissao_max = pd.to_datetime(data_emissao_fim_selecionada) + pd.Timedelta(days=1)
     
     # --- Aplicação dos Filtros (usando valores lidos do state) ---
     df_filtrado_agrupado = df_agrupado.copy() 
@@ -403,7 +515,7 @@ def exibir_acompanhamento(df_cartorio):
             df_filtrado_agrupado[coluna_nome_familia].str.contains(search_term, case=False, na=False)
         ]
 
-    # Aplicar filtro de data apenas se os valores selecionados forem diferentes dos padrões
+    # Aplicar filtro de data de venda apenas se os valores selecionados forem diferentes dos padrões
     is_date_filter_default = (data_inicio_selecionada == min_date_default) and (data_fim_selecionada == max_date_default)
 
     if not is_date_filter_default and data_venda_min and data_venda_max:
@@ -412,6 +524,17 @@ def exibir_acompanhamento(df_cartorio):
         df_filtrado_agrupado = df_filtrado_agrupado[
             (df_filtrado_agrupado['data_venda_familia'] >= data_venda_min) & 
             (df_filtrado_agrupado['data_venda_familia'] < data_venda_max) 
+        ]
+
+    # Aplicar filtro de data de emissão apenas se os valores selecionados forem diferentes dos padrões
+    is_date_emissao_filter_default = (data_emissao_inicio_selecionada == min_date_emissao_default) and (data_emissao_fim_selecionada == max_date_emissao_default)
+
+    if not is_date_emissao_filter_default and data_emissao_min and data_emissao_max:
+        # Ao ativar o filtro de data de emissão, removemos famílias sem data de emissão definida
+        df_filtrado_agrupado = df_filtrado_agrupado.dropna(subset=['data_certidao_final'])
+        df_filtrado_agrupado = df_filtrado_agrupado[
+            (df_filtrado_agrupado['data_certidao_final'] >= data_emissao_min) & 
+            (df_filtrado_agrupado['data_certidao_final'] < data_emissao_max)
         ]
 
     if faixas_selecionadas:
@@ -457,7 +580,6 @@ def exibir_acompanhamento(df_cartorio):
             # Para 'Adendo' e 'Distrato', o valor é o nome do status em maiúsculas
             df_filtrado_agrupado = df_filtrado_agrupado[df_filtrado_agrupado['status_familia'] == status_selecionado.upper()]
 
-    # Aplicar filtro de certidões faltantes (agora com multiselect)
     if faltantes_selecionado:
         condicoes_faltantes = []
         for selecao in faltantes_selecionado:
@@ -470,12 +592,10 @@ def exibir_acompanhamento(df_cartorio):
                     num_faltantes = int(selecao.split(" ")[1])
                     condicoes_faltantes.append(df_filtrado_agrupado['certidoes_faltantes'] == num_faltantes)
                 except (ValueError, IndexError):
-                    pass # Ignora opção inválida
-        
+                    pass
         if condicoes_faltantes:
             filtro_combinado_faltantes = pd.concat(condicoes_faltantes, axis=1).any(axis=1)
             df_filtrado_agrupado = df_filtrado_agrupado[filtro_combinado_faltantes]
-
 
     # --- Cálculos Macro DIN MICOS (após filtros) ---
     # Obter a lista de famílias que passaram pelos filtros
@@ -588,9 +708,11 @@ def exibir_acompanhamento(df_cartorio):
         'total_requerentes': 'Total Requerentes',
         'concluidas': 'Concluídas',
         'percentual_conclusao': '% Conclusão',
-        'data_venda_familia': 'Data Venda', # Renomear coluna de data
-        'responsavel': 'Responsável', # Renomear coluna de responsável
-        'status_familia': 'Status' # Renomear coluna de status
+        'data_venda_familia': 'Data Venda',
+        'data_certidao_final': 'Data Certidão Final',
+        'data_finalizacao_pasta': 'Data Finalização Pasta',
+        'responsavel': 'Responsável',
+        'status_familia': 'Status'
     })
 
     # Ordenar a tabela final (opcional, pode escolher outra coluna)
@@ -599,7 +721,7 @@ def exibir_acompanhamento(df_cartorio):
     # Verificar se, após todos os filtros, o dataframe está vazio
     if df_tabela.empty:
         # Verificar se algum filtro ESTÁ ativo para mostrar a mensagem
-        filtros_ativos = search_term or not is_date_filter_default or faixas_selecionadas or responsaveis_selecionados or (protocolizado_selecionado != "Todos") or (status_selecionado != "Todos") or faltantes_selecionado # Alterado
+        filtros_ativos = search_term or not is_date_filter_default or not is_date_emissao_filter_default or faixas_selecionadas or responsaveis_selecionados or (protocolizado_selecionado != "Todos") or (status_selecionado != "Todos") or faltantes_selecionado
         if filtros_ativos:
              st.warning("Nenhuma família encontrada com os critérios de filtros aplicados.")
         # else: Não mostrar nada se não há filtros e a tabela está vazia (já avisado no início)
@@ -612,20 +734,18 @@ def exibir_acompanhamento(df_cartorio):
     # Selecionar e reordenar colunas para exibição
     colunas_exibicao = [
         'Nome da Família',
-        'Status', # Adicionada
-        'Data Venda', # Adicionada
+        'Status',
+        'Data Venda',
+        'Data Certidão Final',
+        'Data Finalização Pasta',
         'Total Requerentes',
-        'Responsável', # Adicionada
+        'Responsável',
         'Total Certidões',
         'Concluídas',
         '% Conclusão'
     ]
-    # Remover 'Data Venda' se a coluna não existir no df_tabela final (caso raro de erro no loader)
-    if 'Data Venda' not in df_tabela.columns:
-        colunas_exibicao.remove('Data Venda')
-    # Remover 'Responsável' se a coluna não existir
-    if 'Responsável' not in df_tabela.columns:
-        colunas_exibicao.remove('Responsável')
+
+    colunas_exibicao = [col for col in colunas_exibicao if col in df_tabela.columns]
 
     # Configuração dinâmica das colunas
     column_config_dict = {
@@ -646,25 +766,303 @@ def exibir_acompanhamento(df_cartorio):
         ),
     }
     
-    # Adicionar configuração para responsável se a coluna for exibida
     if 'Responsável' in colunas_exibicao:
-        column_config_dict['Responsável'] = st.column_config.TextColumn(
-            label="Responsável"
-        )
+        column_config_dict['Responsável'] = st.column_config.TextColumn(label="Responsável")
 
-    # Adicionar configuração para data de venda se a coluna for exibida
     if 'Data Venda' in colunas_exibicao:
         column_config_dict['Data Venda'] = st.column_config.DateColumn(
             label="Data Venda",
             format="DD/MM/YYYY"
         )
 
+    if 'Data Certidão Final' in colunas_exibicao:
+        column_config_dict['Data Certidão Final'] = st.column_config.DateColumn(
+            label="Data Certidão Final",
+            format="DD/MM/YYYY",
+            help="Data mais recente de certidão entregue (ou emitida, como fallback)"
+        )
+
+    if 'Data Finalização Pasta' in colunas_exibicao:
+        column_config_dict['Data Finalização Pasta'] = st.column_config.DateColumn(
+            label="Data Finaliz. Pasta",
+            format="DD/MM/YYYY",
+            help="Data em que a última certidão da família chegou na etapa 'CERTIDÃO EMITIDA' no funil brasileiro"
+        )
+
     st.dataframe(
-        df_tabela[colunas_exibicao], # Usar df_tabela com colunas selecionadas
+        df_tabela[colunas_exibicao],
         hide_index=True,
         use_container_width=True,
         column_config=column_config_dict,
-    ) 
+    )
+    
+    # --- GRÁFICO DE DISTRIBUIÇÃO DE DIAS PARA FINALIZAÇÃO ---
+    st.markdown("---")
+    st.markdown("#### 📊 Distribuição de Tempo para Finalização de Pastas")
+    
+    # Filtrar apenas famílias 100% concluídas com dados válidos
+    df_finalizadas = df_tabela[
+        (df_tabela['% Conclusão'] == 100) & 
+        (df_tabela['Dias p/ Finalização'].notna())
+    ].copy()
+    
+    if not df_finalizadas.empty:
+        # Criar faixas de dias para o gráfico
+        def categorizar_dias(dias):
+            if pd.isna(dias):
+                return 'Sem dados'
+            elif dias <= 30:
+                return '0-30 dias'
+            elif dias <= 60:
+                return '31-60 dias'
+            elif dias <= 90:
+                return '61-90 dias'
+            elif dias <= 120:
+                return '91-120 dias'
+            elif dias <= 180:
+                return '121-180 dias'
+            elif dias <= 365:
+                return '181-365 dias'
+            else:
+                return 'Mais de 365 dias'
+        
+        df_finalizadas['faixa_dias'] = df_finalizadas['Dias p/ Finalização'].apply(categorizar_dias)
+        
+        # Contar famílias por faixa
+        contagem_por_faixa = df_finalizadas['faixa_dias'].value_counts().reset_index()
+        contagem_por_faixa.columns = ['Faixa de Dias', 'Quantidade de Famílias']
+        
+        # Definir ordem das faixas
+        ordem_faixas = [
+            '0-30 dias',
+            '31-60 dias',
+            '61-90 dias',
+            '91-120 dias',
+            '121-180 dias',
+            '181-365 dias',
+            'Mais de 365 dias'
+        ]
+        
+        for faixa in ordem_faixas:
+            if faixa not in contagem_por_faixa['Faixa de Dias'].values:
+                contagem_por_faixa = pd.concat([
+                    contagem_por_faixa,
+                    pd.DataFrame({'Faixa de Dias': [faixa], 'Quantidade de Famílias': [0]})
+                ], ignore_index=True)
+        
+        contagem_por_faixa['ordem'] = contagem_por_faixa['Faixa de Dias'].apply(
+            lambda x: ordem_faixas.index(x) if x in ordem_faixas else 999
+        )
+        contagem_por_faixa = contagem_por_faixa.sort_values('ordem').drop('ordem', axis=1)
+        
+        media_dias = df_finalizadas['Dias p/ Finalização'].mean()
+        mediana_dias = df_finalizadas['Dias p/ Finalização'].median()
+        total_finalizadas = len(df_finalizadas)
+        
+        col_m1, col_m2, col_m3 = st.columns(3)
+        with col_m1:
+            st.metric("Total de Famílias Finalizadas", f"{total_finalizadas:,}")
+        with col_m2:
+            st.metric("Tempo Médio de Finalização", f"{media_dias:.0f} dias")
+        with col_m3:
+            st.metric("Tempo Mediano", f"{mediana_dias:.0f} dias")
+        
+        fig = px.bar(
+            contagem_por_faixa,
+            x='Faixa de Dias',
+            y='Quantidade de Famílias',
+            title='Distribuição de Famílias por Tempo de Finalização',
+            labels={'Quantidade de Famílias': 'Nº de Famílias', 'Faixa de Dias': 'Tempo para Finalização'},
+            text='Quantidade de Famílias',
+            color='Quantidade de Famílias',
+            color_continuous_scale='Blues'
+        )
+        
+        fig.update_traces(textposition='outside')
+        fig.update_layout(
+            xaxis_tickangle=-45,
+            height=500,
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        st.caption(
+            "📌 Considera famílias com 100% de conclusão e utiliza o tempo entre a data de venda e a última certidão finalizada."
+        )
+    else:
+        st.info("ℹ️ Não há famílias 100% concluídas com dados válidos para exibir o gráfico de tempo de finalização.")
+
+    # --- SEGUNDO GRÁFICO: DISTRIBUIÇÃO POR DATA DE FINALIZAÇÃO DA PASTA ---
+    st.markdown("---")
+    st.markdown("#### 📊 Distribuição por Data de Finalização da Pasta (Última Certidão em 'CERTIDÃO EMITIDA')")
+    
+    # Filtrar apenas famílias 100% concluídas com dados válidos de finalização da pasta
+    df_finalizadas_pasta = df_tabela[
+        (df_tabela['% Conclusão'] == 100) & 
+        (df_tabela['Dias Finaliz. Pasta'].notna())
+    ].copy()
+    
+    if not df_finalizadas_pasta.empty:
+        # Criar faixas de dias para o gráfico
+        def categorizar_dias_pasta(dias):
+            if pd.isna(dias):
+                return 'Sem dados'
+            elif dias <= 30:
+                return '0-30 dias'
+            elif dias <= 60:
+                return '31-60 dias'
+            elif dias <= 90:
+                return '61-90 dias'
+            elif dias <= 120:
+                return '91-120 dias'
+            elif dias <= 180:
+                return '121-180 dias'
+            elif dias <= 365:
+                return '181-365 dias'
+            else:
+                return 'Mais de 365 dias'
+        
+        df_finalizadas_pasta['faixa_dias_pasta'] = df_finalizadas_pasta['Dias Finaliz. Pasta'].apply(categorizar_dias_pasta)
+        
+        # Contar famílias por faixa
+        contagem_por_faixa_pasta = df_finalizadas_pasta['faixa_dias_pasta'].value_counts().reset_index()
+        contagem_por_faixa_pasta.columns = ['Faixa de Dias', 'Quantidade de Famílias']
+        
+        # Definir ordem das faixas
+        ordem_faixas_pasta = [
+            '0-30 dias',
+            '31-60 dias',
+            '61-90 dias',
+            '91-120 dias',
+            '121-180 dias',
+            '181-365 dias',
+            'Mais de 365 dias'
+        ]
+        
+        # Garantir que todas as faixas existam (mesmo com 0)
+        for faixa in ordem_faixas_pasta:
+            if faixa not in contagem_por_faixa_pasta['Faixa de Dias'].values:
+                contagem_por_faixa_pasta = pd.concat([
+                    contagem_por_faixa_pasta,
+                    pd.DataFrame({'Faixa de Dias': [faixa], 'Quantidade de Famílias': [0]})
+                ], ignore_index=True)
+        
+        # Ordenar conforme ordem desejada
+        contagem_por_faixa_pasta['ordem'] = contagem_por_faixa_pasta['Faixa de Dias'].apply(
+            lambda x: ordem_faixas_pasta.index(x) if x in ordem_faixas_pasta else 999
+        )
+        contagem_por_faixa_pasta = contagem_por_faixa_pasta.sort_values('ordem').drop('ordem', axis=1)
+        
+        # Calcular estatísticas
+        media_dias_pasta = df_finalizadas_pasta['Dias Finaliz. Pasta'].mean()
+        mediana_dias_pasta = df_finalizadas_pasta['Dias Finaliz. Pasta'].median()
+        total_finalizadas_pasta = len(df_finalizadas_pasta)
+        
+        # Exibir métricas resumidas
+        col_mp1, col_mp2, col_mp3 = st.columns(3)
+        with col_mp1:
+            st.metric("Total de Pastas Finalizadas", f"{total_finalizadas_pasta:,}")
+        with col_mp2:
+            st.metric("Tempo Médio até Última Emissão", f"{media_dias_pasta:.0f} dias")
+        with col_mp3:
+            st.metric("Tempo Mediano", f"{mediana_dias_pasta:.0f} dias")
+        
+        # Criar gráfico de barras
+        fig_pasta = px.bar(
+            contagem_por_faixa_pasta,
+            x='Faixa de Dias',
+            y='Quantidade de Famílias',
+            title='Distribuição de Famílias por Tempo até Finalização da Pasta (Última Certidão Emitida)',
+            labels={'Quantidade de Famílias': 'Nº de Famílias', 'Faixa de Dias': 'Tempo até Última Certidão Emitida'},
+            text='Quantidade de Famílias',
+            color='Quantidade de Famílias',
+            color_continuous_scale='Greens'
+        )
+        
+        # Ajustar layout
+        fig_pasta.update_traces(textposition='outside')
+        fig_pasta.update_layout(
+            xaxis_tickangle=-45,
+            showlegend=False,
+            height=500
+        )
+        # fig_pasta.update_traces(hovertemplate='<b>%{x}</b><br>Famílias: %{y}<extra></extra>')  # Removido para evitar incompatibilidade
+
+        st.plotly_chart(fig_pasta, use_container_width=True)
+        
+        # Adicionar informação contextual
+        st.caption(
+            f"📌 **Nota:** Este gráfico considera apenas as **{total_finalizadas_pasta} famílias 100% concluídas** "
+            f"(de um total de {len(df_tabela)} famílias exibidas após filtros). "
+            f"O tempo é calculado entre a **Data de Venda** e a **Data que a Última Certidão chegou na etapa 'CERTIDÃO EMITIDA'** no funil brasileiro."
+        )
+
+    # --- GRÁFICO DE DISTRIBUIÇÃO DE FINALIZAÇÕES POR DATA ---
+    st.markdown("---")
+    st.markdown("#### 📊 Famílias Finalizadas por Data")
+
+    df_finalizadas = df_tabela[
+        (df_tabela['% Conclusão'] == 100) &
+        (df_tabela['Data Finalização Pasta'].notna())
+    ].copy()
+
+    if not df_finalizadas.empty:
+        df_finalizadas['Data Finalização Pasta'] = pd.to_datetime(
+            df_finalizadas['Data Finalização Pasta'], errors='coerce'
+        )
+        df_finalizadas.dropna(subset=['Data Finalização Pasta'], inplace=True)
+
+        if not df_finalizadas.empty:
+            df_finalizadas['data_finalizacao_dia'] = df_finalizadas['Data Finalização Pasta'].dt.date
+
+            contagem_por_dia = (
+                df_finalizadas.groupby('data_finalizacao_dia')['Nome da Família']
+                .nunique()
+                .reset_index()
+                .rename(columns={'Nome da Família': 'Famílias Finalizadas'})
+                .sort_values('data_finalizacao_dia')
+            )
+
+            total_finalizadas = contagem_por_dia['Famílias Finalizadas'].sum()
+            data_inicio = contagem_por_dia['data_finalizacao_dia'].min()
+            data_fim = contagem_por_dia['data_finalizacao_dia'].max()
+
+            col_g1, col_g2, col_g3 = st.columns(3)
+            with col_g1:
+                st.metric("Famílias Finalizadas", f"{total_finalizadas:,}")
+            with col_g2:
+                st.metric("Primeira Data", data_inicio.strftime("%d/%m/%Y"))
+            with col_g3:
+                st.metric("Última Data", data_fim.strftime("%d/%m/%Y"))
+
+            fig = px.bar(
+                contagem_por_dia,
+                x='data_finalizacao_dia',
+                y='Famílias Finalizadas',
+                title='Famílias Finalizadas por Dia',
+                labels={'data_finalizacao_dia': 'Data de Finalização', 'Famílias Finalizadas': 'Quantidade de Famílias'},
+                text='Famílias Finalizadas',
+                color='Famílias Finalizadas',
+                color_continuous_scale='Blues'
+            )
+
+            fig.update_traces(textposition='outside')
+            fig.update_layout(
+                xaxis_tickformat='%d/%m/%Y',
+                height=500,
+                showlegend=False
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+            st.caption(
+                "📌 Considera somente famílias 100% concluídas cuja finalização no funil está registrada como 'CERTIDÃO EMITIDA'."
+            )
+        else:
+            st.info("ℹ️ Nenhuma data de finalização válida disponível para gerar o gráfico.")
+    else:
+        st.info("ℹ️ Não há famílias 100% concluídas com data de finalização registrada para exibir o gráfico.")
 
 def calcular_conclusao_por_pipeline(row):
     """

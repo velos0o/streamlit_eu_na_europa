@@ -14,6 +14,7 @@ sys.path.insert(0, str(utils_path))
 from data_processor import format_status_text
 from utils.dataframe_utils import ensure_pandas_df
 
+# Renderização de tabela (sem cache pois pode ser dinâmica)
 def render_styled_table(df, height=None):
     """
     Renderiza tabela usando recursos nativos do Streamlit com status coloridos
@@ -64,6 +65,7 @@ def render_styled_table(df, height=None):
         }
     )
 
+@st.cache_data(ttl=600)  # Cache por 10 minutos
 def create_responsible_status_table(df):
     """
     Cria tabela de status por responsável
@@ -102,6 +104,7 @@ def create_responsible_status_table(df):
     
     return cross_tab
 
+@st.cache_data(ttl=600)  # Cache por 10 minutos
 def create_pendencias_table(df):
     """
     Cria uma tabela de pendências por responsável, contando todas as ocorrências de 'NÃO', 
@@ -180,6 +183,7 @@ def create_pendencias_table(df):
 
     return result_df
 
+@st.cache_data(ttl=600)  # Cache por 10 minutos
 def create_production_table(df):
     """
     Cria tabela de produção geral, contando todas as ocorrências de 'SIM' em cada campo

@@ -2787,7 +2787,7 @@ def exibir_metricas_macro():
 
 def show_ficha_familia():
     # Imports lazy para evitar importação circular
-    from views.cartorio_new.data_loader import carregar_dados_cartorio
+    from views.cartorio_new.data_loader import carregar_dados_cartorio, load_data_all_pipelines
     
     # REMOVIDO: Configuração do layout da página (já feita em main.py)
     # Comentado para evitar conflito: st.set_page_config() deve ser chamado apenas uma vez

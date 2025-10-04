@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
+# Adicionar cache para melhorar performance
+@st.cache_data
 def format_status_text(value):
     """
     Formata o texto de status para exibição
@@ -28,6 +30,7 @@ def format_status_text(value):
     else:
         return value
 
+@st.cache_data(ttl=600)  # Cache por 10 minutos
 def calculate_status_counts(df):
     """
     Calcula as contagens de status de higienização
@@ -125,6 +128,7 @@ def calculate_status_counts(df):
         'completo_pct': round(completos_pct, 1)
     }
 
+@st.cache_data(ttl=300)  # Cache por 5 minutos
 def filter_dataframe_by_date(df, start_date, end_date, date_column='UF_CRM_1741206763'):
     """
     Filtra DataFrame por intervalo de datas
@@ -151,6 +155,7 @@ def filter_dataframe_by_date(df, start_date, end_date, date_column='UF_CRM_17412
     # Aplicar filtro de data
     return df[(df[date_column] >= start_date) & (df[date_column] <= end_date)]
 
+@st.cache_data
 def get_completion_status(row, higilizacao_fields):
     """
     Determina o status de conclusão com base nos campos de higienização
@@ -176,6 +181,7 @@ def get_completion_status(row, higilizacao_fields):
     else:
         return 'COMPLETO'
 
+@st.cache_data(ttl=600)  # Cache por 10 minutos
 def create_responsible_status_table(df, responsible_column='ASSIGNED_BY_NAME'):
     """
     Cria tabela de status por responsável

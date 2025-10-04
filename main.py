@@ -254,9 +254,14 @@ inicializar_estados_sessao()
 # Sincronizar com a URL DEPOIS da inicialização
 sincronizar_estado_e_url()
 
-# Carregando CSS
-with open('assets/styles.css') as f:
-    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+# Carregando CSS com cache para melhor performance
+@st.cache_data
+def load_css():
+    """Carrega o CSS uma única vez e mantém em cache"""
+    with open('assets/styles.css') as f:
+        return f'<style>{f.read()}</style>'
+
+st.markdown(load_css(), unsafe_allow_html=True)
 
 # CSS para botões e interface
 st.markdown("""
