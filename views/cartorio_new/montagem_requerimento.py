@@ -457,7 +457,7 @@ def exibir_montagem_requerimento(df_cartorio):
     df_montadas = df_concluidas[df_concluidas['DATA_MONTAGEM'].notna()].copy()
 
     if not df_montadas.empty:
-        total_periodo = int(df_montadas['NOME_FAMILIA'].nunique())
+        total_periodo = len(df_montadas)
         st.markdown(
             f"""
             <div style='display:flex; gap:12px; align-items:center; margin-bottom:8px;'>
@@ -533,10 +533,10 @@ def exibir_montagem_requerimento(df_cartorio):
     else:
         ranking_responsaveis = (
             df_concluidas_valid
-            .groupby('RESPONSAVEL_MONTAGEM')['NOME_FAMILIA']
-            .nunique()
-            .reset_index(name='familias_unicas')
-            .sort_values('familias_unicas', ascending=False, kind='stable')
+            .groupby('RESPONSAVEL_MONTAGEM')
+            .size()
+            .reset_index(name='total_montagens')
+            .sort_values('total_montagens', ascending=False, kind='stable')
         )
 
         ranking_responsaveis['posicao'] = range(1, len(ranking_responsaveis) + 1)
@@ -594,15 +594,15 @@ def exibir_montagem_requerimento(df_cartorio):
             palette = ["#2563eb", "#0ea5e9", "#10b981"]
             for idx, row in top_cards.iterrows():
                 cor = palette[min(row['posicao'] - 1, len(palette) - 1)]
-                total_familias = int(row['familias_unicas'])
-                label_familia = "Família Concluída" if total_familias == 1 else "Famílias Concluídas"
+                total_montagens = int(row['total_montagens'])
+                label_montagem = "Montagem Concluída" if total_montagens == 1 else "Montagens Concluídas"
                 card_html = textwrap.dedent(
                     f"""
                     <div class='montagem-ranking-card' style="border-color:{cor}33; background: linear-gradient(135deg, {cor}20, {cor}05);">
                         <div class='montagem-ranking-card__posicao' style="color:{cor};">Top {int(row['posicao'])}</div>
                         <div class='montagem-ranking-card__responsavel'>{row['RESPONSAVEL_MONTAGEM']}</div>
-                        <div class='montagem-ranking-card__valor'>{total_familias:,}</div>
-                        <div class='montagem-ranking-card__label'>{label_familia}</div>
+                        <div class='montagem-ranking-card__valor'>{total_montagens:,}</div>
+                        <div class='montagem-ranking-card__label'>{label_montagem}</div>
                     </div>
                     """
                 )
@@ -615,7 +615,7 @@ def exibir_montagem_requerimento(df_cartorio):
             colunas_cards = [
                 "Posição",
                 "Responsável",
-                "Famílias Concluídas"
+                "Montagens Concluídas"
             ]
             restante = ranking_responsaveis.iloc[3:]
 
@@ -680,7 +680,7 @@ def exibir_montagem_requerimento(df_cartorio):
             restante_cards = ["<div class='montagem-ranking-list'>"]
             for _, row in restante.iterrows():
                 posicao = int(row['posicao'])
-                total_familias = int(row['familias_unicas'])
+                total_montagens = int(row['total_montagens'])
                 restante_html = textwrap.dedent(
                     f"""
                     <div class='montagem-ranking-item'>
@@ -688,10 +688,10 @@ def exibir_montagem_requerimento(df_cartorio):
                             <div class='montagem-ranking-item__badge'>{posicao}</div>
                             <div class='montagem-ranking-item__info'>
                                 <div class='montagem-ranking-item__titulo'>{row['RESPONSAVEL_MONTAGEM']}</div>
-                                <div class='montagem-ranking-item__descricao'>Famílias Concluídas</div>
+                                <div class='montagem-ranking-item__descricao'>Montagens Concluídas</div>
                             </div>
                         </div>
-                        <div class='montagem-ranking-item__valor'>{total_familias:,}</div>
+                        <div class='montagem-ranking-item__valor'>{total_montagens:,}</div>
                     </div>
                     """
                 )
@@ -743,16 +743,16 @@ def exibir_montagem_requerimento(df_cartorio):
 
         resumo_periodo = (
             producao_periodo
-            .groupby('RESPONSAVEL_MONTAGEM')['NOME_FAMILIA']
-            .nunique()
-            .reset_index(name='familias_unicas')
-            .sort_values('familias_unicas', ascending=False, kind='stable')
+            .groupby('RESPONSAVEL_MONTAGEM')
+            .size()
+            .reset_index(name='total_montagens')
+            .sort_values('total_montagens', ascending=False, kind='stable')
         )
 
         if resumo_periodo.empty:
             st.info("Sem montagens concluídas no período selecionado.")
         else:
-            st.caption("Resumo de famílias concluídas por responsável no intervalo selecionado.")
+            st.caption("Resumo de montagens concluídas por responsável no intervalo selecionado.")
             st.markdown(
                 """
                 <style>
@@ -794,13 +794,13 @@ def exibir_montagem_requerimento(df_cartorio):
 
             cards_periodo = ["<div class='montagem-resumo-periodo'>"]
             for _, row in resumo_periodo.iterrows():
-                total_familias = int(row['familias_unicas'])
-                label = "Família no Período" if total_familias == 1 else "Famílias no Período"
+                total_montagens = int(row['total_montagens'])
+                label = "Montagem no Período" if total_montagens == 1 else "Montagens no Período"
                 periodo_html = textwrap.dedent(
                     f"""
                     <div class='montagem-resumo-card'>
                         <div class='montagem-resumo-card__titulo'>{row['RESPONSAVEL_MONTAGEM']}</div>
-                        <div class='montagem-resumo-card__valor'>{total_familias:,}</div>
+                        <div class='montagem-resumo-card__valor'>{total_montagens:,}</div>
                         <div class='montagem-resumo-card__label'>{label}</div>
                     </div>
                     """

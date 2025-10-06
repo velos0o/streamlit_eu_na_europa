@@ -98,6 +98,27 @@ def exibir_acompanhamento(df_cartorio):
     # --- Pré-processamento e Merge para atualizar o responsável --- 
     df = df_cartorio.copy()
 
+    # --- FILTRO: Remover STAGE_IDs específicos da contagem ---
+    # Lista de stage_ids que devem ser excluídos da contagem de certidões
+    stage_ids_excluidos = [
+        'DT1098_92:UC_U10R0R',
+        'DT1098_94:UC_L3JFKO',
+        'DT1098_94:UC_MGTPX0',
+        'DT1098_92:UC_Z24IF7',
+        'DT1098_94:FAIL',
+        'DT1098_92:FAIL'
+    ]
+    
+    # Remover registros com esses stage_ids antes de qualquer processamento
+    if 'STAGE_ID' in df.columns:
+        df_antes_filtro = len(df)
+        df = df[~df['STAGE_ID'].isin(stage_ids_excluidos)]
+        df_depois_filtro = len(df)
+        registros_removidos = df_antes_filtro - df_depois_filtro
+        if registros_removidos > 0:
+            st.info(f"ℹ️ {registros_removidos} registro(s) excluído(s) da contagem (estágios específicos não considerados).")
+    # --- FIM FILTRO ---
+
     if not df_responsavel_atualizado.empty:
         # --- PREPARAR CHAVES PARA O MERGE ---
         # Garantir que ambas as chaves sejam strings e sem espaços extras para um merge robusto
@@ -145,35 +166,13 @@ def exibir_acompanhamento(df_cartorio):
         df[coluna_data_entregue] = pd.NaT
     
     # Coluna Final de Data Certidão (Entregue com fallback para Emitida)
+    # ESTA É A DATA DE FINALIZAÇÃO DA PASTA (última certidão da família)
     df['data_certidao_final'] = df[coluna_data_entregue].fillna(df[coluna_data_emissao])
     
     # 2. Simplificar e Categorizar Estágios
     df['STAGE_ID'] = df['STAGE_ID'].astype(str)
     df['ESTAGIO_LEGIVEL'] = df['STAGE_ID'].apply(simplificar_nome_estagio)
     df['CATEGORIA_ESTAGIO'] = df['ESTAGIO_LEGIVEL'].apply(categorizar_estagio)
-    
-    # 2.1. Identificar certidões que chegaram na etapa "CERTIDÃO EMITIDA"
-    # Procurar por estágios que contenham "CERTIDÃO EMITIDA" ou "CERTIDAO EMITIDA" ou similares
-    df['chegou_certidao_emitida'] = df['ESTAGIO_LEGIVEL'].str.contains(
-        'CERTID[AÃ]O EMITIDA|CERTIDAO EMITIDA|EMITIDA',
-        case=False,
-        na=False,
-        regex=True
-    )
-    
-    # 2.2. Para certidões que chegaram em "CERTIDÃO EMITIDA", capturar a data de chegada nesse estágio
-    # Vamos usar a coluna MOVED_TIME (data de movimentação para o estágio atual)
-    coluna_moved_time = 'MOVED_TIME'
-    if coluna_moved_time in df.columns:
-        df[coluna_moved_time] = pd.to_datetime(df[coluna_moved_time], errors='coerce')
-        # Criar coluna que só tem data se a certidão chegou em "CERTIDÃO EMITIDA"
-        df['data_chegada_emitida'] = df.apply(
-            lambda row: row[coluna_moved_time] if row['chegou_certidao_emitida'] else pd.NaT,
-            axis=1
-        )
-    else:
-        st.warning(f"Coluna '{coluna_moved_time}' não encontrada. A data de finalização da pasta não poderá ser calculada com precisão.")
-        df['data_chegada_emitida'] = pd.NaT
     
     # NOVA LÓGICA: Aplicar regras específicas para os pipelines
     df['CONCLUIDA'] = df.apply(lambda row: calcular_conclusao_por_pipeline(row), axis=1)
@@ -245,8 +244,8 @@ def exibir_acompanhamento(df_cartorio):
         'total_requerentes': (coluna_id_requerente, pd.Series.nunique),
         'concluidas': ('CONCLUIDA', 'sum'),
         'data_venda_familia': (coluna_data_venda_familia, 'first'),
-        'data_certidao_final': ('data_certidao_final', 'max'),  # Usa data entregue com fallback
-        'data_finalizacao_pasta': ('data_chegada_emitida', 'max'),  # Pega a data mais recente que uma certidão chegou em "CERTIDÃO EMITIDA"
+        'data_certidao_final': ('data_certidao_final', 'max'),  # Usa data entregue com fallback para emitida
+        'data_finalizacao_pasta': ('data_certidao_final', 'max'),  # MESMA LÓGICA: última certidão da família (entregue ou emitida)
         'responsavel': (coluna_responsavel, 'first'),
         'status_familia': ('status_familia', aggregate_status) # Adicionar agregação de status
     }
@@ -709,7 +708,6 @@ def exibir_acompanhamento(df_cartorio):
         'concluidas': 'Concluídas',
         'percentual_conclusao': '% Conclusão',
         'data_venda_familia': 'Data Venda',
-        'data_certidao_final': 'Data Certidão Final',
         'data_finalizacao_pasta': 'Data Finalização Pasta',
         'responsavel': 'Responsável',
         'status_familia': 'Status'
@@ -736,7 +734,6 @@ def exibir_acompanhamento(df_cartorio):
         'Nome da Família',
         'Status',
         'Data Venda',
-        'Data Certidão Final',
         'Data Finalização Pasta',
         'Total Requerentes',
         'Responsável',
@@ -775,18 +772,11 @@ def exibir_acompanhamento(df_cartorio):
             format="DD/MM/YYYY"
         )
 
-    if 'Data Certidão Final' in colunas_exibicao:
-        column_config_dict['Data Certidão Final'] = st.column_config.DateColumn(
-            label="Data Certidão Final",
-            format="DD/MM/YYYY",
-            help="Data mais recente de certidão entregue (ou emitida, como fallback)"
-        )
-
     if 'Data Finalização Pasta' in colunas_exibicao:
         column_config_dict['Data Finalização Pasta'] = st.column_config.DateColumn(
             label="Data Finaliz. Pasta",
             format="DD/MM/YYYY",
-            help="Data em que a última certidão da família chegou na etapa 'CERTIDÃO EMITIDA' no funil brasileiro"
+            help="Data da última certidão finalizada da família (UF_CRM_34_DATA_CERTIDAO_ENTREGUE ou UF_CRM_34_DATA_CERTIDAO_EMITIDA)"
         )
 
     st.dataframe(
@@ -796,273 +786,237 @@ def exibir_acompanhamento(df_cartorio):
         column_config=column_config_dict,
     )
     
+    # --- SEÇÃO DE DEBUG: FAMÍLIAS 100% SEM DATA DE FINALIZAÇÃO ---
+    st.markdown("---")
+    with st.expander("🔍 DEBUG: Famílias 100% Concluídas SEM Data de Finalização", expanded=False):
+        # Filtrar famílias 100% concluídas sem data de finalização
+        df_debug = df_tabela[
+            (df_tabela['% Conclusão'] == 100) & 
+            (df_tabela['Data Finalização Pasta'].isna())
+        ].copy()
+        
+        if not df_debug.empty:
+            st.warning(f"⚠️ Encontradas **{len(df_debug)} famílias** com 100% de conclusão mas SEM data de finalização registrada.")
+            
+            # Métricas de debug
+            col_d1, col_d2, col_d3 = st.columns(3)
+            with col_d1:
+                total_certidoes_debug = df_debug['Total Certidões'].sum()
+                st.metric("Total de Certidões Afetadas", f"{total_certidoes_debug:,}")
+            with col_d2:
+                total_requerentes_debug = df_debug['Total Requerentes'].sum()
+                st.metric("Total de Requerentes Afetados", f"{total_requerentes_debug:,}")
+            with col_d3:
+                responsaveis_debug = df_debug['Responsável'].nunique()
+                st.metric("Responsáveis Distintos", f"{responsaveis_debug}")
+            
+            st.markdown("##### Tabela de Famílias Afetadas")
+            st.caption("Estas famílias estão 100% concluídas mas não possuem data nos campos UF_CRM_34_DATA_CERTIDAO_ENTREGUE ou UF_CRM_34_DATA_CERTIDAO_EMITIDA")
+            
+            # Colunas para exibição no debug
+            colunas_debug = [
+                'Nome da Família',
+                'Responsável',
+                'Data Venda',
+                'Total Certidões',
+                'Concluídas',
+                '% Conclusão',
+                'Status'
+            ]
+            colunas_debug = [col for col in colunas_debug if col in df_debug.columns]
+            
+            st.dataframe(
+                df_debug[colunas_debug].sort_values('Total Certidões', ascending=False),
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Nome da Família": st.column_config.TextColumn(label="Nome da Família", width="large"),
+                    "Responsável": st.column_config.TextColumn(label="Responsável"),
+                    "Total Certidões": st.column_config.NumberColumn(label="Certidões", format="%d"),
+                    "Concluídas": st.column_config.NumberColumn(label="Concluídas", format="%d"),
+                    "% Conclusão": st.column_config.ProgressColumn(label="% Conclusão", format="%.1f%%", min_value=0, max_value=100),
+                    "Data Venda": st.column_config.DateColumn(label="Data Venda", format="DD/MM/YYYY"),
+                    "Status": st.column_config.TextColumn(label="Status")
+                }
+            )
+            
+            # Análise detalhada - buscar no dataframe original
+            st.markdown("##### 🔎 Análise Detalhada das Certidões")
+            st.caption("Verificando os campos de data individualmente para cada certidão dessas famílias")
+            
+            # Pegar as famílias problemáticas
+            familias_problematicas = df_debug['Nome da Família'].tolist()
+            
+            # Filtrar no dataframe original (df_filtrado_original)
+            df_certidoes_debug = df_filtrado_original[
+                df_filtrado_original[coluna_nome_familia].isin(familias_problematicas)
+            ].copy()
+            
+            if not df_certidoes_debug.empty:
+                # Preparar informações de cada certidão
+                df_certidoes_analise = df_certidoes_debug[[
+                    'ID',
+                    coluna_nome_familia,
+                    'ESTAGIO_LEGIVEL',
+                    'CATEGORIA_ESTAGIO',
+                    coluna_data_emissao,
+                    coluna_data_entregue,
+                    'CONCLUIDA'
+                ]].copy()
+                
+                df_certidoes_analise = df_certidoes_analise.rename(columns={
+                    'ID': 'ID Certidão',
+                    coluna_nome_familia: 'Família',
+                    'ESTAGIO_LEGIVEL': 'Estágio Atual',
+                    'CATEGORIA_ESTAGIO': 'Categoria',
+                    coluna_data_emissao: 'Data Emitida',
+                    coluna_data_entregue: 'Data Entregue',
+                    'CONCLUIDA': 'Concluída?'
+                })
+                
+                # Converter boolean para texto legível
+                df_certidoes_analise['Concluída?'] = df_certidoes_analise['Concluída?'].apply(lambda x: '✅ Sim' if x == 1 else '❌ Não')
+                
+                st.dataframe(
+                    df_certidoes_analise.sort_values(['Família', 'ID Certidão']),
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={
+                        "ID Certidão": st.column_config.NumberColumn(label="ID", format="%d"),
+                        "Família": st.column_config.TextColumn(label="Família"),
+                        "Estágio Atual": st.column_config.TextColumn(label="Estágio"),
+                        "Categoria": st.column_config.TextColumn(label="Categoria"),
+                        "Data Emitida": st.column_config.DateColumn(label="Data Emitida", format="DD/MM/YYYY"),
+                        "Data Entregue": st.column_config.DateColumn(label="Data Entregue", format="DD/MM/YYYY"),
+                        "Concluída?": st.column_config.TextColumn(label="Status Conclusão")
+                    }
+                )
+                
+                # Análise estatística
+                st.markdown("##### 📈 Estatísticas das Certidões Sem Data")
+                col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+                
+                with col_stat1:
+                    total_cert = len(df_certidoes_analise)
+                    st.metric("Total de Certidões", f"{total_cert:,}")
+                
+                with col_stat2:
+                    sem_data_emitida = df_certidoes_analise['Data Emitida'].isna().sum()
+                    st.metric("Sem Data Emitida", f"{sem_data_emitida:,}")
+                
+                with col_stat3:
+                    sem_data_entregue = df_certidoes_analise['Data Entregue'].isna().sum()
+                    st.metric("Sem Data Entregue", f"{sem_data_entregue:,}")
+                
+                with col_stat4:
+                    sem_ambas = ((df_certidoes_analise['Data Emitida'].isna()) & 
+                                 (df_certidoes_analise['Data Entregue'].isna())).sum()
+                    st.metric("Sem Nenhuma Data", f"{sem_ambas:,}")
+                
+        else:
+            st.success("✅ Todas as famílias 100% concluídas possuem data de finalização registrada!")
+    
     # --- GRÁFICO DE DISTRIBUIÇÃO DE DIAS PARA FINALIZAÇÃO ---
     st.markdown("---")
-    st.markdown("#### 📊 Distribuição de Tempo para Finalização de Pastas")
+    st.markdown("#### Distribuição de Tempo para Finalização de Pastas")
     
     # Filtrar apenas famílias 100% concluídas com dados válidos
     df_finalizadas = df_tabela[
         (df_tabela['% Conclusão'] == 100) & 
-        (df_tabela['Dias p/ Finalização'].notna())
-    ].copy()
-    
-    if not df_finalizadas.empty:
-        # Criar faixas de dias para o gráfico
-        def categorizar_dias(dias):
-            if pd.isna(dias):
-                return 'Sem dados'
-            elif dias <= 30:
-                return '0-30 dias'
-            elif dias <= 60:
-                return '31-60 dias'
-            elif dias <= 90:
-                return '61-90 dias'
-            elif dias <= 120:
-                return '91-120 dias'
-            elif dias <= 180:
-                return '121-180 dias'
-            elif dias <= 365:
-                return '181-365 dias'
-            else:
-                return 'Mais de 365 dias'
-        
-        df_finalizadas['faixa_dias'] = df_finalizadas['Dias p/ Finalização'].apply(categorizar_dias)
-        
-        # Contar famílias por faixa
-        contagem_por_faixa = df_finalizadas['faixa_dias'].value_counts().reset_index()
-        contagem_por_faixa.columns = ['Faixa de Dias', 'Quantidade de Famílias']
-        
-        # Definir ordem das faixas
-        ordem_faixas = [
-            '0-30 dias',
-            '31-60 dias',
-            '61-90 dias',
-            '91-120 dias',
-            '121-180 dias',
-            '181-365 dias',
-            'Mais de 365 dias'
-        ]
-        
-        for faixa in ordem_faixas:
-            if faixa not in contagem_por_faixa['Faixa de Dias'].values:
-                contagem_por_faixa = pd.concat([
-                    contagem_por_faixa,
-                    pd.DataFrame({'Faixa de Dias': [faixa], 'Quantidade de Famílias': [0]})
-                ], ignore_index=True)
-        
-        contagem_por_faixa['ordem'] = contagem_por_faixa['Faixa de Dias'].apply(
-            lambda x: ordem_faixas.index(x) if x in ordem_faixas else 999
-        )
-        contagem_por_faixa = contagem_por_faixa.sort_values('ordem').drop('ordem', axis=1)
-        
-        media_dias = df_finalizadas['Dias p/ Finalização'].mean()
-        mediana_dias = df_finalizadas['Dias p/ Finalização'].median()
-        total_finalizadas = len(df_finalizadas)
-        
-        col_m1, col_m2, col_m3 = st.columns(3)
-        with col_m1:
-            st.metric("Total de Famílias Finalizadas", f"{total_finalizadas:,}")
-        with col_m2:
-            st.metric("Tempo Médio de Finalização", f"{media_dias:.0f} dias")
-        with col_m3:
-            st.metric("Tempo Mediano", f"{mediana_dias:.0f} dias")
-        
-        fig = px.bar(
-            contagem_por_faixa,
-            x='Faixa de Dias',
-            y='Quantidade de Famílias',
-            title='Distribuição de Famílias por Tempo de Finalização',
-            labels={'Quantidade de Famílias': 'Nº de Famílias', 'Faixa de Dias': 'Tempo para Finalização'},
-            text='Quantidade de Famílias',
-            color='Quantidade de Famílias',
-            color_continuous_scale='Blues'
-        )
-        
-        fig.update_traces(textposition='outside')
-        fig.update_layout(
-            xaxis_tickangle=-45,
-            height=500,
-            showlegend=False
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        st.caption(
-            "📌 Considera famílias com 100% de conclusão e utiliza o tempo entre a data de venda e a última certidão finalizada."
-        )
-    else:
-        st.info("ℹ️ Não há famílias 100% concluídas com dados válidos para exibir o gráfico de tempo de finalização.")
-
-    # --- SEGUNDO GRÁFICO: DISTRIBUIÇÃO POR DATA DE FINALIZAÇÃO DA PASTA ---
-    st.markdown("---")
-    st.markdown("#### 📊 Distribuição por Data de Finalização da Pasta (Última Certidão em 'CERTIDÃO EMITIDA')")
-    
-    # Filtrar apenas famílias 100% concluídas com dados válidos de finalização da pasta
-    df_finalizadas_pasta = df_tabela[
-        (df_tabela['% Conclusão'] == 100) & 
-        (df_tabela['Dias Finaliz. Pasta'].notna())
-    ].copy()
-    
-    if not df_finalizadas_pasta.empty:
-        # Criar faixas de dias para o gráfico
-        def categorizar_dias_pasta(dias):
-            if pd.isna(dias):
-                return 'Sem dados'
-            elif dias <= 30:
-                return '0-30 dias'
-            elif dias <= 60:
-                return '31-60 dias'
-            elif dias <= 90:
-                return '61-90 dias'
-            elif dias <= 120:
-                return '91-120 dias'
-            elif dias <= 180:
-                return '121-180 dias'
-            elif dias <= 365:
-                return '181-365 dias'
-            else:
-                return 'Mais de 365 dias'
-        
-        df_finalizadas_pasta['faixa_dias_pasta'] = df_finalizadas_pasta['Dias Finaliz. Pasta'].apply(categorizar_dias_pasta)
-        
-        # Contar famílias por faixa
-        contagem_por_faixa_pasta = df_finalizadas_pasta['faixa_dias_pasta'].value_counts().reset_index()
-        contagem_por_faixa_pasta.columns = ['Faixa de Dias', 'Quantidade de Famílias']
-        
-        # Definir ordem das faixas
-        ordem_faixas_pasta = [
-            '0-30 dias',
-            '31-60 dias',
-            '61-90 dias',
-            '91-120 dias',
-            '121-180 dias',
-            '181-365 dias',
-            'Mais de 365 dias'
-        ]
-        
-        # Garantir que todas as faixas existam (mesmo com 0)
-        for faixa in ordem_faixas_pasta:
-            if faixa not in contagem_por_faixa_pasta['Faixa de Dias'].values:
-                contagem_por_faixa_pasta = pd.concat([
-                    contagem_por_faixa_pasta,
-                    pd.DataFrame({'Faixa de Dias': [faixa], 'Quantidade de Famílias': [0]})
-                ], ignore_index=True)
-        
-        # Ordenar conforme ordem desejada
-        contagem_por_faixa_pasta['ordem'] = contagem_por_faixa_pasta['Faixa de Dias'].apply(
-            lambda x: ordem_faixas_pasta.index(x) if x in ordem_faixas_pasta else 999
-        )
-        contagem_por_faixa_pasta = contagem_por_faixa_pasta.sort_values('ordem').drop('ordem', axis=1)
-        
-        # Calcular estatísticas
-        media_dias_pasta = df_finalizadas_pasta['Dias Finaliz. Pasta'].mean()
-        mediana_dias_pasta = df_finalizadas_pasta['Dias Finaliz. Pasta'].median()
-        total_finalizadas_pasta = len(df_finalizadas_pasta)
-        
-        # Exibir métricas resumidas
-        col_mp1, col_mp2, col_mp3 = st.columns(3)
-        with col_mp1:
-            st.metric("Total de Pastas Finalizadas", f"{total_finalizadas_pasta:,}")
-        with col_mp2:
-            st.metric("Tempo Médio até Última Emissão", f"{media_dias_pasta:.0f} dias")
-        with col_mp3:
-            st.metric("Tempo Mediano", f"{mediana_dias_pasta:.0f} dias")
-        
-        # Criar gráfico de barras
-        fig_pasta = px.bar(
-            contagem_por_faixa_pasta,
-            x='Faixa de Dias',
-            y='Quantidade de Famílias',
-            title='Distribuição de Famílias por Tempo até Finalização da Pasta (Última Certidão Emitida)',
-            labels={'Quantidade de Famílias': 'Nº de Famílias', 'Faixa de Dias': 'Tempo até Última Certidão Emitida'},
-            text='Quantidade de Famílias',
-            color='Quantidade de Famílias',
-            color_continuous_scale='Greens'
-        )
-        
-        # Ajustar layout
-        fig_pasta.update_traces(textposition='outside')
-        fig_pasta.update_layout(
-            xaxis_tickangle=-45,
-            showlegend=False,
-            height=500
-        )
-        # fig_pasta.update_traces(hovertemplate='<b>%{x}</b><br>Famílias: %{y}<extra></extra>')  # Removido para evitar incompatibilidade
-
-        st.plotly_chart(fig_pasta, use_container_width=True)
-        
-        # Adicionar informação contextual
-        st.caption(
-            f"📌 **Nota:** Este gráfico considera apenas as **{total_finalizadas_pasta} famílias 100% concluídas** "
-            f"(de um total de {len(df_tabela)} famílias exibidas após filtros). "
-            f"O tempo é calculado entre a **Data de Venda** e a **Data que a Última Certidão chegou na etapa 'CERTIDÃO EMITIDA'** no funil brasileiro."
-        )
-
-    # --- GRÁFICO DE DISTRIBUIÇÃO DE FINALIZAÇÕES POR DATA ---
-    st.markdown("---")
-    st.markdown("#### 📊 Famílias Finalizadas por Data")
-
-    df_finalizadas = df_tabela[
-        (df_tabela['% Conclusão'] == 100) &
         (df_tabela['Data Finalização Pasta'].notna())
     ].copy()
-
+    
     if not df_finalizadas.empty:
-        df_finalizadas['Data Finalização Pasta'] = pd.to_datetime(
-            df_finalizadas['Data Finalização Pasta'], errors='coerce'
-        )
-        df_finalizadas.dropna(subset=['Data Finalização Pasta'], inplace=True)
-
+        # Converter Data Finalização Pasta para datetime
+        df_finalizadas['Data Finalização Pasta'] = pd.to_datetime(df_finalizadas['Data Finalização Pasta'], errors='coerce')
+        df_finalizadas = df_finalizadas.dropna(subset=['Data Finalização Pasta'])
+        
         if not df_finalizadas.empty:
+            # Criar coluna de data (sem hora) para agrupamento
             df_finalizadas['data_finalizacao_dia'] = df_finalizadas['Data Finalização Pasta'].dt.date
-
-            contagem_por_dia = (
-                df_finalizadas.groupby('data_finalizacao_dia')['Nome da Família']
+            
+            # Contar famílias únicas por data de finalização
+            contagem_por_data = (
+                df_finalizadas
+                .groupby('data_finalizacao_dia')['Nome da Família']
                 .nunique()
                 .reset_index()
-                .rename(columns={'Nome da Família': 'Famílias Finalizadas'})
+                .rename(columns={'Nome da Família': 'Quantidade de Famílias'})
                 .sort_values('data_finalizacao_dia')
             )
-
-            total_finalizadas = contagem_por_dia['Famílias Finalizadas'].sum()
-            data_inicio = contagem_por_dia['data_finalizacao_dia'].min()
-            data_fim = contagem_por_dia['data_finalizacao_dia'].max()
-
-            col_g1, col_g2, col_g3 = st.columns(3)
-            with col_g1:
-                st.metric("Famílias Finalizadas", f"{total_finalizadas:,}")
-            with col_g2:
+            
+            # Calcular estatísticas
+            total_finalizadas = len(df_finalizadas)
+            data_inicio = contagem_por_data['data_finalizacao_dia'].min()
+            data_fim = contagem_por_data['data_finalizacao_dia'].max()
+            media_familias_por_dia = contagem_por_data['Quantidade de Famílias'].mean()
+            
+            # Exibir métricas
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            with col_m1:
+                st.metric("Total de Famílias Finalizadas", f"{total_finalizadas:,}")
+            with col_m2:
                 st.metric("Primeira Data", data_inicio.strftime("%d/%m/%Y"))
-            with col_g3:
+            with col_m3:
                 st.metric("Última Data", data_fim.strftime("%d/%m/%Y"))
-
-            fig = px.bar(
-                contagem_por_dia,
+            with col_m4:
+                st.metric("Média por Dia", f"{media_familias_por_dia:.1f}")
+            
+            # Criar gráfico de linha com pontos
+            fig = px.scatter(
+                contagem_por_data,
                 x='data_finalizacao_dia',
-                y='Famílias Finalizadas',
-                title='Famílias Finalizadas por Dia',
-                labels={'data_finalizacao_dia': 'Data de Finalização', 'Famílias Finalizadas': 'Quantidade de Famílias'},
-                text='Famílias Finalizadas',
-                color='Famílias Finalizadas',
-                color_continuous_scale='Blues'
+                y='Quantidade de Famílias',
+                title='Evolução de Famílias Finalizadas por Data',
+                labels={'data_finalizacao_dia': 'Data de Finalização', 'Quantidade de Famílias': 'Nº de Famílias'},
+                color_discrete_sequence=['#2563eb']
             )
-
-            fig.update_traces(textposition='outside')
+            
+            # Adicionar linha conectando os pontos
+            fig.add_scatter(
+                x=contagem_por_data['data_finalizacao_dia'],
+                y=contagem_por_data['Quantidade de Famílias'],
+                mode='lines',
+                line=dict(color='rgba(37, 99, 235, 0.3)', width=2),
+                showlegend=False,
+                hoverinfo='skip'
+            )
+            
+            # Atualizar o tamanho dos pontos e adicionar hover customizado
+            fig.update_traces(
+                marker=dict(size=10, line=dict(width=2, color='white')),
+                selector=dict(mode='markers'),
+                hovertemplate='<b>Data:</b> %{x|%d/%m/%Y}<br><b>Famílias:</b> %{y}<extra></extra>'
+            )
+            
+            # Ajustar layout
             fig.update_layout(
                 xaxis_tickformat='%d/%m/%Y',
                 height=500,
-                showlegend=False
+                showlegend=False,
+                hovermode='x unified',
+                xaxis=dict(
+                    title='Data de Finalização da Pasta',
+                    showgrid=True,
+                    gridcolor='rgba(200, 200, 200, 0.2)'
+                ),
+                yaxis=dict(
+                    title='Quantidade de Famílias',
+                    showgrid=True,
+                    gridcolor='rgba(200, 200, 200, 0.2)'
+                )
             )
-
+            
             st.plotly_chart(fig, use_container_width=True)
-
+            
             st.caption(
-                "📌 Considera somente famílias 100% concluídas cuja finalização no funil está registrada como 'CERTIDÃO EMITIDA'."
+                "📌 Considera famílias com 100% de conclusão. Data de finalização baseada em UF_CRM_34_DATA_CERTIDAO_ENTREGUE ou UF_CRM_34_DATA_CERTIDAO_EMITIDA (última certidão da família)."
             )
         else:
-            st.info("ℹ️ Nenhuma data de finalização válida disponível para gerar o gráfico.")
+            st.info("ℹ️ Não há datas válidas para exibir o gráfico.")
     else:
-        st.info("ℹ️ Não há famílias 100% concluídas com data de finalização registrada para exibir o gráfico.")
+        st.info("ℹ️ Não há famílias 100% concluídas com dados válidos para exibir o gráfico de tempo de finalização.")
+
 
 def calcular_conclusao_por_pipeline(row):
     """

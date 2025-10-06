@@ -6,6 +6,7 @@ import unicodedata
 from api.bitrix_connector import load_merged_data
 from views.cartorio_new.data_loader import carregar_dados_cartorio
 from utils.dataframe_utils import ensure_pandas_df
+from utils.google_sheets_connector import get_google_sheets_client
 
 
 def carregar_congelados_df() -> pd.DataFrame:
