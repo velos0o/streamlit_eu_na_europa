@@ -106,7 +106,10 @@ def exibir_acompanhamento(df_cartorio):
         'DT1098_94:UC_MGTPX0',
         'DT1098_92:UC_Z24IF7',
         'DT1098_94:FAIL',
-        'DT1098_92:FAIL'
+        'DT1098_92:FAIL',
+        'DT1098_102:FAIL',
+        'DT1098_102:UC_676WIG',
+        'DT1098_102:UC_UHPXE8'
     ]
     
     # Remover registros com esses stage_ids antes de qualquer processamento
